@@ -148,6 +148,25 @@ revision повторно.
 Password/email flows и демонстрационные модули не переносятся, если они не
 нужны Planner.
 
+Для первого runtime slice `S02` health и shutdown переносятся как единый
+нейтральный Core-контракт:
+
+- unprefixed `GET /health/live` не вызывает внешние зависимости и возвращает
+  `200 { "status": "ok" }`, пока HTTP listener процесса доступен, включая
+  startup и drain;
+- `GET /health/startup` возвращает `503 { "status": "starting" }` до первого
+  успешного подключения PostgreSQL, после чего latch необратимо возвращает
+  `200 { "status": "ok" }` также во время drain;
+- `GET /health/ready` возвращает `200` только в lifecycle phase `ready` при
+  доступном PostgreSQL; во время startup, drain или database outage он
+  возвращает `503`, не раскрывая driver details;
+- `SIGTERM` и `SIGINT` идемпотентно начинают drain до закрытия listener,
+  прекращают приём новых соединений, ждут in-flight requests не более
+  `6_000 ms`, затем при необходимости принудительно закрывают transport и
+  завершают database/application cleanup в общем watchdog `10_000 ms`;
+  чистое завершение имеет exit code `0`, превышение bound или ошибка cleanup —
+  exit code `1`.
+
 ### 4.4. Что не выбирается автоматически
 
 - BullMQ и queue Redis;

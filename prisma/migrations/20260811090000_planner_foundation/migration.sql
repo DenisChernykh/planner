@@ -1,0 +1,1 @@
+-- S02 establishes migration ownership without inventing product tables.

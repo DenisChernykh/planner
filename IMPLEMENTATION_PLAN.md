@@ -273,22 +273,33 @@ readiness и bounded shutdown. HTTP contracts и observability добавляю�
 - Create: `Dockerfile`, `docker-compose.yml`
 - Modify: `docs/provenance/starter-core.md`
 - Test: `test/integration/platform/foundation-runtime.integration.spec.ts`
-- Test: `test/e2e/health/foundation-health.e2e-spec.ts`
+- Test: `test/e2e/health/foundation-health.e2e.spec.ts`
 
 **Interfaces:** produces `DatabaseTransactionPort`, health contributors and API
 lifecycle used by every product module. Problem registry появляется в S03.
 
-- [ ] Написать integration test: migrator создаёт schema, runtime role может
-  выполнять DML, но не migrations; API readiness зависит от PostgreSQL.
-- [ ] Доказать RED на пустом skeleton.
-- [ ] Перенести только database/lifecycle/health paths и заменить Starter
+**Locked runtime oracle:** unprefixed `/health/live` — process-only
+`200 { "status": "ok" }`; `/health/startup` — irreversible latch from
+`503 { "status": "starting" }` to `200 { "status": "ok" }` after PostgreSQL
+startup; `/health/ready` — `200` only for ready lifecycle plus available
+PostgreSQL and `503` during startup, drain or database outage. `SIGTERM` and
+`SIGINT` begin drain before listener close, wait at most `6_000 ms` for active
+requests and share a hard `10_000 ms` shutdown watchdog. The migrator remains a
+one-shot `prisma migrate deploy` process; API never applies migrations.
+
+- [x] Написать integration test: migrator создаёт schema, runtime role может
+  выполнять DML над test-owned probe, но не migrations или DDL; production
+  migration не создаёт probe table без runtime consumer. API readiness зависит
+  от PostgreSQL.
+- [x] Доказать RED на пустом skeleton.
+- [x] Перенести только database/lifecycle/health paths и заменить Starter
   product composition минимальным Planner `ApiModule`.
-- [ ] Append provenance: exact source SHA/paths, target paths, API/migrator
+- [x] Append provenance: exact source SHA/paths, target paths, API/migrator
   consumers, database/lifecycle failure model, adaptations and exclusions.
-- [ ] Исключить queue/outbox runtime, queue Redis и demo modules из Compose и
+- [x] Исключить queue/outbox runtime, queue Redis и demo modules из Compose и
   dependencies.
-- [ ] Проверить migration на fresh database, health E2E и graceful shutdown.
-- [ ] Commit: `chore: transfer universal backend runtime`.
+- [x] Проверить migration на fresh database, health E2E и graceful shutdown.
+- [x] Commit: `chore: transfer universal backend runtime`.
 
 ### S03 — HTTP contracts, observability and test clock
 
