@@ -459,21 +459,56 @@ members и pre-provisioned Telegram allowlist; третий участник и 
 
 - Create: `src/modules/workspace/**`
 - Create: `src/bootstrap/provision-pair/**`
+- Create/Modify: auth-owned local User operator provisioning seam under
+  `src/modules/auth/{application,infrastructure,composition}/**` and its public
+  module exports
+- Create/Modify: PostgreSQL-only command projection under
+  `src/platform/config/**`
+- Modify: `package.json` with `provision:pair` (no dependency change)
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811110000_pair_workspace/migration.sql`
+- Test: `test/unit/workspace/pair-provisioning-cli.spec.ts`
 - Test: `test/integration/workspace/pair-provisioning.integration.spec.ts`
+- Modify: `test/integration/platform/foundation-runtime.integration.spec.ts`
+  only to expect the accepted A01 migration/tables.
 
-**Produces:** `WorkspaceMemberResolver` из interface ledger; оба member видят
-весь plan, personal mutation отдельно проверяет owner.
+**Produces:** `WorkspaceMemberResolver` из interface ledger. В A01 оба member
+разрешаются в один `spaceId` без role; read-all plan и personal-owner policy
+проверяются downstream после появления planning/personal mutations.
 
-- [ ] Написать RED constraints tests: duplicate Telegram ID, third membership,
+**Locked A01 contract:** `pnpm provision:pair` — PostgreSQL-only operator
+command без HTTP/Redis/OIDC. Он читает из `stdin` один JSON до `16_384` bytes с
+exact shape `{ members: [{ userId, telegramId }, { userId, telegramId }] }`.
+`userId` — distinct lowercase canonical UUID; `telegramId` — distinct canonical
+positive signed-`BIGINT` decimal string and never JSON number. Input order does
+not matter; the `userId → telegramId` mapping does.
+
+Inside one transaction-scoped PostgreSQL advisory lock the auth-owned seam
+creates only missing explicit Users, then workspace creates one generated Space,
+two generated Membership and two allowlist rows. Existing matching Users are
+preserved. Same/reversed mapping returns the original IDs without writes;
+changed mapping or partial state throws `PairProvisioningConflictError`;
+concurrent equal/different runs cannot produce a mixed pair. Error/crash rolls
+back Users and workspace rows together.
+
+DB constraints enforce one singleton Space, membership technical slots `1|2`,
+unique `(space_id, slot)`, `(space_id, user_id)` and `user_id`, unique BIGINT
+Telegram ID and allowlist `user_id` referencing a member. Slot grants no rights
+and carries no persona. CLI output contains only `status`, `spaceId`,
+`memberId/userId`; raw Telegram IDs never reach stdout/stderr/logs. Exit codes
+are `0` created/existing, `2` invalid input, `3` conflict and `1` dependency or
+unexpected failure. Unknown resolver lookup throws safe
+`WorkspaceMemberNotFoundError`; database failure is distinct
+`WorkspaceDependencyUnavailableError`; neither path writes.
+
+- [x] Написать RED constraints tests: duplicate Telegram ID, third membership,
   unknown ID и повтор provisioning с другим payload.
-- [ ] Реализовать `space`, `membership`, `telegram_access_allowlist` и
+- [x] Реализовать `space`, `membership`, `telegram_access_allowlist` и
   idempotent operator provisioning command.
-- [ ] Проверить numeric Telegram ID как PostgreSQL `BIGINT`, TypeScript `bigint`
+- [x] Проверить numeric Telegram ID как PostgreSQL `BIGINT`, TypeScript `bigint`
   и decimal string на CLI/JSON boundary.
-- [ ] Запустить fresh/upgrade migration integration и `pnpm check:quick`.
-- [ ] Commit: `feat: add closed pair workspace`.
+- [x] Запустить fresh/upgrade migration integration и `pnpm check:quick`.
+- [x] Commit: `feat: add closed pair workspace`.
 
 ### A02 — Telegram OIDC ceremony start
 

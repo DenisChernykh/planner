@@ -14,6 +14,43 @@ model User {
   id        String   @id @default(uuid()) @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  membership Membership?
 
   @@map("users")
+}
+
+model Space {
+  id           String       @id @default(uuid()) @db.Uuid
+  singletonKey Int          @unique @default(1) @map("singleton_key") @db.SmallInt
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  memberships  Membership[]
+
+  @@map("spaces")
+}
+
+model Membership {
+  id        String   @id @default(uuid()) @db.Uuid
+  spaceId   String   @map("space_id") @db.Uuid
+  userId    String   @unique @map("user_id") @db.Uuid
+  slot      Int      @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  space     Space                    @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  allowlist TelegramAccessAllowlist?
+
+  @@unique([spaceId, slot])
+  @@unique([spaceId, userId])
+  @@map("memberships")
+}
+
+model TelegramAccessAllowlist {
+  userId     String @unique @map("user_id") @db.Uuid
+  spaceId    String @map("space_id") @db.Uuid
+  telegramId BigInt @unique @map("telegram_id") @db.BigInt
+
+  membership Membership @relation(fields: [spaceId, userId], references: [spaceId, userId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([spaceId, userId])
+  @@map("telegram_access_allowlist")
 }

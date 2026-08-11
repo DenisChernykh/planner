@@ -66,7 +66,7 @@ describe('Planner foundation database runtime', () => {
     await container?.stop()
   })
 
-  it('deploys foundation and local-User migrations without inventing extra tables', async () => {
+  it('deploys accepted foundation, local-User and pair-workspace migrations', async () => {
     const migration = deployMigrations(container.getConnectionUri())
 
     expect(migration).toMatchObject({ exitCode: 0 })
@@ -76,6 +76,7 @@ describe('Planner foundation database runtime', () => {
     expect(migrations.rows).toEqual([
       { migration_name: '20260811090000_planner_foundation' },
       { migration_name: '20260811100000_local_user_session' },
+      { migration_name: '20260811110000_pair_workspace' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name
@@ -84,7 +85,12 @@ describe('Planner foundation database runtime', () => {
           AND table_name <> '_prisma_migrations'
         ORDER BY table_name`,
     )
-    expect(productionTables.rows).toEqual([{ table_name: 'users' }])
+    expect(productionTables.rows).toEqual([
+      { table_name: 'memberships' },
+      { table_name: 'spaces' },
+      { table_name: 'telegram_access_allowlist' },
+      { table_name: 'users' },
+    ])
   })
 
   it('allows runtime DML on a test-owned probe while denying DDL and migration access', async () => {

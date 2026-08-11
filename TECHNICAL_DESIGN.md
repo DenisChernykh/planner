@@ -339,6 +339,66 @@ startup failure очищает успешно поднятого sibling, а shu
 dependencies внутри общего S02 watchdog. Redis instrumentation остаётся
 выключенным. Queue Redis, cache/pub-sub abstraction и `KEYS` запрещены.
 
+### 6.6. A01 operator provisioning и pair workspace
+
+A01 создаёт pair identity только одноразовой PostgreSQL-only operator-командой
+`pnpm provision:pair`. HTTP endpoint, public/JIT signup, Redis и OIDC в этом
+процессе отсутствуют. Команда читает из `stdin` один JSON document не больше
+`16_384` bytes и принимает только объект следующей формы:
+
+```json
+{
+  "members": [
+    { "userId": "lowercase-canonical-uuid", "telegramId": "9007199254740993" },
+    { "userId": "lowercase-canonical-uuid", "telegramId": "9007199254740995" }
+  ]
+}
+```
+
+Объект и каждый member имеют exact keys. `members` содержит ровно две записи с
+разными `userId` и Telegram ID. Telegram ID существует только как canonical
+positive signed-`BIGINT` decimal string: без leading zero, знака, exponent или
+JSON number; application/Prisma получают `bigint`. Порядок двух записей не
+значим, но mapping `userId → telegramId` значим.
+
+Команда использует отдельную validated database-only config projection и не
+требует Redis/session/API variables. В одной PostgreSQL transaction под
+фиксированным transaction-scoped advisory lock она через auth-owned operator
+seam создаёт отсутствующих local User, затем один Space, два Membership и две
+allowlist-записи. Уже существующий User с тем же explicit UUID сохраняется без
+изменений. Space и Member UUID генерируются только при первом успешном запуске.
+Crash или constraint failure откатывает все записи.
+
+Exact same mapping, включая reversed input order и новый process, возвращает
+прежние Space/Member UUID без writes. Любое изменение user set, Telegram set
+или их pairing, а также partial/inconsistent workspace state возвращает typed
+`PairProvisioningConflictError`; provisioning не является repair/update
+процедурой. Concurrent equal commands дают один create и replay с тем же
+result, concurrent different commands — один complete winner и один conflict,
+без mixed pair.
+
+`spaces` имеет DB-enforced singleton constant. `memberships` использует только
+technical slots `1|2` с `CHECK` и unique `(space_id, slot)`, unique
+`(space_id, user_id)` и unique `user_id`; slot не задаёт persona, owner, role
+или права. `telegram_access_allowlist.telegram_id` — PostgreSQL `BIGINT` unique,
+`user_id` unique и ссылается на membership того же User. Поэтому второй Space,
+третий Membership и allowlist для User вне пары не коммитятся. «Закрытое» не
+является status-колонкой: оно означает отсутствие публичного provisioning.
+
+CLI возвращает только canonical JSON `{ status, spaceId, members: [{ memberId,
+userId }] }`, отсортированный по `userId`, и никогда не печатает Telegram ID.
+Exit codes: `0` для `created/existing`, `2` для invalid input, `3` для state
+conflict и `1` для dependency/unexpected failure; stderr содержит только finite
+safe message.
+
+`WorkspaceMemberResolver` реализует ledger contract и возвращает ровно
+`{ spaceId, memberId, userId }`. Unknown User/Telegram ID даёт safe typed
+`WorkspaceMemberNotFoundError` без writes, database failure — отдельный
+`WorkspaceDependencyUnavailableError`. A01 доказывает общий `spaceId` и
+отсутствие role; read-all plan и сравнение trusted `memberId` с будущим
+`owner_member_id` проверяются в первых planning/personal-mutation slices, а не
+симулируются до появления этих моделей.
+
 ## 7. Концептуальная модель хранения
 
 Названия таблиц являются целевыми концептами; окончательные Prisma names

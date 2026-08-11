@@ -23,6 +23,7 @@
     "openapi:lint": "redocly lint docs/api/openapi.json",
     "prisma:generate": "prisma generate --config prisma.config.ts",
     "prisma:validate": "prisma validate --config prisma.config.ts",
+    "provision:pair": "tsx src/bootstrap/provision-pair/main.ts",
     "start:api": "node dist/bootstrap/api/main.js",
     "start:migrate": "prisma migrate deploy --config prisma.config.ts",
     "test": "pnpm run test:run",
