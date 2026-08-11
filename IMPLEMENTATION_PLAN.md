@@ -378,29 +378,70 @@ password/email vertical.
 
 - Create: `src/modules/auth/application/**`
 - Create: `src/modules/auth/domain/**`
-- Create: `src/modules/auth/infrastructure/redis-session.store.ts`
+- Create: `src/modules/auth/infrastructure/**`
 - Create: `src/modules/auth/presentation/**`
-- Create: `src/modules/auth/composition/auth.module.ts`
+- Create: `src/modules/auth/composition/**`
+- Create: `src/modules/auth/index.ts`
+- Create: `src/platform/redis/**`
+- Modify: `src/platform/config/runtime-*.ts`
+- Modify: `src/bootstrap/api/api.module.ts`
+- Modify: `src/bootstrap/api/configure-api.ts`
+- Modify: `src/bootstrap/api/api-runtime.ts`
+- Modify: `src/bootstrap/api/graceful-shutdown.ts`
+- Modify: `src/bootstrap/contracts/openapi-runtime-config.ts`
+- Modify: `src/platform/http/health/**`
+- Modify: `src/platform/http/docs/**`
+- Modify: `docs/api/openapi.json`
+- Modify: `docker-compose.yml`
 - Modify: `docs/provenance/starter-core.md`
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811100000_local_user_session/migration.sql`
+- Test: `test/unit/auth/session-foundation.spec.ts`
 - Test: `test/integration/auth/opaque-session.integration.spec.ts`
-- Test: `test/e2e/auth/protected-session.e2e-spec.ts`
+- Test: `test/e2e/auth/protected-session.e2e.spec.ts`
+- Modify: `test/integration/platform/foundation-runtime.integration.spec.ts`
+  only to expect the accepted S04 migration and minimal `users` table.
+- Create/Modify: `test/**/support/**` and the S02 health E2E only where needed
+  for the required auth Redis runtime.
 
 **Produces:** `AuthenticatedPrincipal { userId: UserId; sessionId: string }`,
 authentication guard and session issuer/revoker. Password, email, public signup
 and approval-request code are absent.
 
-- [ ] Написать RED tests для session issue/authenticate/revoke, CSRF/Origin и
+`User` contains only UUID plus created/updated timestamps. The internal issuer
+has A03 as its first production consumer, verifies an existing pre-provisioned
+User and never creates/upserts one; S04 exposes no HTTP endpoint accepting a
+`userId`. Each issue creates an independent session. Production routes are
+`GET /auth/me`, `GET /auth/csrf` and `POST /auth/logout`.
+
+Raw tokens are 32 random bytes/canonical base64url, public session IDs are 16
+independent random bytes and Redis stores only an HMAC digest. Session TTLs are
+7-day idle/30-day absolute with 5-minute touch throttling. Cookie policy is
+`planner-session` outside production and `__Host-planner-session` in production,
+`HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain`, and production `Secure`.
+Unsafe methods require JSON, an exact configured Origin/Referer origin and a
+constant-time session-bound CSRF token.
+
+Auth adds module-owned `AUTHENTICATION_REQUIRED` 401 and
+`AUTHORIZATION_DENIED` 403 without changing the S03 core catalog. Unknown,
+malformed, expired, revoked or missing-User sessions return the former; bad
+Origin/CSRF returns the latter; dependency failures reuse
+`DEPENDENCY_UNAVAILABLE` 503. Auth Redis is a required startup/readiness
+dependency with `2_000/2_000/2_500/1_000 ms` connect/command/health/shutdown
+bounds. Redis loss makes readiness and session operations fail closed while
+liveness/startup stay available after the startup latch; PostgreSQL is never
+mutated by session failure. Queue Redis and Redis instrumentation stay absent.
+
+- [x] Написать RED tests для session issue/authenticate/revoke, CSRF/Origin и
   Redis unavailable.
-- [ ] Перенести minimal User/session subset и адаптировать composition без
+- [x] Перенести minimal User/session subset и адаптировать composition без
   password/email dependencies.
-- [ ] Append exact source/target paths, session consumer, Redis-loss/security
+- [x] Append exact source/target paths, session consumer, Redis-loss/security
   failure model, adaptations and exclusions to provenance.
-- [ ] Проверить, что unknown/revoked session возвращает RFC 9457 response и не
+- [x] Проверить, что unknown/revoked session возвращает RFC 9457 response и не
   создаёт User.
-- [ ] Запустить auth integration, HTTP E2E и `pnpm check:quick`.
-- [ ] Commit: `feat: add local user session foundation`.
+- [x] Запустить auth integration, HTTP E2E и `pnpm check:quick`.
+- [x] Commit: `feat: add local user session foundation`.
 
 ---
 

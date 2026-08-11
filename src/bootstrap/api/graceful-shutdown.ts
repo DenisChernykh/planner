@@ -48,9 +48,13 @@ export class GracefulShutdownCoordinator {
       resources.shutdownGraceMs - resources.httpDrainTimeoutMs,
     )
     const cleanupSignal = this.deadlineSignal(cleanupBudget)
-    await resources.database.close(cleanupSignal).catch(() => {
+    const dependencyCleanup = await Promise.allSettled([
+      resources.database.close(cleanupSignal),
+      resources.redis.close(cleanupSignal),
+    ])
+    if (dependencyCleanup.some((result) => result.status === 'rejected')) {
       failed = true
-    })
+    }
     await this.observability?.close(cleanupSignal).catch(() => undefined)
     await resources.application.close().catch(() => {
       failed = true

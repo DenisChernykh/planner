@@ -13,6 +13,17 @@ export const runtimeDefaults = Object.freeze({
     transactionMaxWaitMs: 2_000,
     transactionTimeoutMs: 5_000,
   }),
+  redis: Object.freeze({
+    connectTimeoutMs: 2_000,
+    commandTimeoutMs: 2_000,
+    healthTimeoutMs: 2_500,
+    shutdownTimeoutMs: 1_000,
+  }),
+  auth: Object.freeze({
+    idleTimeoutMs: 604_800_000,
+    absoluteTimeoutMs: 2_592_000_000,
+    touchIntervalMs: 300_000,
+  }),
   observability: Object.freeze({
     exporterTimeoutMs: 1_000,
     batchSpanScheduleDelayMs: 5_000,

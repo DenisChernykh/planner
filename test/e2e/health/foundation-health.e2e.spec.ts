@@ -7,6 +7,7 @@ import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql'
+import type { StartedRedisContainer } from '@testcontainers/redis'
 import { Pool } from 'pg'
 
 import { ApiRuntime } from '@/bootstrap/api/api-runtime'
@@ -17,10 +18,13 @@ import {
 } from '@/bootstrap/api/process-signals'
 import { ActiveRequestTracker } from '@/platform/http/bootstrap/active-request-tracker'
 import { ApplicationLifecycleState } from '@/platform/lifecycle/application-lifecycle.state'
+import { startRedisContainer } from '@test/integration/support/redis-container'
 
 const execFileAsync = promisify(execFile)
 const POSTGRES_IMAGE =
   'postgres:18.4-trixie@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a'
+const sessionKeySecret = Buffer.alloc(32, 41).toString('base64url')
+const csrfSecret = Buffer.alloc(32, 42).toString('base64url')
 
 class TestSignalSource implements ProcessSignalSource {
   private readonly listeners = new Map<NodeJS.Signals, Set<() => void>>()
@@ -98,16 +102,20 @@ async function resumePostgres(
 
 describe('Planner foundation API health and shutdown', () => {
   let container: StartedPostgreSqlContainer
+  let redis: StartedRedisContainer
   let runtime: ApiRuntime | undefined
   let baseUrl: string
   let suspended = false
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer(POSTGRES_IMAGE)
-      .withDatabase('planner_health_test')
-      .withUsername('planner_runtime')
-      .withPassword('runtime-password-for-test-only')
-      .start()
+    ;[container, redis] = await Promise.all([
+      new PostgreSqlContainer(POSTGRES_IMAGE)
+        .withDatabase('planner_health_test')
+        .withUsername('planner_runtime')
+        .withPassword('runtime-password-for-test-only')
+        .start(),
+      startRedisContainer(),
+    ])
     const port = await reservePort()
     baseUrl = `http://127.0.0.1:${port}`
     Object.assign(process.env, {
@@ -115,14 +123,29 @@ describe('Planner foundation API health and shutdown', () => {
       API_HOST: '127.0.0.1',
       API_PORT: String(port),
       DATABASE_URL: container.getConnectionUri(),
+      REDIS_AUTH_URL: redis.getConnectionUrl(),
+      REDIS_KEY_PREFIX: 'planner',
+      AUTH_SESSION_KEY_SECRET: sessionKeySecret,
+      AUTH_CSRF_SECRET: csrfSecret,
+      AUTH_CSRF_ORIGINS: baseUrl,
     })
   })
 
   afterAll(async () => {
     if (suspended) await resumePostgres(container)
     await runtime?.stop()
-    await container?.stop()
-    for (const key of ['NODE_ENV', 'API_HOST', 'API_PORT', 'DATABASE_URL']) {
+    await Promise.all([container?.stop(), redis?.stop()])
+    for (const key of [
+      'NODE_ENV',
+      'API_HOST',
+      'API_PORT',
+      'DATABASE_URL',
+      'REDIS_AUTH_URL',
+      'REDIS_KEY_PREFIX',
+      'AUTH_SESSION_KEY_SECRET',
+      'AUTH_CSRF_SECRET',
+      'AUTH_CSRF_ORIGINS',
+    ]) {
       delete process.env[key]
     }
   })
@@ -332,6 +355,10 @@ describe('Planner foundation API health and shutdown', () => {
         httpDrainTimeoutMs: 6_000,
         shutdownGraceMs: 10_000,
         database: {
+          connect: () => Promise.resolve(),
+          close: () => Promise.resolve(),
+        },
+        redis: {
           connect: () => Promise.resolve(),
           close: () => Promise.resolve(),
         },

@@ -49,7 +49,10 @@ export class ApiRuntime {
       this.ensureStartupAllowed()
       await this.resources.application.listen()
       this.ensureStartupAllowed()
-      await this.resources.database.connect(this.startupController.signal)
+      await this.startDependencies(
+        this.resources,
+        this.startupController.signal,
+      )
       this.ensureStartupAllowed()
       this.resources.lifecycle.markReady()
       return this.resources.application.address()
@@ -58,6 +61,21 @@ export class ApiRuntime {
       await this.cleanupPartialResources()
       throw new Error('API startup failed', { cause: error })
     }
+  }
+
+  private async startDependencies(
+    resources: ApiRuntimeResources,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const results = await Promise.allSettled([
+      Promise.resolve().then(() => resources.database.connect(signal)),
+      Promise.resolve().then(() => resources.redis.connect(signal)),
+    ])
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    )
+    if (failure === undefined) return
+    throw failure.reason
   }
 
   private ensureStartupAllowed(): void {
@@ -75,7 +93,10 @@ export class ApiRuntime {
     if (resources === undefined) return
     this.cleanupPromise ??= (async () => {
       const signal = AbortSignal.timeout(resources.shutdownGraceMs)
-      await resources.database.close(signal).catch(() => undefined)
+      await Promise.allSettled([
+        resources.database.close(signal),
+        resources.redis.close(signal),
+      ])
       await resources.application.close().catch(() => undefined)
     })()
     await this.cleanupPromise

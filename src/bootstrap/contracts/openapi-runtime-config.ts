@@ -2,6 +2,8 @@ import { buildApiRuntimeConfig } from '@/platform/config/runtime-environment'
 import type { ApplicationRuntimeConfig } from '@/platform/config/runtime-config.types'
 
 export function createOpenApiRuntimeConfig(): ApplicationRuntimeConfig {
+  const sessionSecret = Buffer.alloc(32, 31).toString('base64url')
+  const csrfSecret = Buffer.alloc(32, 32).toString('base64url')
   return buildApiRuntimeConfig({
     NODE_ENV: 'production',
     API_HOST: '127.0.0.1',
@@ -9,5 +11,10 @@ export function createOpenApiRuntimeConfig(): ApplicationRuntimeConfig {
     DATABASE_URL:
       'postgresql://contract:contract@127.0.0.1:1/contract?schema=public',
     DATABASE_POOL_MAX: 1,
+    REDIS_AUTH_URL: 'redis://default:contract@127.0.0.1:1',
+    REDIS_KEY_PREFIX: 'planner',
+    AUTH_SESSION_KEY_SECRET: sessionSecret,
+    AUTH_CSRF_SECRET: csrfSecret,
+    AUTH_CSRF_ORIGINS: 'https://planner.invalid',
   })
 }

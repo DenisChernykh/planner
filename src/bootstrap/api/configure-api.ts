@@ -16,6 +16,8 @@ import {
   type StructuredLogger,
 } from '@/platform/logging/logging.contracts'
 import { ApplicationLifecycleState } from '@/platform/lifecycle/application-lifecycle.state'
+import type { RedisLifecyclePort } from '@/platform/redis/redis-lifecycle'
+import { REDIS_LIFECYCLE } from '@/platform/redis/redis.tokens'
 
 import { ApiModule } from './api.module'
 
@@ -31,6 +33,7 @@ export interface ApiApplicationHandle {
 export interface ApiRuntimeResources {
   readonly application: ApiApplicationHandle
   readonly database: DatabaseLifecycle
+  readonly redis: RedisLifecyclePort
   readonly lifecycle: ApplicationLifecycleState
   readonly requestTracker: ActiveRequestTracker
   readonly httpDrainTimeoutMs: number
@@ -47,6 +50,7 @@ export async function configureApi(
   const config = app.get(RuntimeConfigService)
   const lifecycle = app.get(ApplicationLifecycleState)
   const database = app.get<DatabaseLifecycle>(DATABASE_LIFECYCLE)
+  const redis = app.get<RedisLifecyclePort>(REDIS_LIFECYCLE)
   const requestTracker = app.get(ActiveRequestTracker)
   configureHttpApplication(
     app,
@@ -60,6 +64,7 @@ export async function configureApi(
 
   return {
     database,
+    redis,
     lifecycle,
     requestTracker,
     httpDrainTimeoutMs: config.http.drainTimeoutMs,

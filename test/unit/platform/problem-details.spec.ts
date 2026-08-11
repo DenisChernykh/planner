@@ -40,11 +40,32 @@ import { SanitizingSpanExporter } from '@/platform/observability/sanitizing-span
 import { SystemProductClock } from '@/platform/time/system-product-clock'
 import { FakeProductClock } from '@/platform/time/fake-product-clock'
 
+interface Deferred<T> {
+  readonly promise: Promise<T>
+  readonly resolve: (value: T | PromiseLike<T>) => void
+  readonly reject: (reason?: unknown) => void
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: Deferred<T>['resolve']
+  let reject!: Deferred<T>['reject']
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 describe('S03 HTTP problem contracts', () => {
   const requiredEnvironment = {
     API_HOST: '127.0.0.1',
     API_PORT: 3000,
     DATABASE_URL: 'postgresql://contract:contract@127.0.0.1:1/contract',
+    REDIS_AUTH_URL: 'redis://default:contract@127.0.0.1:1',
+    REDIS_KEY_PREFIX: 'planner',
+    AUTH_SESSION_KEY_SECRET: Buffer.alloc(32, 61).toString('base64url'),
+    AUTH_CSRF_SECRET: Buffer.alloc(32, 62).toString('base64url'),
+    AUTH_CSRF_ORIGINS: 'https://planner.invalid',
   } as const
 
   it('marks the production health controller as explicitly public', () => {
@@ -494,10 +515,8 @@ describe('S03 HTTP problem contracts', () => {
   it('starts typed OTel before loading the API and closes it after startup failure', async () => {
     // Loading the API before telemetry or leaking telemetry cleanup failures must fail.
     const config = buildApiRuntimeConfig({
+      ...requiredEnvironment,
       NODE_ENV: 'test',
-      API_HOST: '127.0.0.1',
-      API_PORT: 3000,
-      DATABASE_URL: 'postgresql://contract:contract@127.0.0.1:1/contract',
       OTEL_SDK_DISABLED: 'false',
       OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector.invalid:4318',
     })
@@ -537,10 +556,8 @@ describe('S03 HTTP problem contracts', () => {
   it('keeps disabled OTel inert and uses only injected HTTP/PG lifecycle fakes when enabled', async () => {
     // Reading process.env here, constructing a network exporter, or skipping cleanup must fail.
     const disabledConfig = buildApiRuntimeConfig({
+      ...requiredEnvironment,
       NODE_ENV: 'test',
-      API_HOST: '127.0.0.1',
-      API_PORT: 3000,
-      DATABASE_URL: 'postgresql://contract:contract@127.0.0.1:1/contract',
       OTEL_SDK_DISABLED: 'true',
     })
     const forbiddenDependencies: ObservabilityBootstrapDependencies = {
@@ -558,10 +575,8 @@ describe('S03 HTTP problem contracts', () => {
     ).resolves.toBeUndefined()
 
     const enabledConfig = buildApiRuntimeConfig({
+      ...requiredEnvironment,
       NODE_ENV: 'test',
-      API_HOST: '127.0.0.1',
-      API_PORT: 3000,
-      DATABASE_URL: 'postgresql://contract:contract@127.0.0.1:1/contract',
       OTEL_SDK_DISABLED: 'false',
       OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector.invalid:4318/root',
     })
@@ -642,6 +657,10 @@ describe('S03 HTTP problem contracts', () => {
           connect: () => Promise.resolve(),
           close: () => Promise.resolve(),
         },
+        redis: {
+          connect: () => Promise.resolve(),
+          close: () => Promise.resolve(),
+        },
         application: {
           listen: () => Promise.resolve(),
           closeListener: () => Promise.resolve(),
@@ -675,5 +694,117 @@ describe('S03 HTTP problem contracts', () => {
     })
     expect(deadlines).toEqual([6_000, 4_000])
     expect(telemetryShutdowns).toBe(1)
+  })
+
+  it.each([
+    ['database', 'synchronous'],
+    ['database', 'asynchronous'],
+    ['redis', 'synchronous'],
+    ['redis', 'asynchronous'],
+  ] as const)(
+    'waits for and closes the late sibling after %s %s startup failure',
+    async (failedDependency, failureMode) => {
+      const sibling = deferred<void>()
+      const asynchronousFailure = deferred<void>()
+      const failure = new Error(
+        `${failedDependency} ${failureMode} startup failure`,
+      )
+      const databaseClose = jest.fn().mockResolvedValue(undefined)
+      const redisClose = jest.fn().mockResolvedValue(undefined)
+      const failingConnect = (): Promise<void> => {
+        if (failureMode === 'synchronous') throw failure
+        return asynchronousFailure.promise
+      }
+      const runtime = new ApiRuntime(() =>
+        Promise.resolve({
+          lifecycle: new ApplicationLifecycleState(),
+          requestTracker: new ActiveRequestTracker(),
+          httpDrainTimeoutMs: 6_000,
+          shutdownGraceMs: 10_000,
+          database: {
+            connect:
+              failedDependency === 'database'
+                ? failingConnect
+                : () => sibling.promise,
+            close: databaseClose,
+          },
+          redis: {
+            connect:
+              failedDependency === 'redis'
+                ? failingConnect
+                : () => sibling.promise,
+            close: redisClose,
+          },
+          application: {
+            listen: () => Promise.resolve(),
+            closeListener: () => Promise.resolve(),
+            closeIdleConnections: () => undefined,
+            closeAllConnections: () => undefined,
+            close: () => Promise.resolve(),
+            address: () => null,
+          },
+        }),
+      )
+      let startupSettled = false
+      const startup = runtime.start()
+      void startup.then(
+        () => {
+          startupSettled = true
+        },
+        () => {
+          startupSettled = true
+        },
+      )
+      if (failureMode === 'asynchronous') asynchronousFailure.reject(failure)
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(startupSettled).toBe(false)
+
+      sibling.resolve()
+      await expect(startup).rejects.toMatchObject({
+        message: 'API startup failed',
+        cause: failure,
+      })
+      expect(databaseClose).toHaveBeenCalledTimes(1)
+      expect(redisClose).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('closes both dependencies and reports exit 1 when one shutdown rejects', async () => {
+    const databaseClose = jest
+      .fn()
+      .mockRejectedValue(new Error('database close failure'))
+    const redisClose = jest.fn().mockResolvedValue(undefined)
+    const runtime = new ApiRuntime(() =>
+      Promise.resolve({
+        lifecycle: new ApplicationLifecycleState(),
+        requestTracker: new ActiveRequestTracker(),
+        httpDrainTimeoutMs: 6_000,
+        shutdownGraceMs: 10_000,
+        database: {
+          connect: () => Promise.resolve(),
+          close: databaseClose,
+        },
+        redis: {
+          connect: () => Promise.resolve(),
+          close: redisClose,
+        },
+        application: {
+          listen: () => Promise.resolve(),
+          closeListener: () => Promise.resolve(),
+          closeIdleConnections: () => undefined,
+          closeAllConnections: () => undefined,
+          close: () => Promise.resolve(),
+          address: () => null,
+        },
+      }),
+    )
+    await runtime.start()
+
+    await expect(
+      new GracefulShutdownCoordinator(runtime).shutdown('SIGTERM'),
+    ).resolves.toEqual({ exitCode: 1, forced: false })
+    expect(databaseClose).toHaveBeenCalledTimes(1)
+    expect(redisClose).toHaveBeenCalledTimes(1)
   })
 })

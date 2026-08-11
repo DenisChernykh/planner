@@ -21,12 +21,14 @@ import {
   checkOpenApiDrift,
   generateOpenApiArtifact,
 } from '@/bootstrap/contracts/generate-openapi'
+import { createOpenApiRuntimeConfig } from '@/bootstrap/contracts/openapi-runtime-config'
 import { configureHttpApplication } from '@/platform/http/bootstrap/configure-http-application'
 import { ActiveRequestTracker } from '@/platform/http/bootstrap/active-request-tracker'
 import { RequestContext } from '@/platform/http/context/request-context'
 import { ApiProblemResponses } from '@/platform/http/docs/api-problem-responses.decorator'
 import { createOpenApiDocument } from '@/platform/http/docs/openapi-document'
 import { HttpErrorsModule } from '@/platform/http/errors/http-errors.module'
+import { HttpProblemRegistry } from '@/platform/http/errors/http-problem.registry'
 import { CORE_HTTP_PROBLEM_CONTRIBUTION } from '@/platform/http/errors/http-problem.mapper'
 import {
   STRUCTURED_LOGGER,
@@ -34,6 +36,16 @@ import {
   type StructuredLogger,
 } from '@/platform/logging/logging.contracts'
 import { ApplicationLifecycleState } from '@/platform/lifecycle/application-lifecycle.state'
+
+interface OpenApiResponse {
+  readonly content?: Record<
+    string,
+    {
+      readonly schema?: unknown
+      readonly examples?: Record<string, unknown>
+    }
+  >
+}
 
 class ContractRequestDto {
   @IsEmail()
@@ -320,17 +332,42 @@ describe('S03 HTTP contracts', () => {
     expect(typeof (body as { requestId?: unknown }).requestId).toBe('string')
   })
 
-  it('generates the production health graph with RFC 9457 schemas and responses', async () => {
-    // Replacing the production module with a static document or omitting Problem responses must fail.
+  it('generates the exact production health and auth graph with the complete Problem catalog', async () => {
+    // Stale health-only paths, arbitrary problem codes, or manual auth responses must fail.
     const document = JSON.parse(await generateOpenApiArtifact()) as {
-      paths: Record<string, { get?: { responses?: Record<string, unknown> } }>
-      components?: { schemas?: Record<string, unknown> }
+      paths: Record<
+        string,
+        {
+          get?: {
+            responses?: Record<string, OpenApiResponse>
+            security?: readonly Record<string, readonly unknown[]>[]
+          }
+          post?: {
+            responses?: Record<string, OpenApiResponse>
+            security?: readonly Record<string, readonly unknown[]>[]
+          }
+        }
+      >
+      components?: {
+        schemas?: Record<
+          string,
+          { properties?: Record<string, { enum?: readonly string[] }> }
+        >
+        securitySchemes?: Record<string, unknown>
+      }
     }
     expect(Object.keys(document.paths).sort()).toEqual([
+      '/auth/csrf',
+      '/auth/logout',
+      '/auth/me',
       '/health/live',
       '/health/ready',
       '/health/startup',
     ])
+    expect(document.paths['/auth/issue']).toBeUndefined()
+    expect(Object.keys(document.paths['/auth/me'] ?? {})).toEqual(['get'])
+    expect(Object.keys(document.paths['/auth/csrf'] ?? {})).toEqual(['get'])
+    expect(Object.keys(document.paths['/auth/logout'] ?? {})).toEqual(['post'])
     expect(Object.keys(document.components?.schemas ?? {}).sort()).toEqual(
       expect.arrayContaining([
         'ProblemFieldErrorResponseDto',
@@ -338,8 +375,38 @@ describe('S03 HTTP contracts', () => {
         'ValidationProblemResponseDto',
       ]),
     )
-    for (const path of Object.values(document.paths)) {
-      expect(path.get?.responses?.['500']).toMatchObject({
+    const exactProblemCodes = [
+      'AUTHENTICATION_REQUIRED',
+      'AUTHORIZATION_DENIED',
+      'CONFLICT',
+      'DEPENDENCY_UNAVAILABLE',
+      'INTERNAL_ERROR',
+      'MALFORMED_REQUEST',
+      'NOT_FOUND',
+      'PAYLOAD_TOO_LARGE',
+      'RATE_LIMIT_EXCEEDED',
+      'UNSUPPORTED_MEDIA_TYPE',
+      'VALIDATION_FAILED',
+    ]
+    expect(
+      document.components?.schemas?.['ProblemResponseDto']?.properties?.['code']
+        ?.enum,
+    ).toEqual(exactProblemCodes)
+    expect(document.components?.securitySchemes?.['sessionCookie']).toEqual({
+      type: 'apiKey',
+      in: 'cookie',
+      name: '__Host-planner-session',
+      description: 'Opaque HttpOnly browser session cookie.',
+    })
+
+    for (const healthPath of [
+      '/health/live',
+      '/health/ready',
+      '/health/startup',
+    ]) {
+      const operation = document.paths[healthPath]?.get
+      expect(operation?.security).toEqual([])
+      expect(operation?.responses?.['500']).toMatchObject({
         content: {
           'application/problem+json': {
             schema: { $ref: '#/components/schemas/ProblemResponseDto' },
@@ -347,6 +414,52 @@ describe('S03 HTTP contracts', () => {
         },
       })
     }
+
+    const authenticationProblem = {
+      type: 'https://planner.invalid/problems/authentication-required',
+      title: 'Authentication required',
+      status: 401,
+      detail: 'A valid browser session is required.',
+      instance: 'urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      code: 'AUTHENTICATION_REQUIRED',
+      requestId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    }
+    for (const operation of [
+      document.paths['/auth/me']?.get,
+      document.paths['/auth/csrf']?.get,
+      document.paths['/auth/logout']?.post,
+    ]) {
+      expect(
+        operation?.responses?.['401']?.content?.['application/problem+json']
+          ?.examples,
+      ).toEqual({
+        AUTHENTICATION_REQUIRED: {
+          summary: 'Authentication required',
+          value: authenticationProblem,
+        },
+      })
+    }
+    expect(
+      document.paths['/auth/logout']?.post?.responses?.['403']?.content?.[
+        'application/problem+json'
+      ]?.examples,
+    ).toEqual({
+      AUTHORIZATION_DENIED: {
+        summary: 'Authorization denied',
+        value: {
+          type: 'https://planner.invalid/problems/authorization-denied',
+          title: 'Authorization denied',
+          status: 403,
+          detail: 'The request did not satisfy browser authorization controls.',
+          instance: 'urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV',
+          code: 'AUTHORIZATION_DENIED',
+          requestId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        },
+      },
+    })
+    expect(document.paths['/auth/logout']?.post?.security).toEqual([
+      { sessionCookie: [], csrfToken: [] },
+    ])
   })
 
   it('publishes an RFC 6901 pointer schema for nested escaped segments', async () => {
@@ -371,7 +484,11 @@ describe('S03 HTTP contracts', () => {
 
   it('generates a validation Problem example that validates against its selected schema', () => {
     // Selecting ValidationProblemResponseDto while omitting required errors must fail.
-    const document = createOpenApiDocument(app)
+    const document = createOpenApiDocument(
+      app,
+      createOpenApiRuntimeConfig(),
+      app.get(HttpProblemRegistry).definitions,
+    )
     const operation = document.paths['/contract/validate']?.post as
       | {
           responses?: Record<

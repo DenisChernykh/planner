@@ -85,3 +85,12 @@ export const PROBLEM_CATALOG = Object.freeze(
     defineProblemDefinition({ slug, code, status, title, detail }),
   ),
 )
+
+export function getProblemDefinition(
+  code: CoreProblemCode,
+): RegisteredProblemDefinition {
+  const definition = PROBLEM_CATALOG.find((entry) => entry.code === code)
+  if (definition === undefined)
+    throw new Error(`Unregistered OpenAPI problem: ${code}`)
+  return definition
+}

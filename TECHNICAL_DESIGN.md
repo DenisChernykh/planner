@@ -280,6 +280,65 @@ userId является terminal identity collision; пользователь н
 - blocked/deactivated bot state не меняет web-доступ, но показывается как
   предупреждение в настройках.
 
+### 6.5. S04 local User и browser session contract
+
+S04 создаёт только session substrate для будущего Telegram OIDC callback. В
+PostgreSQL появляется стабильный local `User` с UUID и timestamps; production
+runtime не принимает `userId` из HTTP и никогда не создаёт или upsert-ит User.
+Pre-provisioning принадлежит A01, а первый production consumer session issuer —
+A03. Email, password, account status, roles, permissions, public signup,
+allowlist, external identity и workspace membership в S04 отсутствуют.
+
+`AuthenticatedPrincipal` имеет ровно `{ userId: UserId; sessionId: string }`.
+Внутренний issuer сначала перечитывает существующий User из PostgreSQL и только
+затем создаёт новую независимую session; повторная выдача не отзывает ранее
+созданные sessions. Каждый authenticated request перечитывает существование
+User, а missing User fail closed без записи в PostgreSQL.
+
+Browser session использует следующие exact controls:
+
+- raw bearer token — 32 random bytes в canonical unpadded base64url (43 chars),
+  public `sessionId` — отдельные 16 random bytes (22 chars), CSRF seed — ещё 32
+  independent random bytes;
+- Redis key содержит только HMAC-SHA256 raw token отдельным 32-byte secret; raw
+  token не хранится ни в Redis key/value, ни в PostgreSQL или logs;
+- CSRF token — session-bound HMAC-SHA256 от public session ID и seed с другим
+  32-byte secret; оба runtime secrets canonical base64url и не могут совпадать;
+- idle TTL — 7 дней, absolute TTL — 30 дней, touch выполняется не чаще одного
+  раза в 5 минут и не продлевает absolute expiry; atomic touch/revoke не может
+  воскресить revoked или expired session;
+- cookie называется `planner-session` в development/test и
+  `__Host-planner-session` в production, имеет `HttpOnly`, `SameSite=Lax`,
+  `Path=/`, без `Domain`, а production также `Secure`;
+- unsafe methods требуют `application/json`, не-cross-site request, ровно один
+  разрешённый `Origin` либо exact origin из `Referer` и constant-time equal
+  `X-CSRF-Token`; `GET`, `HEAD`, `OPTIONS` обходят Origin/CSRF checks, но не
+  authentication.
+
+Production HTTP surface S04: protected `GET /auth/me` возвращает только
+`{ userId, sessionId }`, protected `GET /auth/csrf` возвращает session-bound
+`{ csrfToken }`, `POST /auth/logout` атомарно отзывает current session, очищает
+cookie с теми же attributes и возвращает `204`. Публичного issue endpoint нет.
+Authentication default-on; только explicit `@PublicEndpoint`, включая health,
+обходит global authentication guard.
+
+Missing, malformed, expired, revoked session и session отсутствующего User
+возвращают module-owned RFC 9457 `AUTHENTICATION_REQUIRED` 401. Invalid
+Origin/CSRF возвращает module-owned `AUTHORIZATION_DENIED` 403, non-JSON unsafe
+request — core `UNSUPPORTED_MEDIA_TYPE` 415. Ошибка PostgreSQL или auth Redis
+возвращает core `DEPENDENCY_UNAVAILABLE` 503 без driver/URL/token details и без
+User mutations. Эти auth definitions подключаются отдельным contribution и не
+расширяют S03 core catalog.
+
+Auth Redis — required API dependency с connect/command/health/shutdown bounds
+`2_000/2_000/2_500/1_000 ms`. Listener становится доступен до dependency
+startup, а irreversible startup latch и `ready` требуют первого успешного
+подключения и PostgreSQL, и auth Redis. Последующая потеря Redis оставляет
+`live/startup` доступными, делает `ready` и session operations fail closed;
+startup failure очищает успешно поднятого sibling, а shutdown закрывает обе
+dependencies внутри общего S02 watchdog. Redis instrumentation остаётся
+выключенным. Queue Redis, cache/pub-sub abstraction и `KEYS` запрещены.
+
 ## 7. Концептуальная модель хранения
 
 Названия таблиц являются целевыми концептами; окончательные Prisma names

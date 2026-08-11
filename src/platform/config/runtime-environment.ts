@@ -28,6 +28,24 @@ export function buildApiRuntimeConfig(
   }
   const environment = result.value
   const endpoint = environment.OTEL_EXPORTER_OTLP_ENDPOINT
+  const production = environment.NODE_ENV === 'production'
+  const sessionKeySecret = new Uint8Array(environment.AUTH_SESSION_KEY_SECRET)
+  const csrfSecret = new Uint8Array(environment.AUTH_CSRF_SECRET)
+  const csrfOrigins = Object.freeze([...environment.AUTH_CSRF_ORIGINS])
+  const auth = {
+    sessionCookieName: production
+      ? '__Host-planner-session'
+      : 'planner-session',
+    secureCookie: production,
+    get sessionKeySecret(): Uint8Array {
+      return new Uint8Array(sessionKeySecret)
+    },
+    get csrfSecret(): Uint8Array {
+      return new Uint8Array(csrfSecret)
+    },
+    csrfOrigins,
+    ...runtimeDefaults.auth,
+  }
   return Object.freeze({
     environment: environment.NODE_ENV,
     logging: Object.freeze({
@@ -43,6 +61,12 @@ export function buildApiRuntimeConfig(
       poolMax: environment.DATABASE_POOL_MAX,
       ...runtimeDefaults.database,
     }),
+    redis: Object.freeze({
+      authUrl: environment.REDIS_AUTH_URL,
+      keyPrefix: environment.REDIS_KEY_PREFIX,
+      ...runtimeDefaults.redis,
+    }),
+    auth: Object.freeze(auth),
     observability: Object.freeze({
       disabled: environment.OTEL_SDK_DISABLED,
       ...(endpoint === undefined ? {} : { endpoint }),

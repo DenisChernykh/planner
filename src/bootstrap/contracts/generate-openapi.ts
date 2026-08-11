@@ -6,16 +6,24 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import { ApiModule } from '@/bootstrap/api/api.module'
 import { createOpenApiDocument } from '@/platform/http/docs/openapi-document'
 import { canonicalizeJson } from '@/platform/http/docs/openapi-normalizer'
+import { HttpProblemRegistry } from '@/platform/http/errors/http-problem.registry'
 
 import { createOpenApiRuntimeConfig } from './openapi-runtime-config'
 
 export async function generateOpenApiArtifact(): Promise<string> {
+  const config = createOpenApiRuntimeConfig()
   const app = await NestFactory.create<NestExpressApplication>(
-    ApiModule.forRoot(createOpenApiRuntimeConfig()),
+    ApiModule.forRoot(config),
     { abortOnError: false, bodyParser: false, logger: false, preview: true },
   )
   try {
-    return canonicalizeJson(createOpenApiDocument(app))
+    return canonicalizeJson(
+      createOpenApiDocument(
+        app,
+        config,
+        app.get(HttpProblemRegistry).definitions,
+      ),
+    )
   } finally {
     await app.close()
   }

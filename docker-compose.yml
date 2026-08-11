@@ -5,6 +5,7 @@ x-runtime-image: &runtime-image
     target: runtime
 
 x-database-url: &database-url postgresql://planner:local-development-only@postgres:5432/planner?schema=public
+x-redis-auth-url: &redis-auth-url redis://default:local-development-only@redis-auth:6379
 
 services:
   postgres:
@@ -19,6 +20,31 @@ services:
       - postgres-data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U planner -d planner']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  redis-auth:
+    image: redis:8.8.0-trixie@sha256:234c902a2db49461a129e2d4aeff85b28cf20187ed274a67f6e50995fa713c7b
+    command:
+      - redis-server
+      - --requirepass
+      - local-development-only
+      - --appendonly
+      - 'yes'
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+    environment:
+      REDISCLI_AUTH: local-development-only
+    ports:
+      - '127.0.0.1:${REDIS_AUTH_PORT:-6379}:6379'
+    volumes:
+      - redis-auth-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 2s
       timeout: 3s
       retries: 30
@@ -41,9 +67,16 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 3000
       DATABASE_URL: *database-url
+      REDIS_AUTH_URL: *redis-auth-url
+      REDIS_KEY_PREFIX: planner
+      AUTH_SESSION_KEY_SECRET: MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM
+      AUTH_CSRF_SECRET: NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ
+      AUTH_CSRF_ORIGINS: http://127.0.0.1:${API_PORT:-3000}
     depends_on:
       migrator:
         condition: service_completed_successfully
+      redis-auth:
+        condition: service_healthy
     ports:
       - '127.0.0.1:${API_PORT:-3000}:3000'
     healthcheck:
@@ -59,3 +92,4 @@ services:
 
 volumes:
   postgres-data:
+  redis-auth-data:

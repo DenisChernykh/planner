@@ -10,8 +10,54 @@ interface ValidatedRuntimeEnvironment {
   readonly API_PORT: number
   readonly DATABASE_URL: string
   readonly DATABASE_POOL_MAX: number
+  readonly REDIS_AUTH_URL: string
+  readonly REDIS_KEY_PREFIX: string
+  readonly AUTH_SESSION_KEY_SECRET: Uint8Array
+  readonly AUTH_CSRF_SECRET: Uint8Array
+  readonly AUTH_CSRF_ORIGINS: readonly string[]
   readonly OTEL_SDK_DISABLED: boolean
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string
+}
+
+function isRedisUrl(value: string): boolean {
+  try {
+    return ['redis:', 'rediss:'].includes(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}
+
+function decodeSecret(value: string): Uint8Array | undefined {
+  if (!/^[A-Za-z0-9_-]{43}$/u.test(value)) return undefined
+  const decoded = Buffer.from(value, 'base64url')
+  return decoded.length === 32 && decoded.toString('base64url') === value
+    ? new Uint8Array(decoded)
+    : undefined
+}
+
+function parseOrigins(value: string): readonly string[] | undefined {
+  const origins = value.split(',').map((origin) => origin.trim())
+  if (origins.length === 0 || origins.some((origin) => origin === ''))
+    return undefined
+  if (new Set(origins).size !== origins.length) return undefined
+  for (const origin of origins) {
+    try {
+      const url = new URL(origin)
+      if (
+        url.origin !== origin ||
+        !['http:', 'https:'].includes(url.protocol) ||
+        url.username !== '' ||
+        url.password !== '' ||
+        url.pathname !== '/' ||
+        url.search !== '' ||
+        url.hash !== ''
+      )
+        return undefined
+    } catch {
+      return undefined
+    }
+  }
+  return Object.freeze(origins)
 }
 
 function isPostgreSqlUrl(value: string): boolean {
@@ -39,6 +85,33 @@ export const runtimeEnvironmentSchema = Joi.object<ValidatedRuntimeEnvironment>(
         isPostgreSqlUrl(value) ? value : helpers.error('any.invalid'),
       ),
     DATABASE_POOL_MAX: Joi.number().integer().min(1).max(100).default(10),
+    REDIS_AUTH_URL: Joi.string()
+      .trim()
+      .required()
+      .custom((value: string, helpers) =>
+        isRedisUrl(value) ? value : helpers.error('any.invalid'),
+      ),
+    REDIS_KEY_PREFIX: Joi.string()
+      .pattern(/^[A-Za-z0-9._-]+$/u)
+      .default('planner'),
+    AUTH_SESSION_KEY_SECRET: Joi.string()
+      .required()
+      .custom(
+        (value: string, helpers) =>
+          decodeSecret(value) ?? helpers.error('any.invalid'),
+      ),
+    AUTH_CSRF_SECRET: Joi.string()
+      .required()
+      .custom(
+        (value: string, helpers) =>
+          decodeSecret(value) ?? helpers.error('any.invalid'),
+      ),
+    AUTH_CSRF_ORIGINS: Joi.string()
+      .required()
+      .custom(
+        (value: string, helpers) =>
+          parseOrigins(value) ?? helpers.error('any.invalid'),
+      ),
     OTEL_SDK_DISABLED: Joi.boolean().default(true),
     OTEL_EXPORTER_OTLP_ENDPOINT: Joi.string()
       .trim()
@@ -46,6 +119,21 @@ export const runtimeEnvironmentSchema = Joi.object<ValidatedRuntimeEnvironment>(
       .empty('')
       .optional(),
   },
-)
+).custom((value: ValidatedRuntimeEnvironment, helpers) => {
+  if (
+    Buffer.from(value.AUTH_SESSION_KEY_SECRET).equals(
+      Buffer.from(value.AUTH_CSRF_SECRET),
+    )
+  )
+    return helpers.error('auth.secretsDistinct')
+  if (
+    value.NODE_ENV === 'production' &&
+    value.AUTH_CSRF_ORIGINS.some(
+      (origin) => new URL(origin).protocol !== 'https:',
+    )
+  )
+    return helpers.error('auth.productionHttpsOrigin')
+  return value
+}, 'auth runtime constraints')
 
 export type { ValidatedRuntimeEnvironment }

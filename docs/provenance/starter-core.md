@@ -204,3 +204,83 @@ Planner metadata only and production does not enable/regenerate public docs.
 Focused unit/E2E, offline generation/drift/lint, architecture and quick gates
 are local evidence only. They do not prove collector availability, GitHub CI,
 OCI publication, deployment, hosted HTTP behavior, Telegram smoke or restore.
+
+## S04 local User and opaque-session transfer
+
+### Source and target mapping
+
+S04 selectively adapts the independently verified clean Starter repository at
+`/Users/denischernykh/projects/starters/nest-js-starter`, `stage =
+origin/stage = a0c8e8002af59536dea3c8209fe527bd033b2eca`. The Planner target baseline is
+`4db2af5687d522cfd1d4655a6f3b14db906e9c27` on
+`agent/s04-local-user-opaque-session`; the S04 containing commit is assigned by
+the controller. Neither repository becomes an upstream or runtime dependency
+of the other.
+
+- Starter `src/platform/redis/redis-client.factory.ts`,
+  `redis-auth.connection.ts`, `redis-command.executor.ts`,
+  `redis-key.builder.ts`, `redis-codec.ts`, `redis-script.runner.ts`,
+  `redis-lifecycle.ts`, `redis-readiness.indicator.ts`, `redis.module.ts` and
+  `redis.tokens.ts` map to the same Planner paths under
+  `src/platform/redis/**`, reduced to one auth-only capability.
+- Starter `src/modules/auth/application/session-store.port.ts`,
+  `authenticate-session.use-case.ts`, `get-csrf-token.query.ts` and the neutral
+  issue/revoke mechanics map to Planner `src/modules/auth/application/**`.
+- Starter `src/modules/auth/infrastructure/node-auth-crypto.adapter.ts`,
+  `session-record.codec.ts`, `redis-session.scripts.ts`,
+  `redis-session.store.ts` and the local-User lookup extracted from
+  `prisma-auth.repository.ts` map to Planner auth infrastructure.
+- Starter `src/modules/auth/presentation/session-cookie.ts`,
+  `auth-cookie.adapter.ts`, `authentication.guard.ts`,
+  `auth-request.context.ts`, `auth-request.interceptor.ts`,
+  `current-principal.decorator.ts`, `browser-origin.guard.ts` and
+  `session-csrf.guard.ts` supply the browser boundary. Planner exposes only
+  `GET /auth/me`, `GET /auth/csrf` and `POST /auth/logout`.
+- Starter auth Problem contribution, OpenAPI security definitions, required
+  Redis readiness/lifecycle, local Compose and real Redis test support map to
+  the corresponding Planner platform, bootstrap, documentation and test
+  paths. The PostgreSQL target adds only `users(id, created_at, updated_at)`.
+
+### Named consumers and failure model
+
+The global authentication guard is the immediate consumer of session
+authentication and protects every route without exact `@PublicEndpoint`
+metadata. A03 is the first production consumer of `IssueSessionUseCase`; S04
+does not publish an issue endpoint or accept a `userId` from HTTP.
+
+Issue verifies a pre-existing PostgreSQL User before any Redis write. Every
+authenticated request rechecks that User. Missing, malformed, expired,
+revoked, corrupt or missing-User sessions fail closed as
+`AUTHENTICATION_REQUIRED`; Origin or CSRF rejection is
+`AUTHORIZATION_DENIED`; PostgreSQL or auth-Redis failure is the safe core
+`DEPENDENCY_UNAVAILABLE`. No failure mutates User state or returns driver,
+connection URL, raw token or secret data.
+
+The listener remains observable while PostgreSQL and auth Redis start in a
+failure-atomic group. Initial readiness requires both. After the irreversible
+startup latch, Redis loss leaves liveness/startup available while readiness and
+session operations fail closed; recovery restores readiness. Database and
+Redis cleanup share the S02 shutdown budget.
+
+### Adaptations and exclusions
+
+Planner removes Starter email/password, signup, approval, account status,
+roles/RBAC, session listing, logout-all, rate limiting, device/network
+fingerprints and user-session indexes. Each issue creates one independent
+digest-addressed record. Atomic Lua create/touch/revoke keeps idle and absolute
+expiry bounded without `KEYS` or resurrection. The raw 32-byte token remains
+browser-only; Redis keys use its dedicated HMAC digest, while a separate secret
+derives the session-bound CSRF token.
+
+Only local `redis-auth` is added. Queue Redis, BullMQ, ioredis, outbox,
+cache/pub-sub abstraction, Redis telemetry instrumentation, OIDC, allowlist,
+external identity, workspace/membership, public provisioning and production
+deployment configuration are intentionally absent. Package dependency sections
+and `pnpm-lock.yaml` remain unchanged.
+
+### S04 evidence boundary
+
+Focused unit, real PostgreSQL/Redis integration, HTTP E2E, OpenAPI, Compose and
+quick gates are local evidence. They do not prove GitHub CI, hosted runtime,
+production credentials, OCI publication, deployment, backup restore, OIDC or
+the later A01/A03 consumers.

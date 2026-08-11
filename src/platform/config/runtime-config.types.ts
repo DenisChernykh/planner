@@ -32,11 +32,33 @@ export interface OpenTelemetryRuntimeConfig {
   readonly batchSpanExportTimeoutMs: number
 }
 
+export interface RedisRuntimeConfig {
+  readonly authUrl: string
+  readonly keyPrefix: string
+  readonly connectTimeoutMs: number
+  readonly commandTimeoutMs: number
+  readonly healthTimeoutMs: number
+  readonly shutdownTimeoutMs: number
+}
+
+export interface AuthRuntimeConfig {
+  readonly sessionCookieName: string
+  readonly secureCookie: boolean
+  readonly sessionKeySecret: Uint8Array
+  readonly csrfSecret: Uint8Array
+  readonly csrfOrigins: readonly string[]
+  readonly idleTimeoutMs: number
+  readonly absoluteTimeoutMs: number
+  readonly touchIntervalMs: number
+}
+
 export interface ApplicationRuntimeConfig {
   readonly environment: RuntimeEnvironment
   readonly logging: LoggingRuntimeConfig
   readonly http: HttpRuntimeConfig
   readonly database: DatabaseRuntimeConfig
+  readonly redis: RedisRuntimeConfig
+  readonly auth: AuthRuntimeConfig
   readonly observability: OpenTelemetryRuntimeConfig
 }
 
