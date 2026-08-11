@@ -205,13 +205,13 @@ branch/fast-forward protocol.
 - [x] Убедиться, что host-capable `gh auth status` успешен для
   `DenisChernykh`.
 - [x] Повторно проверить отсутствие `DenisChernykh/planner`.
-- [ ] На clean `main` выполнить:
+- [x] На clean `main` выполнить:
 
 ```bash
 gh repo create DenisChernykh/planner --private --source=. --remote=origin --push
 ```
 
-- [ ] Проверить `main...origin/main`, `git status -sb` и GitHub visibility
+- [x] Проверить `main...origin/main`, `git status -sb` и GitHub visibility
   `PRIVATE`.
 
 ### S01 — Starter toolchain transfer
