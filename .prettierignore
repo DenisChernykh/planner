@@ -1,0 +1,14 @@
+node_modules
+dist
+src/generated/prisma
+coverage
+docs/api/openapi.json
+pnpm-lock.yaml
+test/architecture/fixtures
+test/fixtures
+IMPLEMENTATION_PLAN.md
+PRD.md
+README.md
+SCREEN_MAP.md
+TECHNICAL_DESIGN.md
+USER_FLOWS.md

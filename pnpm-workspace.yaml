@@ -1,0 +1,68 @@
+allowBuilds:
+  '@prisma/engines@7.9.0': true
+  '@scarf/scarf': false
+  'cpu-features@0.0.10': false
+  esbuild: true
+  msgpackr-extract: false
+  'prisma@7.9.0': true
+  'protobufjs@7.6.5': false
+  'ssh2@1.17.0': false
+  unrs-resolver: true
+autoInstallPeers: false
+engineStrict: true
+minimumReleaseAgeExclude:
+  - '@prisma/adapter-pg@7.9.0'
+  - '@prisma/client-runtime-utils@7.9.0'
+  - '@prisma/client@7.9.0'
+  - '@prisma/config@7.9.0'
+  - '@prisma/debug@7.9.0'
+  - '@prisma/driver-adapter-utils@7.9.0'
+  - '@prisma/engines@7.9.0'
+  - '@prisma/fetch-engine@7.9.0'
+  - '@prisma/get-platform@7.9.0'
+  - prisma@7.9.0
+  - '@typescript-eslint/eslint-plugin@8.65.0'
+  - '@typescript-eslint/parser@8.65.0'
+  - '@typescript-eslint/project-service@8.65.0'
+  - '@typescript-eslint/scope-manager@8.65.0'
+  - '@typescript-eslint/tsconfig-utils@8.65.0'
+  - '@typescript-eslint/type-utils@8.65.0'
+  - '@typescript-eslint/types@8.65.0'
+  - '@typescript-eslint/typescript-estree@8.65.0'
+  - '@typescript-eslint/utils@8.65.0'
+  - '@typescript-eslint/visitor-keys@8.65.0'
+  - typescript-eslint@8.65.0
+  - '@redocly/cli@2.40.0'
+  - '@opentelemetry/api-logs@0.221.0'
+  - '@opentelemetry/configuration@0.221.0'
+  - '@opentelemetry/context-async-hooks@2.10.0'
+  - '@opentelemetry/core@2.10.0'
+  - '@opentelemetry/exporter-logs-otlp-grpc@0.221.0'
+  - '@opentelemetry/exporter-logs-otlp-http@0.221.0'
+  - '@opentelemetry/exporter-logs-otlp-proto@0.221.0'
+  - '@opentelemetry/exporter-trace-otlp-grpc@0.221.0'
+  - '@opentelemetry/exporter-trace-otlp-http@0.221.0'
+  - '@opentelemetry/exporter-trace-otlp-proto@0.221.0'
+  - '@opentelemetry/exporter-zipkin@2.10.0'
+  - '@opentelemetry/instrumentation-http@0.221.0'
+  - '@opentelemetry/instrumentation@0.221.0'
+  - '@opentelemetry/otlp-exporter-base@0.221.0'
+  - '@opentelemetry/otlp-grpc-exporter-base@0.221.0'
+  - '@opentelemetry/otlp-transformer@0.221.0'
+  - '@opentelemetry/propagator-b3@2.10.0'
+  - '@opentelemetry/propagator-jaeger@2.10.0'
+  - '@opentelemetry/resources@2.10.0'
+  - '@opentelemetry/sdk-logs@0.221.0'
+  - '@opentelemetry/sdk-trace-base@2.10.0'
+  - '@opentelemetry/sdk-trace-node@2.10.0'
+  - '@opentelemetry/sdk-trace@2.10.0'
+overrides:
+  '@nestjs/swagger>js-yaml': 5.2.2
+  find-my-way: 9.7.0
+peerDependencyRules:
+  ignoreMissing:
+    - react
+    - react-dom
+saveExact: true
+strictPeerDependencies: true
+verifyDepsBeforeRun: error

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["jest", "node"]
+  },
+  "include": ["prisma.config.ts", "scripts/**/*.ts", "test/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test/architecture/fixtures/**",
+    "test/fixtures/**"
+  ]
+}

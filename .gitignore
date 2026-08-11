@@ -1,2 +1,10 @@
 .DS_Store
 ~$*.docx
+node_modules/
+dist/
+src/generated/prisma/
+coverage/
+.env
+.env.*
+!.env.example
+*.log

@@ -223,8 +223,10 @@ toolchain Starter, но ещё не содержит runtime и product modules.
 
 **Files:**
 
+- Modify: `.gitignore`
 - Create: `.nvmrc`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`
-- Create: `tsconfig.json`, `tsconfig.build.json`, `tsconfig.test.json`
+- Create: `tsconfig.base.json`, `tsconfig.json`, `tsconfig.build.json`,
+  `tsconfig.test.json`
 - Create: `jest.unit.config.mjs`, `jest.integration.config.mjs`,
   `jest.e2e.config.mjs`
 - Create: `eslint.config.mjs`, `.prettierrc.json`, `.prettierignore`
@@ -236,20 +238,20 @@ toolchain Starter, но ещё не содержит runtime и product modules.
 Runtime source, product modules, approval requests, password/email code,
 BullMQ/outbox and generated files are excluded.
 
-- [ ] Записать source repo, branch, full SHA, clean state, exact source/target
+- [x] Записать source repo, branch, full SHA, clean state, exact source/target
   paths, Planner build/test consumers, toolchain drift/install failure model,
   adaptations and intentional exclusions в provenance.
-- [ ] Механически перенести только allowlisted toolchain files, адаптировать
+- [x] Механически перенести только allowlisted toolchain files, адаптировать
   package metadata/scripts and exact dependencies, затем в host-capable
   environment проверить `node --version`, `pnpm --version` and run
   `pnpm install`. Это bootstrap exception: до него Jest command не существует.
-- [ ] Добавить failing skeleton test, импортирующий отсутствующий
+- [x] Добавить failing skeleton test, импортирующий отсутствующий
   `src/app-metadata.ts` и ожидающий `{ name: "planner", nodeMajor: 24 }`.
-- [ ] Запустить `pnpm test:unit:run -- test/unit/toolchain/planner-skeleton.spec.ts`
+- [x] Запустить `pnpm test:unit:run -- test/unit/toolchain/planner-skeleton.spec.ts`
   и получить RED именно из-за отсутствующего module.
-- [ ] Создать `src/app-metadata.ts`, получить GREEN, затем запустить format and
+- [x] Создать `src/app-metadata.ts`, получить GREEN, затем запустить format and
   typecheck.
-- [ ] Commit: `chore: transfer planner toolchain foundation`.
+- [x] Commit: `chore: transfer planner toolchain foundation`.
 
 ### S02 — Universal runtime Core transfer
 
