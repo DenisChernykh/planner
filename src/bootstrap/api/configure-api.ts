@@ -10,6 +10,11 @@ import type { DatabaseLifecycle } from '@/platform/database/database.contracts'
 import { DATABASE_LIFECYCLE } from '@/platform/database/database.tokens'
 import { ActiveRequestTracker } from '@/platform/http/bootstrap/active-request-tracker'
 import { configureHttpApplication } from '@/platform/http/bootstrap/configure-http-application'
+import { RequestContext } from '@/platform/http/context/request-context'
+import {
+  STRUCTURED_LOGGER,
+  type StructuredLogger,
+} from '@/platform/logging/logging.contracts'
 import { ApplicationLifecycleState } from '@/platform/lifecycle/application-lifecycle.state'
 
 import { ApiModule } from './api.module'
@@ -43,7 +48,13 @@ export async function configureApi(
   const lifecycle = app.get(ApplicationLifecycleState)
   const database = app.get<DatabaseLifecycle>(DATABASE_LIFECYCLE)
   const requestTracker = app.get(ActiveRequestTracker)
-  configureHttpApplication(app, lifecycle, requestTracker)
+  configureHttpApplication(
+    app,
+    lifecycle,
+    requestTracker,
+    app.get(RequestContext),
+    app.get<StructuredLogger>(STRUCTURED_LOGGER),
+  )
   await app.init()
   const server = app.getHttpServer()
 

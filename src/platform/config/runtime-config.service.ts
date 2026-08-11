@@ -5,6 +5,8 @@ import {
   type ApplicationRuntimeConfig,
   type DatabaseRuntimeConfig,
   type HttpRuntimeConfig,
+  type LoggingRuntimeConfig,
+  type OpenTelemetryRuntimeConfig,
   type RuntimeEnvironment,
 } from './runtime-config.types'
 
@@ -23,7 +25,15 @@ export class RuntimeConfigService {
     return this.config.http
   }
 
+  public get logging(): LoggingRuntimeConfig {
+    return this.config.logging
+  }
+
   public get database(): DatabaseRuntimeConfig {
     return this.config.database
+  }
+
+  public get observability(): OpenTelemetryRuntimeConfig {
+    return this.config.observability
   }
 }

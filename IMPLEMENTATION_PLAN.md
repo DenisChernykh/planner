@@ -315,23 +315,56 @@ product modules.
 - Create: `src/platform/http/errors/**`, `src/platform/http/policy/**`
 - Create: `src/platform/logging/**`, `src/platform/observability/**`
 - Create: `src/shared/application/product-clock.ts`
-- Modify: `docs/provenance/starter-core.md`
+- Modify: API/config/bootstrap composition, `src/bootstrap/contracts/**`,
+  `src/bootstrap/observability/**`, `scripts/openapi/**`,
+  `docs/api/openapi.json`, `package.json` and only directly required config
+  files; `docs/provenance/starter-core.md`
 - Test: `test/unit/platform/problem-details.spec.ts`
-- Test: `test/e2e/platform/http-contracts.e2e-spec.ts`
+- Test: `test/e2e/platform/http-contracts.e2e.spec.ts`
 
 **Produces:** HTTP problem registry, OpenAPI document builder, safe logger and
 `ProductClock` adapter used by every temporal product test.
 
-- [ ] Написать RED cases validation Problem Details, correlation ID, PII-safe
+**Locked S03 contract:** Problem Details use
+`application/problem+json`, namespace `https://planner.invalid/problems/<slug>`
+and `urn:request:<requestId>` with fields `type`, `title`, `status`, `detail`,
+`instance`, `code`, `requestId`; validation alone adds sorted/deduplicated
+value-free RFC 6901 `errors`. The only core definitions are
+`MALFORMED_REQUEST` 400, `NOT_FOUND` 404, `CONFLICT` 409,
+`PAYLOAD_TOO_LARGE` 413, `UNSUPPORTED_MEDIA_TYPE` 415,
+`VALIDATION_FAILED` 422, `RATE_LIMIT_EXCEEDED` 429, `INTERNAL_ERROR` 500 and
+`DEPENDENCY_UNAVAILABLE` 503. Validation is transform-on, implicit-conversion-
+off, whitelist/forbidNonWhitelisted/forbidUnknownValues-on; duplicate or
+unregistered definitions fail startup and unknown failures are constant safe
+`INTERNAL_ERROR`.
+
+`X-Request-ID` accepts exactly one canonical UUID or uppercase ULID, otherwise
+uses `randomUUID()`, echoes the selected value on every response and propagates
+only correlation-safe fields. JSON and URL-encoded bodies are bounded to
+`1_048_576` bytes; request/headers/keep-alive timeouts are `30_000`, `10_000`
+and `5_000 ms`, without changing S02 `6_000/10_000 ms` shutdown bounds. Access
+records contain only route template, uppercase method, status, duration and
+correlation; logger/exporter/collector failures lose telemetry only. Trace is
+allowlist-only, with events/links and Redis instrumentation excluded.
+
+OpenAPI generation is deterministic and offline at `docs/api/openapi.json`:
+only `openapi:generate` writes; `openapi:drift` is non-writing byte drift;
+`openapi:lint` validates; runtime never regenerates. Test-only Nest
+module/controller/DTO is permitted only in this S03 E2E file for validation and
+must not enter production composition or generated OpenAPI. `ProductClock` is
+the exact Planner-only contract `{ now(): Date; today(timeZone:
+"Asia/Yekaterinburg"): string }`; only system adapter reads `new Date()`.
+
+- [x] Написать RED cases validation Problem Details, correlation ID, PII-safe
   serialization and fake-clock date in `Asia/Yekaterinburg`.
-- [ ] Перенести selected HTTP/logging/observability paths and create system/
+- [x] Перенести selected HTTP/logging/observability paths and create system/
   fake `ProductClock` implementations.
-- [ ] Append exact source/target paths, consumers, HTTP/telemetry failure model,
+- [x] Append exact source/target paths, consumers, HTTP/telemetry failure model,
   adaptations and exclusions to provenance.
-- [ ] Проверить bounded body/time limits, OpenAPI generation/drift and absence
+- [x] Проверить bounded body/time limits, OpenAPI generation/drift and absence
   of raw secrets/IDs in captured logs.
-- [ ] Запустить unit/E2E, architecture check and `pnpm check:quick`.
-- [ ] Commit: `chore: transfer backend contract boundaries`.
+- [x] Запустить unit/E2E, architecture check and `pnpm check:quick`.
+- [x] Commit: `chore: transfer backend contract boundaries`.
 
 ### S04 — Local User and opaque session subset
 

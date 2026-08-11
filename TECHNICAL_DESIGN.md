@@ -829,6 +829,54 @@ Contracts не «железные навсегда»:
 - опубликованные product snapshots остаются immutable независимо от API
   evolution.
 
+### 15.1. S03 platform contract
+
+S03 вводит нейтральную HTTP-boundary до появления product modules. Каждый
+response получает выбранный `X-Request-ID`: принимается ровно один canonical
+UUID либо uppercase ULID; отсутствующий, malformed, lowercase, overlong или
+multi-value header заменяется `randomUUID()`. Этот же ID входит в
+`urn:request:<requestId>`, access/application logs и trace-safe attributes.
+
+Ошибки отдаются только как `application/problem+json` RFC 9457 с полями
+`type`, `title`, `status`, `detail`, `instance`, `code`, `requestId`; validation
+добавляет `errors: [{ pointer, code, detail }]`. Namespace типов строго
+`https://planner.invalid/problems/<slug>`. Core registry содержит только
+`MALFORMED_REQUEST` 400, `NOT_FOUND` 404, `CONFLICT` 409,
+`PAYLOAD_TOO_LARGE` 413, `UNSUPPORTED_MEDIA_TYPE` 415,
+`VALIDATION_FAILED` 422, `RATE_LIMIT_EXCEEDED` 429, `INTERNAL_ERROR` 500 и
+`DEPENDENCY_UNAVAILABLE` 503. Duplicate или unregistered definitions
+останавливают startup; unknown exceptions схлопываются в constant safe
+`INTERNAL_ERROR` без message, cause или stack.
+
+Global validation использует `transform: true`, disabled implicit conversion,
+`whitelist: true`, `forbidNonWhitelisted: true` и `forbidUnknownValues: true`.
+Field errors используют отсортированные и deduplicated RFC 6901 pointers и
+никогда не содержат rejected values. JSON и URL-encoded body ограничены
+`1_048_576` bytes; request/headers/keep-alive timeouts равны соответственно
+`30_000`, `10_000` и `5_000 ms`. Эти limits не меняют S02 drain `6_000 ms` и
+hard shutdown watchdog `10_000 ms`.
+
+Access records могут содержать только route template, uppercase method, status,
+duration и correlation. Structured attributes primitive-only и event-allowlisted;
+request body/query/raw URL/cookie/authorization, OIDC payload/token/code, raw
+Telegram ID/username/phone, email, free text и database/Redis URLs отбрасываются.
+Error serialization содержит type и не более восьми sanitized frames, без
+message/cause. Trace exporter allowlist-only, удаляет events/links, не включает
+Redis instrumentation или Redis-specific `db.statement`; logger/exporter/
+collector failure теряет только telemetry и не меняет safe HTTP response.
+
+OpenAPI существует как deterministic offline artifact
+`docs/api/openapi.json` c Planner metadata. Только explicit
+`openapi:generate` пишет artifact; `openapi:drift` non-writing byte-compares;
+`openapi:lint` validates artifact. Runtime его не regenerates; public
+development docs возможны только при explicit enable, а production default off.
+
+`ProductClock` — Planner adaptation, а не Starter transfer:
+`{ now(): Date; today(timeZone: "Asia/Yekaterinburg"): string }`. Только outer
+system adapter читает `new Date()`; fake clock проверяет UTC-to-
+Asia/Yekaterinburg date boundary, а `progress` и product/domain logic остаются
+pure.
+
 ## 16. Failure model
 
 | Failure | Обязательное поведение |

@@ -1,4 +1,5 @@
 import type { ApiRuntime } from './api-runtime'
+import type { ObservabilityRuntime } from '@/platform/observability/observability.runtime'
 
 export interface GracefulShutdownResult {
   readonly exitCode: 0 | 1
@@ -14,6 +15,7 @@ export class GracefulShutdownCoordinator {
     private readonly runtime: ApiRuntime,
     private readonly deadlineSignal: DeadlineSignalFactory = (milliseconds) =>
       AbortSignal.timeout(Math.max(1, milliseconds)),
+    private readonly observability?: ObservabilityRuntime,
   ) {}
 
   public shutdown(reason: string): Promise<GracefulShutdownResult> {
@@ -45,11 +47,11 @@ export class GracefulShutdownCoordinator {
       1,
       resources.shutdownGraceMs - resources.httpDrainTimeoutMs,
     )
-    await resources.database
-      .close(this.deadlineSignal(cleanupBudget))
-      .catch(() => {
-        failed = true
-      })
+    const cleanupSignal = this.deadlineSignal(cleanupBudget)
+    await resources.database.close(cleanupSignal).catch(() => {
+      failed = true
+    })
+    await this.observability?.close(cleanupSignal).catch(() => undefined)
     await resources.application.close().catch(() => {
       failed = true
     })

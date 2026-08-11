@@ -1,0 +1,17 @@
+extends:
+  - recommended
+
+rules:
+  no-invalid-media-type-examples: error
+  # S03 publishes validation Problem schemas before the first product DTO route.
+  no-unused-components: off
+  operation-2xx-response: error
+  # Infrastructure probes intentionally have no normal client-error contract.
+  operation-4xx-response: off
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-operationId-url-safe: error
+  operation-singular-tag: error
+  operation-summary: error
+  operation-tag-defined: error
+  security-defined: error

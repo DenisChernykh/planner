@@ -27,8 +27,12 @@ export function buildApiRuntimeConfig(
     throw new RuntimeConfigurationError(result.error.details.map(toIssue))
   }
   const environment = result.value
+  const endpoint = environment.OTEL_EXPORTER_OTLP_ENDPOINT
   return Object.freeze({
     environment: environment.NODE_ENV,
+    logging: Object.freeze({
+      level: environment.LOG_LEVEL,
+    }),
     http: Object.freeze({
       host: environment.API_HOST,
       port: environment.API_PORT,
@@ -38,6 +42,11 @@ export function buildApiRuntimeConfig(
       url: environment.DATABASE_URL,
       poolMax: environment.DATABASE_POOL_MAX,
       ...runtimeDefaults.database,
+    }),
+    observability: Object.freeze({
+      disabled: environment.OTEL_SDK_DISABLED,
+      ...(endpoint === undefined ? {} : { endpoint }),
+      ...runtimeDefaults.observability,
     }),
   })
 }

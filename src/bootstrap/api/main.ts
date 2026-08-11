@@ -1,9 +1,8 @@
 import 'dotenv/config'
 
+import { bootstrapApi } from './bootstrap-api'
 import { createApiRuntimeConfig } from '@/platform/config/runtime-environment'
 
-import { runApi } from './run-api'
-
-void runApi(createApiRuntimeConfig()).catch(() => {
+void bootstrapApi(createApiRuntimeConfig()).catch(() => {
   process.exitCode = 1
 })

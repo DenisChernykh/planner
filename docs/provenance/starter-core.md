@@ -153,3 +153,54 @@ integration/E2E, formatting, linting, typecheck, architecture, compiled build,
 `check:quick`, Compose rendering and Git whitespace evidence. These local checks
 do not prove a Docker image smoke, GitHub CI, publication, deployment, hosted
 health, backup restore or completion of M0.
+
+## S03 backend contract-boundaries transfer
+
+### Source and target mapping
+
+S03 selectively adapts the independently verified Starter source
+`/Users/denischernykh/projects/starters/nest-js-starter`, `stage @
+a0c8e8002af59536dea3c8209fe527bd033b2eca`, into Planner from baseline
+`68b196ca55d93163c58a04fcbd759947b12407c8`. The containing target commit is
+owned by the S03 controller; no source checkout is modified and no cherry-pick
+compatibility is implied.
+
+- Starter `src/platform/http/context/**`, `errors/**`, selected
+  `bootstrap/configure-http-application.ts` and `docs/**` map to Planner
+  `src/platform/http/{context,errors,bootstrap,docs}/**`.
+- Starter
+  `src/platform/http/policy/public-endpoint.decorator.ts` maps exactly to
+  Planner `src/platform/http/policy/public-endpoint.decorator.ts`; the
+  production `src/platform/http/health/health.controller.ts` consumes the
+  marker. S04 authentication policy is the named future consumer: default
+  authentication may be bypassed only when this unique metadata key is
+  explicitly present on a controller or handler. Unmarked endpoints remain
+  protected by default; S03 adds no guard, session or authentication behavior.
+- Starter `src/platform/logging/**`, `src/platform/observability/**`,
+  `src/bootstrap/observability/**`, `src/bootstrap/contracts/**` and
+  `scripts/openapi/**` map to same-purpose Planner paths.
+- Planner `src/shared/application/product-clock.ts` and
+  `src/platform/time/system-product-clock.ts` are an adaptation: Starter has
+  no neutral ProductClock.
+
+### Named consumers, failure model and exclusions
+
+The empty API runtime consumes correlation, validation, bounded body/server
+policy, Problem Details and safe access/error logs. Product HTTP adapters will
+consume the immutable problem catalog and deterministic offline OpenAPI artifact;
+temporal product tests consume `ProductClock`. Invalid input, unknown failures,
+malformed or oversized requests have safe typed HTTP responses; malformed IDs
+are replaced; logger/exporter failure loses telemetry only. No rejected values,
+secrets, raw identity, raw URL/query/body or error message/cause is a permitted
+recorded field.
+
+S03 deliberately excludes Starter service names/titles/tags/problem URIs,
+demo/auth/cookie/CSRF/docs-access policy, Redis instrumentation, OIDC, sessions,
+product modules, deployment assets, queues and outbox. The OpenAPI artifact is
+Planner metadata only and production does not enable/regenerate public docs.
+
+### S03 evidence boundary
+
+Focused unit/E2E, offline generation/drift/lint, architecture and quick gates
+are local evidence only. They do not prove collector availability, GitHub CI,
+OCI publication, deployment, hosted HTTP behavior, Telegram smoke or restore.

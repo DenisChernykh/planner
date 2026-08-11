@@ -1,5 +1,12 @@
 export type RuntimeEnvironment = 'development' | 'test' | 'production'
 
+export type RuntimeLogLevel =
+  'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+
+export interface LoggingRuntimeConfig {
+  readonly level: RuntimeLogLevel
+}
+
 export interface DatabaseRuntimeConfig {
   readonly url: string
   readonly poolMax: number
@@ -17,10 +24,20 @@ export interface HttpRuntimeConfig {
   readonly shutdownGraceMs: number
 }
 
+export interface OpenTelemetryRuntimeConfig {
+  readonly disabled: boolean
+  readonly endpoint?: string
+  readonly exporterTimeoutMs: number
+  readonly batchSpanScheduleDelayMs: number
+  readonly batchSpanExportTimeoutMs: number
+}
+
 export interface ApplicationRuntimeConfig {
   readonly environment: RuntimeEnvironment
+  readonly logging: LoggingRuntimeConfig
   readonly http: HttpRuntimeConfig
   readonly database: DatabaseRuntimeConfig
+  readonly observability: OpenTelemetryRuntimeConfig
 }
 
 export interface RuntimeConfigurationIssue {
