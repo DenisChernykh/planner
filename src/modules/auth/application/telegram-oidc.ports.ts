@@ -3,6 +3,9 @@ export const TELEGRAM_OIDC_DISCOVERY_URL =
   'https://oauth.telegram.org/.well-known/openid-configuration'
 export const TELEGRAM_OIDC_AUTHORIZATION_ENDPOINT =
   'https://oauth.telegram.org/auth'
+export const TELEGRAM_OIDC_TOKEN_ENDPOINT = 'https://oauth.telegram.org/token'
+export const TELEGRAM_OIDC_JWKS_URL =
+  'https://oauth.telegram.org/.well-known/jwks.json'
 export const TELEGRAM_OIDC_CALLBACK_PATH = '/auth/telegram/callback'
 export const TELEGRAM_OIDC_SCOPE = 'openid profile telegram:bot_access'
 export const TELEGRAM_OIDC_TRANSACTION_TTL_MS = 300_000
@@ -28,6 +31,21 @@ export interface OidcTransactionStorePort {
 
 export interface TelegramOidcProviderPort {
   resolveAuthorizationEndpoint(): Promise<string>
+  verifyAuthorizationCode(
+    input: TelegramOidcVerificationInput,
+  ): Promise<VerifiedTelegramOidcIdentity>
+}
+
+export interface TelegramOidcVerificationInput {
+  readonly code: string
+  readonly transaction: OidcTransaction
+  readonly nowMs: number
+}
+
+export interface VerifiedTelegramOidcIdentity {
+  readonly issuer: typeof TELEGRAM_OIDC_ISSUER
+  readonly subject: string
+  readonly providerUserId: bigint
 }
 
 export interface OidcCryptoPort {
@@ -50,6 +68,14 @@ export type TelegramOidcFetch = (
   input: string,
   init?: RequestInit,
 ) => Promise<Response>
+
+export interface TelegramOidcProviderConfig {
+  readonly timeoutMs: number
+  readonly bodyLimitBytes: number
+  readonly clientId?: string
+  readonly clientSecret?: string
+  readonly callbackUrl?: string
+}
 
 export const OIDC_TRANSACTION_STORE: unique symbol = Symbol(
   'OIDC_TRANSACTION_STORE',

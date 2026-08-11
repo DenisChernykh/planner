@@ -55,6 +55,7 @@ export interface AuthRuntimeConfig {
 
 export interface TelegramOidcRuntimeConfig {
   readonly clientId: string
+  readonly clientSecret: Uint8Array
   readonly callbackUrl: string
   readonly stateKeySecret: Uint8Array
   readonly discoveryTimeoutMs: number

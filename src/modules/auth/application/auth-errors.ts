@@ -1,6 +1,9 @@
 export type AuthFailureCode =
   | 'AUTHENTICATION_REQUIRED'
   | 'AUTHORIZATION_DENIED'
+  | 'OIDC_LOGIN_REJECTED'
+  | 'OIDC_ACCESS_DENIED'
+  | 'OIDC_CALLBACK_INVALID'
   | 'AUTH_DEPENDENCY_UNAVAILABLE'
 
 export class AuthError extends Error {
@@ -36,6 +39,27 @@ export class AuthDependencyUnavailableError extends AuthError {
       options,
     )
     this.name = 'AuthDependencyUnavailableError'
+  }
+}
+
+export class OidcLoginRejectedError extends AuthError {
+  public constructor(options?: ErrorOptions) {
+    super('OIDC_LOGIN_REJECTED', 'Telegram login rejected', options)
+    this.name = 'OidcLoginRejectedError'
+  }
+}
+
+export class OidcAccessDeniedError extends AuthError {
+  public constructor(options?: ErrorOptions) {
+    super('OIDC_ACCESS_DENIED', 'Telegram access denied', options)
+    this.name = 'OidcAccessDeniedError'
+  }
+}
+
+export class OidcCallbackValidationError extends AuthError {
+  public constructor() {
+    super('OIDC_CALLBACK_INVALID', 'OIDC callback query is invalid')
+    this.name = 'OidcCallbackValidationError'
   }
 }
 

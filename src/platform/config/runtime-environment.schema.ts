@@ -17,6 +17,7 @@ interface ValidatedRuntimeEnvironment {
   readonly AUTH_OIDC_STATE_KEY_SECRET: Uint8Array
   readonly AUTH_CSRF_ORIGINS: readonly string[]
   readonly TELEGRAM_OIDC_CLIENT_ID: string
+  readonly TELEGRAM_OIDC_CLIENT_SECRET: Uint8Array
   readonly TELEGRAM_OIDC_CALLBACK_URL: string
   readonly OTEL_SDK_DISABLED: boolean
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string
@@ -35,6 +36,24 @@ function decodeSecret(value: string): Uint8Array | undefined {
   const decoded = Buffer.from(value, 'base64url')
   return decoded.length === 32 && decoded.toString('base64url') === value
     ? new Uint8Array(decoded)
+    : undefined
+}
+
+function encodeOidcClientSecret(value: string): Uint8Array | undefined {
+  const encoded = Buffer.from(value, 'utf8')
+  let containsControl = false
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index)
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
+      containsControl = true
+      break
+    }
+  }
+  return encoded.length >= 16 &&
+    encoded.length <= 512 &&
+    encoded.toString('utf8') === value &&
+    !containsControl
+    ? new Uint8Array(encoded)
     : undefined
 }
 
@@ -151,6 +170,12 @@ export const runtimeEnvironmentSchema = Joi.object<ValidatedRuntimeEnvironment>(
     TELEGRAM_OIDC_CLIENT_ID: Joi.string()
       .pattern(/^[1-9][0-9]*$/u)
       .required(),
+    TELEGRAM_OIDC_CLIENT_SECRET: Joi.string()
+      .required()
+      .custom(
+        (value: string, helpers) =>
+          encodeOidcClientSecret(value) ?? helpers.error('any.invalid'),
+      ),
     TELEGRAM_OIDC_CALLBACK_URL: Joi.string().required(),
     OTEL_SDK_DISABLED: Joi.boolean().default(true),
     OTEL_EXPORTER_OTLP_ENDPOINT: Joi.string()

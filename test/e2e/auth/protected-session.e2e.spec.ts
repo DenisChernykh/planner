@@ -237,6 +237,7 @@ describe('S04 protected opaque-session HTTP contract', () => {
       AUTH_OIDC_STATE_KEY_SECRET: Buffer.alloc(32, 23).toString('base64url'),
       AUTH_CSRF_ORIGINS: origin,
       TELEGRAM_OIDC_CLIENT_ID: '123456789',
+      TELEGRAM_OIDC_CLIENT_SECRET: 'session-e2e-telegram-client-secret',
       TELEGRAM_OIDC_CALLBACK_URL: `${origin}/auth/telegram/callback`,
     })
     runtime = new ApiRuntime()
@@ -268,6 +269,7 @@ describe('S04 protected opaque-session HTTP contract', () => {
       'AUTH_OIDC_STATE_KEY_SECRET',
       'AUTH_CSRF_ORIGINS',
       'TELEGRAM_OIDC_CLIENT_ID',
+      'TELEGRAM_OIDC_CLIENT_SECRET',
       'TELEGRAM_OIDC_CALLBACK_URL',
     ])
       delete process.env[key]

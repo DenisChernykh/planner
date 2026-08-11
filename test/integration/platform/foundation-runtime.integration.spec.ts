@@ -66,7 +66,7 @@ describe('Planner foundation database runtime', () => {
     await container?.stop()
   })
 
-  it('deploys accepted foundation, local-User and pair-workspace migrations', async () => {
+  it('deploys accepted foundation, local-User, pair-workspace and external-identity migrations', async () => {
     const migration = deployMigrations(container.getConnectionUri())
 
     expect(migration).toMatchObject({ exitCode: 0 })
@@ -77,6 +77,7 @@ describe('Planner foundation database runtime', () => {
       { migration_name: '20260811090000_planner_foundation' },
       { migration_name: '20260811100000_local_user_session' },
       { migration_name: '20260811110000_pair_workspace' },
+      { migration_name: '20260811120000_telegram_external_identity' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name
@@ -89,6 +90,7 @@ describe('Planner foundation database runtime', () => {
       { table_name: 'memberships' },
       { table_name: 'spaces' },
       { table_name: 'telegram_access_allowlist' },
+      { table_name: 'telegram_external_identities' },
       { table_name: 'users' },
     ])
   })

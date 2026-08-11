@@ -46,6 +46,7 @@ function runtimeConfig(): ApplicationRuntimeConfig {
     AUTH_OIDC_STATE_KEY_SECRET: oidcStateSecret,
     AUTH_CSRF_ORIGINS: 'http://127.0.0.1:3000',
     TELEGRAM_OIDC_CLIENT_ID: '123456789',
+    TELEGRAM_OIDC_CLIENT_SECRET: 'start-e2e-telegram-client-secret',
     TELEGRAM_OIDC_CALLBACK_URL: 'http://127.0.0.1:3000/auth/telegram/callback',
   })
 }

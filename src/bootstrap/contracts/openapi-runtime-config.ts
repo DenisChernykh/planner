@@ -19,6 +19,7 @@ export function createOpenApiRuntimeConfig(): ApplicationRuntimeConfig {
     AUTH_OIDC_STATE_KEY_SECRET: oidcStateSecret,
     AUTH_CSRF_ORIGINS: 'https://planner.invalid',
     TELEGRAM_OIDC_CLIENT_ID: '123456789',
+    TELEGRAM_OIDC_CLIENT_SECRET: 'openapi-only-telegram-client-secret',
     TELEGRAM_OIDC_CALLBACK_URL:
       'https://planner.invalid/auth/telegram/callback',
   })

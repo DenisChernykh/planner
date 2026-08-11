@@ -305,6 +305,79 @@ Anonymous ceremony-start остаётся ограничен временем ж
 contract обязателен до любого публичного deployment. A02 не переносит
 password-flow limiter и не вводит новый application-wide Redis abstraction.
 
+Locked callback/identity contract для A03:
+
+- public `GET /auth/telegram/callback` не принимает caller-controlled redirect.
+  Strict JSON scalar и malformed JSON сохраняют общий `MALFORMED_REQUEST` `400`,
+  valid JSON body больше `1_048_576 bytes` — `PAYLOAD_TOO_LARGE` `413`, а любой
+  parser-accepted object/array или non-JSON text body даёт
+  `VALIDATION_FAILED` `422` до ceremony I/O;
+- первая фаза принимает ровно один canonical 43-character `state`. Missing,
+  duplicate, non-canonical state либо constant-time mismatch с browser-binding
+  cookie возвращает module-owned `OIDC_LOGIN_REJECTED` `401` без `GETDEL` и без
+  очистки cookie. После match controller заранее выставляет
+  `Cache-Control: no-store`, `Pragma: no-cache`,
+  `Referrer-Policy: no-referrer`, вызывает application use case через
+  `try/finally` и всегда очищает state cookie;
+- use case выполняет ровно один `GETDEL` без retry до обработки остального
+  callback. Затем exact success query содержит только scalar `state` и `code`,
+  где code — visible ASCII length `1..4096`. Exact OAuth error содержит
+  `state`, `error` и optional `error_description`/`error_uri`: каждое поле
+  scalar и unique; `error` — RFC 6749 NQSCHAR length `1..128`, description —
+  NQSCHAR до `1024`, URI value — NQSCHAR до `2048`. Description и URI не
+  сохраняются и не логируются;
+- code вместе с error, duplicate/array/unknown/missing/invalid remaining fields
+  при уже matched canonical state образуют application candidate `invalid`:
+  transaction consumes один раз, затем existing `VALIDATION_FAILED` `422`
+  получает ровно одну safe issue
+  `{ pointer: "/query", code: "invalid_value", detail: "OIDC callback query is invalid." }`.
+  OAuth error consumes transaction, не вызывает provider/PostgreSQL/session и
+  возвращает `OIDC_LOGIN_REJECTED` `401`;
+- missing/expired/replayed transaction, token endpoint `invalid_grant`, invalid
+  signature/claims/nonce возвращают тот же safe `OIDC_LOGIN_REJECTED` `401`.
+  Verified identity вне allowlist и любой binding collision возвращают новый
+  `OIDC_ACCESS_DENIED` `403`; dependency failures — существующий safe
+  `DEPENDENCY_UNAVAILABLE` `503`. Titles/details не содержат provider data;
+- success отвечает bodyless `303` с exact relative `Location: /`, request ID,
+  перечисленными cache/referrer headers, новой local-session cookie и очисткой
+  state cookie. Callback response, state, code, OAuth error values, cookies,
+  tokens и raw Telegram ID не логируются;
+- после `GETDEL` provider выполняет ровно по одному redirect-free request в
+  порядке discovery → token → JWKS, без retry, cache или UserInfo. Каждый
+  request имеет timeout `2_000 ms`, принимает только JSON и streaming body до
+  `16_384 bytes` включительно. Discovery фиксирует issuer, authorization,
+  token и JWKS endpoints, Authorization Code grant, `client_secret_basic`,
+  `RS256`, `S256` и A02 scopes;
+- token request использует Basic credentials и form ровно из
+  `grant_type`, `code`, `redirect_uri`, `client_id`, `code_verifier`. Только
+  JSON `400 { error: "invalid_grant" }` является login rejection; другие
+  status/error/malformed/oversized responses — dependency failure. Success
+  требует bounded non-empty `access_token`, compact `id_token`, exact
+  `token_type=Bearer`; optional `expires_in` — positive safe integer;
+- pilot pin-ит `RS256`; BotFather configuration с другим signing algorithm
+  является rejected operational drift. Fresh JWKS на каждый callback содержит
+  не более 16 keys с unique `(kid, alg)` и ровно один подходящий public RSA key
+  не короче 2048 bits; `use` absent/`sig`, `key_ops` absent либо содержит
+  `verify`. Protected header требует `alg=RS256`, bounded `kid`, optional exact
+  `typ=JWT` и запрещает `none`, `jku`, `x5u`, `jwk`, `x5c`, `crit`, `b64`;
+- JWT проверяется локальным JWK set с exact issuer и scalar audience, optional
+  `azp` absent/exact client ID, bounded opaque case-sensitive `sub`, integer
+  `exp`/`iat`, expected nonce и numeric `id`. Один injected `nowMs` используется
+  и для JWT, и для session; tolerance `30 s`, `iat` лежит в
+  `[now-330 s, now+30 s]`, `exp > iat` и `exp > now-30 s`. Nonce canonical и
+  сравнивается constant-time. JSON-number `id` должен быть positive integer не
+  больше `2^52-1`, затем конвертируется в `bigint`. Optional `at_hash` и
+  `c_hash` проверяются по access token/code. Profile/phone claims игнорируются;
+- API runtime требует отдельный `TELEGRAM_OIDC_CLIENT_SECRET`: opaque exact
+  non-trimmed UTF-8 value `16..512 bytes` без control characters. Secret не
+  нужен database-only provisioner/migrator и никогда не входит в diagnostics;
+- exact flow: consume → provider verification → atomic PostgreSQL binding
+  commit → S04 session issue → cookies. PostgreSQL failure не создаёт session.
+  Redis session failure даёт `503` и no session cookie, но уже проверенный
+  durable binding сохраняется; новая ceremony idempotently переиспользует его.
+  Response-write failure может оставить только недоступную TTL session.
+  Негативные исходы до binding не создают identity/session.
+
 Актуальная внешняя спецификация: [Log In With Telegram](https://core.telegram.org/bots/telegram-login).
 
 Scope `telegram:bot_access` разрешает связанному боту отправлять пользователю
@@ -323,8 +396,24 @@ Planner.
 - TypeScript domain/adapter использует `bigint`, а JSON/логически внешний
   transport передаёт ID lossless decimal string;
 - nullable email; фиктивный email из Telegram identity не синтезируется;
-- mutable profile fields `name`, `preferred_username`, `picture` только для
-  отображения.
+- future display projection может хранить mutable `name`,
+  `preferred_username`, `picture` только в отдельной named task после появления
+  consumer; identity binding A03 эти claims не сохраняет.
+
+A03 не сохраняет profile claims: до появления named display consumer они
+проверяются только как untrusted optional payload и немедленно отбрасываются.
+`telegram_external_identities` хранит immutable
+`{ issuer, subject, provider_user_id, user_id, created_at }`, unique
+`(issuer, subject)`, `(issuer, provider_user_id)` и `(issuer, user_id)` и
+composite FK `(user_id, provider_user_id)` на одну allowlist row. Auth-owned
+binding adapter читает из workspace-owned allowlist только эту exact identity
+projection и не импортирует workspace module.
+
+OIDC `id` приходит JSON number и поэтому A03 принимает только диапазон
+`1..2^52-1`. A01 сознательно сохраняет более широкий lossless signed-BIGINT
+operator boundary; provisioned значение выше OIDC range остаётся валидной
+allowlist записью, но не может аутентифицироваться через текущий Telegram JSON
+claim contract.
 
 Telegram username и email не используются для linking. Bot API `from.id`
 разрешается в local User через pre-provisioned allowlist. OIDC login сначала

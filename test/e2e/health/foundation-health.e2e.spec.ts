@@ -130,6 +130,7 @@ describe('Planner foundation API health and shutdown', () => {
       AUTH_OIDC_STATE_KEY_SECRET: Buffer.alloc(32, 13).toString('base64url'),
       AUTH_CSRF_ORIGINS: baseUrl,
       TELEGRAM_OIDC_CLIENT_ID: '123456789',
+      TELEGRAM_OIDC_CLIENT_SECRET: 'health-e2e-telegram-client-secret',
       TELEGRAM_OIDC_CALLBACK_URL: `${baseUrl}/auth/telegram/callback`,
     })
   })
@@ -150,6 +151,7 @@ describe('Planner foundation API health and shutdown', () => {
       'AUTH_OIDC_STATE_KEY_SECRET',
       'AUTH_CSRF_ORIGINS',
       'TELEGRAM_OIDC_CLIENT_ID',
+      'TELEGRAM_OIDC_CLIENT_SECRET',
       'TELEGRAM_OIDC_CALLBACK_URL',
     ]) {
       delete process.env[key]

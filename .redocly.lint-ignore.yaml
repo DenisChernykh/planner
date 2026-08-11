@@ -1,3 +1,4 @@
 docs/api/openapi.json:
   operation-2xx-response:
     - '#/paths/~1auth~1telegram~1start/get/responses'
+    - '#/paths/~1auth~1telegram~1callback/get/responses'

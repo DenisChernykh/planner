@@ -2,12 +2,20 @@ import { Module } from '@nestjs/common'
 import { APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core'
 
 import { AuthenticateSessionUseCase } from '../application/authenticate-session.use-case'
+import {
+  CompleteTelegramOidcLoginUseCase,
+  type LocalSessionIssuerPort,
+} from '../application/complete-telegram-oidc-login.use-case'
 import { GetCsrfTokenQuery } from '../application/get-csrf-token.query'
 import { IssueSessionUseCase } from '../application/issue-session.use-case'
 import { LOCAL_USER_PORT } from '../application/local-user.port'
 import { RevokeSessionUseCase } from '../application/revoke-session.use-case'
 import { SESSION_STORE } from '../application/session-store.port'
 import { StartTelegramOidcLoginUseCase } from '../application/start-telegram-oidc-login.use-case'
+import {
+  TELEGRAM_IDENTITY_BINDING_PORT,
+  type TelegramIdentityBindingPort,
+} from '../application/telegram-identity-binding.port'
 import {
   OIDC_TRANSACTION_STORE,
   TELEGRAM_OIDC_PROVIDER,
@@ -16,6 +24,7 @@ import {
 } from '../application/telegram-oidc.ports'
 import { NodeAuthCryptoAdapter } from '../infrastructure/node-auth-crypto.adapter'
 import { PrismaLocalUserRepository } from '../infrastructure/prisma-local-user.repository'
+import { PrismaTelegramIdentityBinder } from '../infrastructure/prisma-telegram-identity-binder'
 import { RedisOidcTransactionStore } from '../infrastructure/redis-oidc-transaction.store'
 import { RedisSessionStore } from '../infrastructure/redis-session.store'
 import { TelegramOidcProvider } from '../infrastructure/telegram-oidc.provider'
@@ -40,6 +49,11 @@ import type { RedisCommandExecutorPort } from '@/platform/redis/redis-command.ex
   providers: [
     PrismaLocalUserRepository,
     { provide: LOCAL_USER_PORT, useExisting: PrismaLocalUserRepository },
+    PrismaTelegramIdentityBinder,
+    {
+      provide: TELEGRAM_IDENTITY_BINDING_PORT,
+      useExisting: PrismaTelegramIdentityBinder,
+    },
     NodeAuthCryptoAdapter,
     {
       provide: RedisSessionStore,
@@ -90,6 +104,11 @@ import type { RedisCommandExecutorPort } from '@/platform/redis/redis-command.ex
         new TelegramOidcProvider(globalThis.fetch, {
           timeoutMs: config.auth.telegramOidc.discoveryTimeoutMs,
           bodyLimitBytes: config.auth.telegramOidc.discoveryBodyLimitBytes,
+          clientId: config.auth.telegramOidc.clientId,
+          clientSecret: Buffer.from(
+            config.auth.telegramOidc.clientSecret,
+          ).toString('utf8'),
+          callbackUrl: config.auth.telegramOidc.callbackUrl,
         }),
     },
     { provide: TELEGRAM_OIDC_PROVIDER, useExisting: TelegramOidcProvider },
@@ -116,6 +135,27 @@ import type { RedisCommandExecutorPort } from '@/platform/redis/redis-command.ex
     AuthenticateSessionUseCase,
     GetCsrfTokenQuery,
     IssueSessionUseCase,
+    {
+      provide: CompleteTelegramOidcLoginUseCase,
+      inject: [
+        OIDC_TRANSACTION_STORE,
+        TELEGRAM_OIDC_PROVIDER,
+        TELEGRAM_IDENTITY_BINDING_PORT,
+        IssueSessionUseCase,
+      ],
+      useFactory: (
+        transactions: OidcTransactionStorePort,
+        provider: TelegramOidcProviderPort,
+        identities: TelegramIdentityBindingPort,
+        sessions: LocalSessionIssuerPort,
+      ) =>
+        new CompleteTelegramOidcLoginUseCase(
+          transactions,
+          provider,
+          identities,
+          sessions,
+        ),
+    },
     RevokeSessionUseCase,
     {
       provide: OidcStateCookieAdapter,
@@ -180,6 +220,7 @@ import type { RedisCommandExecutorPort } from '@/platform/redis/redis-command.ex
   ],
   exports: [
     IssueSessionUseCase,
+    CompleteTelegramOidcLoginUseCase,
     StartTelegramOidcLoginUseCase,
     OIDC_TRANSACTION_STORE,
     TELEGRAM_OIDC_PROVIDER,

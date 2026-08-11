@@ -38,6 +38,7 @@ import {
 import { ApplicationLifecycleState } from '@/platform/lifecycle/application-lifecycle.state'
 
 interface OpenApiResponse {
+  readonly headers?: Record<string, unknown>
   readonly content?: Record<
     string,
     {
@@ -45,6 +46,19 @@ interface OpenApiResponse {
       readonly examples?: Record<string, unknown>
     }
   >
+}
+
+interface OpenApiParameter {
+  readonly name?: string
+  readonly in?: string
+  readonly required?: boolean
+  readonly description?: string
+  readonly schema?: {
+    readonly type?: string
+    readonly pattern?: string
+    readonly minLength?: number
+    readonly maxLength?: number
+  }
 }
 
 class ContractRequestDto {
@@ -341,6 +355,7 @@ describe('S03 HTTP contracts', () => {
           get?: {
             responses?: Record<string, OpenApiResponse>
             security?: readonly Record<string, readonly unknown[]>[]
+            parameters?: readonly OpenApiParameter[]
           }
           post?: {
             responses?: Record<string, OpenApiResponse>
@@ -360,6 +375,7 @@ describe('S03 HTTP contracts', () => {
       '/auth/csrf',
       '/auth/logout',
       '/auth/me',
+      '/auth/telegram/callback',
       '/auth/telegram/start',
       '/health/live',
       '/health/ready',
@@ -369,9 +385,142 @@ describe('S03 HTTP contracts', () => {
     expect(Object.keys(document.paths['/auth/me'] ?? {})).toEqual(['get'])
     expect(Object.keys(document.paths['/auth/csrf'] ?? {})).toEqual(['get'])
     expect(Object.keys(document.paths['/auth/logout'] ?? {})).toEqual(['post'])
+    expect(
+      Object.keys(document.paths['/auth/telegram/callback'] ?? {}),
+    ).toEqual(['get'])
     expect(Object.keys(document.paths['/auth/telegram/start'] ?? {})).toEqual([
       'get',
     ])
+    expect(
+      Object.keys(
+        document.paths['/auth/telegram/callback']?.get?.responses ?? {},
+      ).sort(),
+    ).toEqual(['303', '400', '401', '403', '413', '422', '503'])
+    expect(document.paths['/auth/telegram/callback']?.get?.security).toEqual([])
+    const callbackParameters =
+      document.paths['/auth/telegram/callback']?.get?.parameters ?? []
+    expect(callbackParameters.map(({ name }) => name).sort()).toEqual([
+      'code',
+      'error',
+      'error_description',
+      'error_uri',
+      'state',
+    ])
+    expect(
+      Object.fromEntries(
+        callbackParameters.map(({ name, ...parameter }) => [name, parameter]),
+      ),
+    ).toEqual({
+      state: {
+        in: 'query',
+        required: true,
+        description:
+          'Canonical OIDC state. Required for both success and OAuth error callbacks.',
+        schema: {
+          type: 'string',
+          pattern: '^[A-Za-z0-9_-]{43}$',
+          minLength: 43,
+          maxLength: 43,
+        },
+      },
+      code: {
+        in: 'query',
+        required: false,
+        description: 'Authorization code. Supply exactly one of code or error.',
+        schema: {
+          type: 'string',
+          pattern: '^[\\x21-\\x7E]+$',
+          minLength: 1,
+          maxLength: 4_096,
+        },
+      },
+      error: {
+        in: 'query',
+        required: false,
+        description: 'OAuth error. Supply exactly one of error or code.',
+        schema: {
+          type: 'string',
+          pattern: '^[\\x20-\\x21\\x23-\\x5B\\x5D-\\x7E]+$',
+          minLength: 1,
+          maxLength: 128,
+        },
+      },
+      error_description: {
+        in: 'query',
+        required: false,
+        description:
+          'Optional OAuth error description; allowed only with error and ignored by Planner.',
+        schema: {
+          type: 'string',
+          pattern: '^[\\x20-\\x21\\x23-\\x5B\\x5D-\\x7E]*$',
+          minLength: 0,
+          maxLength: 1_024,
+        },
+      },
+      error_uri: {
+        in: 'query',
+        required: false,
+        description:
+          'Optional OAuth error URI; allowed only with error and ignored by Planner.',
+        schema: {
+          type: 'string',
+          pattern: '^[\\x20-\\x21\\x23-\\x5B\\x5D-\\x7E]*$',
+          minLength: 0,
+          maxLength: 2_048,
+        },
+      },
+    })
+    expect(
+      document.paths['/auth/telegram/callback']?.get?.responses?.['303']
+        ?.headers,
+    ).toEqual({
+      'Cache-Control': { schema: { enum: ['no-store'], type: 'string' } },
+      Location: {
+        description: 'Fixed relative Planner destination.',
+        schema: { enum: ['/'], type: 'string' },
+      },
+      Pragma: { schema: { enum: ['no-cache'], type: 'string' } },
+      'Referrer-Policy': {
+        schema: { enum: ['no-referrer'], type: 'string' },
+      },
+      'Set-Cookie': {
+        description: 'Local session cookie and cleared OIDC state cookie.',
+        schema: {
+          items: { type: 'string' },
+          maxItems: 2,
+          minItems: 2,
+          type: 'array',
+        },
+      },
+      'X-Request-ID': {
+        description: 'Trusted request correlation ID.',
+        schema: { type: 'string' },
+      },
+    })
+    expect(
+      document.paths['/auth/telegram/callback']?.get?.responses?.['422']
+        ?.content?.['application/problem+json']?.examples,
+    ).toEqual({
+      VALIDATION_FAILED: {
+        summary: 'Validation failed',
+        value: {
+          type: 'https://planner.invalid/problems/validation-failed',
+          title: 'Validation failed',
+          status: 422,
+          detail: 'One or more request fields are invalid.',
+          instance: 'urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV',
+          code: 'VALIDATION_FAILED',
+          requestId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+          errors: [
+            {
+              pointer: '/query',
+              code: 'invalid_value',
+              detail: 'OIDC callback query is invalid.',
+            },
+          ],
+        },
+      },
+    })
     expect(Object.keys(document.components?.schemas ?? {}).sort()).toEqual(
       expect.arrayContaining([
         'ProblemFieldErrorResponseDto',
@@ -387,6 +536,8 @@ describe('S03 HTTP contracts', () => {
       'INTERNAL_ERROR',
       'MALFORMED_REQUEST',
       'NOT_FOUND',
+      'OIDC_ACCESS_DENIED',
+      'OIDC_LOGIN_REJECTED',
       'PAYLOAD_TOO_LARGE',
       'RATE_LIMIT_EXCEEDED',
       'UNSUPPORTED_MEDIA_TYPE',

@@ -620,24 +620,65 @@ local session; replay, invalid claims and identity collision fail closed.
 **Files:**
 
 - Create: `src/modules/auth/application/complete-telegram-oidc-login.use-case.ts`
+- Create: `src/modules/auth/application/telegram-identity-binding.port.ts`
 - Modify: `src/modules/auth/infrastructure/telegram-oidc.provider.ts`
+- Create: `src/modules/auth/infrastructure/prisma-telegram-identity-binder.ts`
 - Modify: `src/modules/auth/presentation/telegram-oidc.controller.ts`
+- Modify: auth Problems/contribution/module and runtime config
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811120000_telegram_external_identity/migration.sql`
-- Test: `test/e2e/auth/telegram-oidc.e2e-spec.ts`
+- Modify: `package.json`, `pnpm-lock.yaml`, OpenAPI artifact/config and local
+  Compose fixture
+- Test: `test/contract/auth/telegram-oidc-callback.contract.spec.ts`
+- Test: `test/integration/auth/telegram-external-identity.integration.spec.ts`
+- Test: `test/e2e/auth/telegram-oidc-callback.e2e.spec.ts`
 
 **Produces:** unique `(issuer, subject)` plus numeric Telegram ID mapping to one
-local User; uses S04 session issuer.
+local User; uses S04 session issuer. `jose@6.2.3` verifies a freshly fetched,
+strictly bounded local JWKS; no generic federation or UserInfo client is added.
 
-- [ ] Написать fake issuer/JWKS RED matrix success, cancel, consumed/replayed
-  state, nonce/PKCE/signature/iss/aud/exp failure, outage, unknown ID and
-  binding collision.
-- [ ] Реализовать token exchange/JWKS validation, one-time consume and
-  allowlist-to-local-user binding.
-- [ ] Не использовать username/email for linking; negative cases create no
+**Locked A03 contract:** public `GET /auth/telegram/callback` has no
+caller-selected redirect. Parser-owned JSON scalar/malformed body remains `400`,
+body above 1 MiB remains `413`, and parser-admitted object/array/text body is
+`422` before ceremony I/O. Exactly one canonical state must constant-time match
+the browser cookie before Redis; mismatch is `OIDC_LOGIN_REJECTED` `401` with
+zero consume/clear. After match, `GETDEL` happens exactly once before remaining
+query classification and state cookie is cleared in `finally`. Exact code,
+OAuth error and invalid candidates follow the phase/order, field bounds and
+safe redaction contract in `TECHNICAL_DESIGN.md` section 6.1.
+
+Callback provider I/O is discovery → token → JWKS once each, fixed Telegram
+URLs, no redirect/retry/cache/UserInfo, `2_000 ms` and inclusive `16_384-byte`
+JSON body bounds. Token POST uses exact Basic/form contract. Pilot accepts only
+RS256 and local JWKS with bounded/unique strong RSA keys. JWT pins issuer,
+scalar audience, optional azp, subject, exp/iat window, nonce, numeric Telegram
+ID `1..2^52-1` and optional OIDC hashes. `TELEGRAM_OIDC_CLIENT_SECRET` is an
+API-only validated secret. Raw callback/provider/profile values are neither
+stored nor logged.
+
+Auth owns an atomic Prisma binding adapter which reads only the exact allowlist
+projection. One transaction under fixed A03 advisory lock creates or verifies
+immutable `telegram_external_identities`; composite FK proves user/provider ID
+belong to the same allowlist row. Unknown verified ID or any subject/ID/user
+collision is `OIDC_ACCESS_DENIED` `403` with rollback. Binding commit precedes
+S04 Redis session issue: Redis failure returns `503` without session cookie but
+keeps the valid binding for idempotent recovery. Success is bodyless `303 /`
+with two cookies and exact no-store/no-cache/no-referrer headers. OpenAPI lists
+only `303/400/401/403/413/422/503`; Redocly receives one additional exact
+callback-only 2xx-ignore pointer while the global rule stays `error`.
+
+- [x] Написать fake issuer/JWKS RED matrix success, cancel, consumed/replayed
+  state, parser/query order, nonce/PKCE/header/JWK/signature/claims/time/ID
+  bounds, outage, unknown ID, redaction and binding collision.
+- [x] Реализовать token exchange/JWKS validation, one-time consume and
+  atomic allowlist-to-local-user binding с exact provider/session ordering.
+- [x] Доказать real-PostgreSQL migration/constraints/idempotency/concurrency и
+  real PostgreSQL+Redis callback/session recovery. Не использовать
+  username/email/profile for linking; pre-binding negatives create no
   User/external identity/session.
-- [ ] Запустить E2E, migration integration, OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: complete allowlisted Telegram OIDC login`.
+- [x] Запустить full unit/contract/integration/E2E, Prisma/OpenAPI/Compose,
+  architecture/build, `pnpm check:quick` и scope/secret/lock audit.
+- [x] Commit: `feat: complete allowlisted Telegram OIDC login`.
 
 ---
 

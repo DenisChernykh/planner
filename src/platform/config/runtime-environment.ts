@@ -34,6 +34,9 @@ export function buildApiRuntimeConfig(
   const oidcStateKeySecret = new Uint8Array(
     environment.AUTH_OIDC_STATE_KEY_SECRET,
   )
+  const oidcClientSecret = new Uint8Array(
+    environment.TELEGRAM_OIDC_CLIENT_SECRET,
+  )
   const csrfOrigins = Object.freeze([...environment.AUTH_CSRF_ORIGINS])
   const auth = {
     sessionCookieName: production
@@ -52,6 +55,9 @@ export function buildApiRuntimeConfig(
     touchIntervalMs: runtimeDefaults.auth.touchIntervalMs,
     telegramOidc: Object.freeze({
       clientId: environment.TELEGRAM_OIDC_CLIENT_ID,
+      get clientSecret(): Uint8Array {
+        return new Uint8Array(oidcClientSecret)
+      },
       callbackUrl: environment.TELEGRAM_OIDC_CALLBACK_URL,
       get stateKeySecret(): Uint8Array {
         return new Uint8Array(oidcStateKeySecret)

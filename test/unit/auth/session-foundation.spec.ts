@@ -91,6 +91,7 @@ function runtimeInput(
     AUTH_OIDC_STATE_KEY_SECRET: Buffer.alloc(32, 7).toString('base64url'),
     AUTH_CSRF_ORIGINS: 'http://127.0.0.1:3000',
     TELEGRAM_OIDC_CLIENT_ID: '123456789',
+    TELEGRAM_OIDC_CLIENT_SECRET: '  opaque Telegram client secret  ',
     TELEGRAM_OIDC_CALLBACK_URL: 'http://127.0.0.1:3000/auth/telegram/callback',
     ...overrides,
   }
@@ -327,11 +328,24 @@ describe('S04 local User and opaque session foundation', () => {
     const firstOidcSecret = config.auth.telegramOidc.stateKeySecret
     firstOidcSecret[0] = 255
     expect(config.auth.telegramOidc.stateKeySecret[0]).toBe(7)
+    const firstClientSecret = config.auth.telegramOidc.clientSecret
+    firstClientSecret[0] = 255
+    expect(
+      Buffer.from(config.auth.telegramOidc.clientSecret).toString('utf8'),
+    ).toBe('  opaque Telegram client secret  ')
     const runtimeService = new RuntimeConfigService(config)
     const firstServiceOidcSecret =
       runtimeService.auth.telegramOidc.stateKeySecret
     firstServiceOidcSecret[0] = 255
     expect(runtimeService.auth.telegramOidc.stateKeySecret[0]).toBe(7)
+    const firstServiceClientSecret =
+      runtimeService.auth.telegramOidc.clientSecret
+    firstServiceClientSecret[0] = 255
+    expect(
+      Buffer.from(runtimeService.auth.telegramOidc.clientSecret).toString(
+        'utf8',
+      ),
+    ).toBe('  opaque Telegram client secret  ')
     expect(config.auth.telegramOidc).toMatchObject({
       clientId: '123456789',
       callbackUrl: 'http://127.0.0.1:3000/auth/telegram/callback',
@@ -355,6 +369,20 @@ describe('S04 local User and opaque session foundation', () => {
         }),
       ),
     ).toThrow()
+    for (const invalidClientSecret of [
+      'fifteen-bytes!!',
+      'valid-length-but-control\u0000',
+      `valid-length-malformed-${'\ud800'}`,
+      'x'.repeat(513),
+    ]) {
+      expect(() =>
+        buildApiRuntimeConfig(
+          runtimeInput({
+            TELEGRAM_OIDC_CLIENT_SECRET: invalidClientSecret,
+          }),
+        ),
+      ).toThrow()
+    }
     for (const collision of [
       { AUTH_OIDC_STATE_KEY_SECRET: runtimeInput()['AUTH_SESSION_KEY_SECRET'] },
       { AUTH_OIDC_STATE_KEY_SECRET: runtimeInput()['AUTH_CSRF_SECRET'] },

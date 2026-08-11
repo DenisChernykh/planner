@@ -49,8 +49,25 @@ model TelegramAccessAllowlist {
   spaceId    String @map("space_id") @db.Uuid
   telegramId BigInt @unique @map("telegram_id") @db.BigInt
 
-  membership Membership @relation(fields: [spaceId, userId], references: [spaceId, userId], onDelete: Restrict, onUpdate: Cascade)
+  membership Membership                 @relation(fields: [spaceId, userId], references: [spaceId, userId], onDelete: Restrict, onUpdate: Cascade)
+  identities TelegramExternalIdentity[]
 
   @@id([spaceId, userId])
+  @@unique([userId, telegramId])
   @@map("telegram_access_allowlist")
+}
+
+model TelegramExternalIdentity {
+  issuer         String   @db.VarChar(255)
+  subject        String   @db.VarChar(255)
+  providerUserId BigInt   @map("provider_user_id") @db.BigInt
+  userId         String   @map("user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  allowlist TelegramAccessAllowlist @relation(fields: [userId, providerUserId], references: [userId, telegramId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([issuer, subject])
+  @@unique([issuer, providerUserId])
+  @@unique([issuer, userId])
+  @@map("telegram_external_identities")
 }

@@ -48,6 +48,7 @@ export class RuntimeConfigService {
       csrfOrigins: Object.freeze([...auth.csrfOrigins]),
       telegramOidc: Object.freeze({
         ...auth.telegramOidc,
+        clientSecret: new Uint8Array(auth.telegramOidc.clientSecret),
         stateKeySecret: new Uint8Array(auth.telegramOidc.stateKeySecret),
       }),
     })

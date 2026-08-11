@@ -19,6 +19,10 @@ import { OidcStateCookieAdapter } from '@/modules/auth/presentation/oidc-state-c
 
 const clientId = '123456789'
 const callbackUrl = 'http://127.0.0.1:3000/auth/telegram/callback'
+
+function unusedVerifyAuthorizationCode(): Promise<never> {
+  return Promise.reject(new Error('callback verification is not used'))
+}
 const state = Buffer.alloc(32, 1).toString('base64url')
 const nonce = Buffer.alloc(32, 2).toString('base64url')
 const verifier = Buffer.alloc(32, 3).toString('base64url')
@@ -142,6 +146,7 @@ describe('A02 Telegram OIDC ceremony contract', () => {
         order.push('provider')
         return Promise.resolve(TELEGRAM_OIDC_AUTHORIZATION_ENDPOINT)
       }),
+      verifyAuthorizationCode: unusedVerifyAuthorizationCode,
     }
     const create = jest.fn<
       ReturnType<OidcTransactionStorePort['create']>,
@@ -233,7 +238,10 @@ describe('A02 Telegram OIDC ceremony contract', () => {
       finalVerifier,
     ])
     const useCase = new StartTelegramOidcLoginUseCase(
-      { resolveAuthorizationEndpoint: resolve },
+      {
+        resolveAuthorizationEndpoint: resolve,
+        verifyAuthorizationCode: unusedVerifyAuthorizationCode,
+      },
       createStore(create),
       crypto,
       { clientId, callbackUrl },
@@ -284,6 +292,7 @@ describe('A02 Telegram OIDC ceremony contract', () => {
         {
           resolveAuthorizationEndpoint: () =>
             Promise.resolve(TELEGRAM_OIDC_AUTHORIZATION_ENDPOINT),
+          verifyAuthorizationCode: unusedVerifyAuthorizationCode,
         },
         createStore(create),
         crypto,
@@ -323,6 +332,7 @@ describe('A02 Telegram OIDC ceremony contract', () => {
       {
         resolveAuthorizationEndpoint: () =>
           Promise.resolve(TELEGRAM_OIDC_AUTHORIZATION_ENDPOINT),
+        verifyAuthorizationCode: unusedVerifyAuthorizationCode,
       },
       createStore(create),
       crypto,
@@ -356,6 +366,7 @@ describe('A02 Telegram OIDC ceremony contract', () => {
         {
           resolveAuthorizationEndpoint: () =>
             Promise.resolve(TELEGRAM_OIDC_AUTHORIZATION_ENDPOINT),
+          verifyAuthorizationCode: unusedVerifyAuthorizationCode,
         },
         createStore(create),
         crypto,
@@ -385,6 +396,7 @@ describe('A02 Telegram OIDC ceremony contract', () => {
       {
         resolveAuthorizationEndpoint: () =>
           Promise.resolve(TELEGRAM_OIDC_AUTHORIZATION_ENDPOINT),
+        verifyAuthorizationCode: unusedVerifyAuthorizationCode,
       },
       createStore(create),
       createCrypto(values),
@@ -404,6 +416,7 @@ describe('A02 Telegram OIDC ceremony contract', () => {
       {
         resolveAuthorizationEndpoint: () =>
           Promise.resolve('https://evil.example/auth'),
+        verifyAuthorizationCode: unusedVerifyAuthorizationCode,
       },
       createStore(foreignCreate),
       createCrypto([state, nonce, verifier]),
