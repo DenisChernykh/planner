@@ -11,6 +11,7 @@ export interface MemberContext {
 export interface WorkspaceMemberResolver {
   resolveUser(userId: UserId): Promise<MemberContext>
   resolveTelegramId(telegramId: bigint): Promise<MemberContext>
+  resolveMember(memberId: MemberId): Promise<MemberContext>
 }
 
 export const WORKSPACE_MEMBER_RESOLVER: unique symbol = Symbol(

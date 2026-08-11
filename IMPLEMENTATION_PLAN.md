@@ -111,25 +111,53 @@ export type PlanMonthId = string;
 export type PublicationId = string;
 export type PlanGoalId = string;
 
-export type ActorRef =
-  | { kind: "member"; id: MemberId }
-  | { kind: "system"; id: "planner-worker" };
+export type CanonicalJsonValue =
+  | null
+  | boolean
+  | string
+  | number
+  | readonly CanonicalJsonValue[]
+  | CanonicalJsonObject;
 
-export type ApplicationCommand<TPayload> = {
-  commandId: string;
-  trustedActor: ActorRef;
-  expectedRevision?: bigint;
-  payload: TPayload;
+export type CanonicalJsonObject = {
+  readonly [key: string]: CanonicalJsonValue;
 };
 
-export type CommandType = string;
+export type ActorRef =
+  | { readonly kind: "member"; readonly id: MemberId }
+  | { readonly kind: "system"; readonly id: "planner-worker" };
+
+export type ApplicationCommand<TPayload> = {
+  readonly commandId: string;
+  readonly trustedActor: ActorRef;
+  readonly expectedRevision?: bigint;
+  readonly payload: TPayload;
+};
+
+export type DurableCommandResultRef<K extends string = string> = {
+  readonly kind: K;
+  readonly aggregateId: string;
+  readonly aggregateRevision: bigint;
+};
+
+export type CommandExecutionContext = {
+  readonly occurredAt: Date;
+};
+
+export type CommandDefinition<TPayload, K extends string> = {
+  readonly commandType: string;
+  readonly resultKind: K;
+  readonly toCanonicalPayload: (payload: TPayload) => CanonicalJsonObject;
+};
 
 export interface CommandExecutor {
-  execute<TPayload, TResult>(
-    commandType: CommandType,
+  execute<TPayload, K extends string>(
+    definition: CommandDefinition<TPayload, K>,
     command: ApplicationCommand<TPayload>,
-    effect: () => Promise<TResult>,
-  ): Promise<TResult>;
+    effect: (
+      context: CommandExecutionContext,
+    ) => Promise<DurableCommandResultRef<K>>,
+  ): Promise<DurableCommandResultRef<K>>;
 }
 
 export type MemberContext = {
@@ -141,6 +169,7 @@ export type MemberContext = {
 export interface WorkspaceMemberResolver {
   resolveUser(userId: UserId): Promise<MemberContext>;
   resolveTelegramId(telegramId: bigint): Promise<MemberContext>;
+  resolveMember(memberId: MemberId): Promise<MemberContext>;
 }
 
 export type ProductClock = {
@@ -157,7 +186,9 @@ Receipt scope равен `(actorScope, commandType, commandId)`, где actorSco
 детерминированно выводится из `trustedActor`. Canonical fingerprint покрывает
 `commandType`, `expectedRevision` и payload; receipt хранит result reference,
 aggregate revision and completion time. Replay lookup выполняется до permission
-check and CAS.
+check and CAS. Durable mutation result ограничен immutable typed aggregate ref;
+произвольного `TResult`, result JSONB, global command bus или generic audit
+store нет.
 
 ---
 
@@ -695,23 +726,46 @@ actor-scoped receipt, fingerprint, receipt-before-CAS и finite action history.
 
 - Create: `src/shared/application/application-command.ts`
 - Create: `src/shared/application/command-receipt.port.ts`
+- Create: `src/shared/application/command-fingerprint.ts`
+- Create: `src/shared/application/durable-command.executor.ts`
+- Create/Modify: neutral receipt adapter and export under
+  `src/platform/database/**`
+- Modify: workspace member resolver public port and Prisma adapter
 - Create: `src/modules/planning/**`
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811130000_plan_draft_kernel/migration.sql`
+- Test: `test/unit/shared/application/command-fingerprint.spec.ts`
+- Test: `test/unit/shared/application/command-executor.spec.ts`
 - Test: `test/integration/planning/draft-command.integration.spec.ts`
+- Modify: exact migration/table inventory in
+  `test/integration/platform/foundation-runtime.integration.spec.ts`
 
 **Produces:** locked `CommandExecutor`, `GetDraftQuery`, month revision and
 shared receipt contract later adopted by tracking.
 
-- [ ] Написать RED tests для first execution, exact replay, same-key/different-
-  payload conflict, stale revision и concurrent same-month creation.
-- [ ] Реализовать unique `(actorScope, commandType, commandId)`, canonical
-  fingerprint and receipt lookup before permissions/CAS; effect, action history
-  and completed result reference фиксировать одной transaction.
-- [ ] Проверить system actor отдельно from member; adapters inject trustedActor,
-  while untrusted HTTP/Telegram DTO contains no actor field.
-- [ ] Запустить planning integration и `pnpm check:quick`.
-- [ ] Commit: `feat: add idempotent plan draft kernel`.
+- [x] Написать три approved RED suites: canonical fingerprint matrix; executor
+  ordering/replay/rollback; real-PostgreSQL draft commands and query.
+- [x] Реализовать receipt key exact `(actorScope, commandType, commandId)`, где
+  member scope — `member:<canonical-lowercase-member-uuid>`, system scope —
+  `system:planner-worker`; fingerprint v1 покрывает только `commandType`,
+  nullable/positive-decimal `expectedRevision` и exact-projected payload.
+- [x] В одной PostgreSQL transaction взять
+  `pg_advisory_xact_lock(hashtextextended(keyJson, 8503113703))`, выполнить
+  receipt conflict/replay до clock/permission/CAS, прочитать clock ровно один
+  раз для fresh command, затем атомарно сохранить effect, finite planning
+  history и typed completed receipt.
+- [x] Реализовать `CreateEmptyDraft` с обязательным exact focus и canonical
+  `YYYY-MM`, lifecycle/draft revision `1n`; `UpdateMonthFocus` с positive
+  draft-only expected revision; `GetDraftQuery` без receipt. Actor разрешается
+  server-side через `resolveMember`; payload exact-rejects actor/member/user/
+  space и любые extra fields. Оба member имеют равные draft configuration
+  rights; system actor P01 fail closed.
+- [x] Добавить только P01 tables: `plan_months`, `plan_drafts`, neutral
+  `command_receipts`, `planning_action_groups` и
+  `planning_month_focus_changes`; receipt/history immutable, action-to-receipt
+  FK deferred, arbitrary JSON отсутствует.
+- [x] Запустить planning integration и `pnpm check:quick`.
+- [x] Commit: `feat: add idempotent plan draft kernel`.
 
 ### P02 — Catalog, versions and analytical series
 

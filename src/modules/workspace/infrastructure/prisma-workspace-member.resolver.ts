@@ -64,4 +64,19 @@ export class PrismaWorkspaceMemberResolver implements WorkspaceMemberResolver {
       throw new WorkspaceDependencyUnavailableError({ cause: error })
     }
   }
+
+  public async resolveMember(memberId: string): Promise<MemberContext> {
+    try {
+      const row = await this.database.withClient((client) =>
+        client.membership.findUnique({
+          where: { id: memberId },
+          select: { id: true, spaceId: true, userId: true },
+        }),
+      )
+      return toMemberContext(row)
+    } catch (error: unknown) {
+      if (error instanceof WorkspaceMemberNotFoundError) throw error
+      throw new WorkspaceDependencyUnavailableError({ cause: error })
+    }
+  }
 }

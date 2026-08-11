@@ -78,6 +78,7 @@ describe('Planner foundation database runtime', () => {
       { migration_name: '20260811100000_local_user_session' },
       { migration_name: '20260811110000_pair_workspace' },
       { migration_name: '20260811120000_telegram_external_identity' },
+      { migration_name: '20260811130000_plan_draft_kernel' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name
@@ -87,7 +88,12 @@ describe('Planner foundation database runtime', () => {
         ORDER BY table_name`,
     )
     expect(productionTables.rows).toEqual([
+      { table_name: 'command_receipts' },
       { table_name: 'memberships' },
+      { table_name: 'plan_drafts' },
+      { table_name: 'plan_months' },
+      { table_name: 'planning_action_groups' },
+      { table_name: 'planning_month_focus_changes' },
       { table_name: 'spaces' },
       { table_name: 'telegram_access_allowlist' },
       { table_name: 'telegram_external_identities' },

@@ -554,15 +554,20 @@ safe message.
 `WorkspaceMemberResolver` реализует ledger contract и возвращает ровно
 `{ spaceId, memberId, userId }`. Unknown User/Telegram ID даёт safe typed
 `WorkspaceMemberNotFoundError` без writes, database failure — отдельный
-`WorkspaceDependencyUnavailableError`. A01 доказывает общий `spaceId` и
+`WorkspaceDependencyUnavailableError`. P01 расширяет тот же public port методом
+`resolveMember(memberId)` с тем же exact result и safe error contract. Planning
+commands принимают trusted member actor, разрешают member server-side и выводят
+`spaceId`; payload не содержит `spaceId`, `memberId`, `userId` или
+`trustedActor`. A01 доказывает общий `spaceId` и
 отсутствие role; read-all plan и сравнение trusted `memberId` с будущим
 `owner_member_id` проверяются в первых planning/personal-mutation slices, а не
 симулируются до появления этих моделей.
 
 ## 7. Концептуальная модель хранения
 
-Названия таблиц являются целевыми концептами; окончательные Prisma names
-определяются implementation plan без изменения инвариантов.
+Названия таблиц являются целевыми концептами; P01 фиксирует первые physical
+names и ограничения ниже, следующие tasks добавляют только свои модели без
+ослабления этих инвариантов.
 
 ### 7.1. Identity и workspace
 
@@ -585,8 +590,10 @@ Catalog archive никогда не удаляет historical versions. Publishe
 
 ### 7.3. Month, draft и publication
 
-- `plan_months` с unique `(space_id, year, month)`, lifecycle status,
-  aggregate revision, `active_publication_id`, `facts_revision` и timestamps;
+- `plan_months` с UUID PK, `space_id` FK RESTRICT, canonical month как первый
+  день в `month_start DATE`, unique `(space_id, month_start)`, finite lifecycle
+  status `draft|published|grace|closed`, lifecycle revision `BIGINT >= 1` и
+  explicit timestamps;
 - `plan_drafts` с mandatory editable month focus и optimistic revision;
 - `plan_draft_goals` с editable configuration, analytical-series reference,
   order и optional display-only `sourceProvenance`;
@@ -599,6 +606,11 @@ Catalog archive никогда не удаляет historical versions. Publishe
 Одна plan month может иметь несколько publication revisions, но не более одной
 active publication. Cancel до начала месяца помечает revision cancelled; он не
 переписывается и не удаляется.
+
+P01 создаёт только goal-empty draft: `plan_months` и `plan_drafts` без catalog,
+goal, fact, publication, seed, active-publication pointer или facts revision.
+Focus хранится exact без trim/Unicode normalization; application и database
+требуют `btrim(focus)` non-empty и `char_length(focus) <= 500`.
 
 Каждый снимок содержит все поля, влияющие на отображение и расчёты: title,
 why, category, scope/owner, type, repetition, target, unit, precision,
@@ -677,6 +689,16 @@ payload, но не как неограниченный контейнер фак
 История append-only и module-owned. Нет global arbitrary-JSON audit store.
 Undo находит последнее разрешённое собственное действие и создаёт новую
 компенсирующую revision, не удаляя историю.
+
+P01 материализует planning-owned `planning_action_groups` только с finite
+`draft_created|month_focus_updated`, exact actor member/system columns and
+consistency checks, actor scope, plan-draft target, command identity,
+nullable/positive before revision, positive after revision и одним
+`occurred_at`. One-to-one `planning_month_focus_changes` хранит nullable exact
+before focus и mandatory exact after focus. Composite action command key имеет
+deferred FK на completed receipt key: action допустим до insert receipt внутри
+одной transaction, но orphan не коммитится. Receipt и обе history tables
+запрещают ordinary UPDATE/DELETE database triggers.
 
 ## 8. Temporal contract
 
@@ -826,21 +848,48 @@ Effective lifecycle вычисляется из persisted state и календ�
 ### 10.1. Envelope
 
 ```ts
-type ApplicationCommand<TPayload> = {
-  commandId: string;
-  trustedActor: {
-    kind: "member" | "system";
-    id: string;
-  };
-  expectedRevision?: bigint;
-  payload: TPayload;
+export type ActorRef =
+  | { readonly kind: "member"; readonly id: string }
+  | { readonly kind: "system"; readonly id: "planner-worker" };
+
+export type ApplicationCommand<TPayload> = {
+  readonly commandId: string;
+  readonly trustedActor: ActorRef;
+  readonly expectedRevision?: bigint;
+  readonly payload: TPayload;
 };
+
+export type DurableCommandResultRef<K extends string = string> = {
+  readonly kind: K;
+  readonly aggregateId: string;
+  readonly aggregateRevision: bigint;
+};
+
+export type CommandExecutionContext = { readonly occurredAt: Date };
+
+export type CommandDefinition<TPayload, K extends string> = {
+  readonly commandType: string;
+  readonly resultKind: K;
+  readonly toCanonicalPayload: (payload: TPayload) => CanonicalJsonObject;
+};
+
+export interface CommandExecutor {
+  execute<TPayload, K extends string>(
+    definition: CommandDefinition<TPayload, K>,
+    command: ApplicationCommand<TPayload>,
+    effect: (
+      context: CommandExecutionContext,
+    ) => Promise<DurableCommandResultRef<K>>,
+  ): Promise<DurableCommandResultRef<K>>;
+}
 ```
 
 Web и Telegram adapters создают одинаковые product commands. `trustedActor`
 никогда не принимается из untrusted payload: web получает его из сессии,
 Telegram — из verified private-chat `from.id`, worker использует отдельного
-system actor.
+system actor. `commandId` — canonical lowercase UUID. Member actor scope равен
+`member:<canonical-lowercase-member-uuid>`, system scope —
+`system:planner-worker`.
 
 ### 10.2. Durable receipt
 
@@ -850,20 +899,48 @@ Unique scope:
 (actorScope, commandType, commandId)
 ```
 
-Receipt хранит canonical request fingerprint, result reference, aggregate
-revision и completion time. Effect, action history и completed receipt
+Receipt хранит SHA-256 lowercase 64-hex canonical request fingerprint, finite
+typed result kind, aggregate ID, positive aggregate revision и completion time;
+произвольного result JSONB нет. Neutral receipt port и Prisma adapter принадлежат
+database platform, не planning. Effect, action history и completed receipt
 коммитятся одной transaction.
 
 Порядок выполнения обязателен:
 
-1. Найти receipt.
-2. При same key/different fingerprint вернуть conflict.
-3. При same key/same fingerprint вернуть прежний result.
-4. Только для нового command проверить expected revision и permissions.
-5. Выполнить effect и атомарно записать receipt.
+1. Взять transaction-scoped PostgreSQL lock
+   `pg_advisory_xact_lock(hashtextextended(keyJson, 8503113703))` для полного
+   receipt key.
+2. Найти receipt.
+3. При same key/different fingerprint вернуть
+   `CommandFingerprintConflictError`.
+4. При same key/same fingerprint восстановить typed ref и вернуть его без clock,
+   permission, aggregate read или effect.
+5. Только для нового command прочитать `ProductClock.now()` ровно один раз.
+6. Вызвать module effect, который владеет permission, CAS, effect и typed
+   history.
+7. Проверить expected result kind, canonical ID и positive revision.
+8. Записать completed receipt с тем же timestamp и commit.
 
 Crash до commit не оставляет ни effect, ни receipt. Retry выполняет команду
-заново. Receipts пилота хранятся не меньше связанных facts.
+заново. Completed receipts immutable. Collision advisory hash может
+сериализовать unrelated commands, но не меняет correctness. Receipts пилота
+хранятся не меньше связанных facts.
+
+Canonical fingerprint v1 имеет preimage с ключами `commandType`,
+`expectedRevision`, `payload`. Actor и command ID не входят в fingerprint,
+поскольку входят в receipt key. `expectedRevision` отсутствующий становится
+`null`, присутствующий — positive canonical base-10 decimal string. Command
+definition exact-validates and exact-projects payload, включая rejection extra
+fields. Canonical JSON recursively сортирует object keys по UTF-16 code units,
+сохраняет array order/string bytes, не делает trim/Unicode normalization и
+кодируется UTF-8 JSON. Он rejects `undefined`, payload bigint, unsafe/non-finite
+numbers, Date, class instances, cycles и unpaired surrogates. Lossless integer
+DTO уже является decimal string. Known vector:
+
+```text
+{"commandType":"planning.update-month-focus.v1","expectedRevision":"7","payload":{"focus":"Прожить апрель","planMonthId":"018f0000-0000-7000-8000-000000000001"}}
+d2a4181c1d2a1f3ce552e90e927be25f2ff2cc7f6f431ec39de2f8580c72f5de
+```
 
 ### 10.3. Command IDs
 
@@ -893,6 +970,46 @@ CAS применяется к минимальному изменяемому ag
 
 Независимые `add` contributions не конфликтуют только из-за одновременности;
 каждый вклад является отдельным command/effect.
+
+P01 `CreateEmptyDraft` принимает exact `{ targetMonth, focus }`, запрещает
+`expectedRevision`, создаёт lifecycle revision `1n` и draft revision `1n` и
+возвращает `planning.plan-draft.v1` ref. Canonical month — `YYYY-MM`, years
+`0001..9999`; P01 не ограничивает create текущим/следующим месяцем. Different
+command ID для уже существующего space/month возвращает safe existing ref в
+`PlanMonthAlreadyExistsError` без receipt/history.
+
+P01 `UpdateMonthFocus` принимает exact `{ planMonthId, focus }`, требует
+positive draft `expectedRevision`, атомарно увеличивает только
+`plan_drafts.revision`; plan-month lifecycle revision не меняется. Same focus
+под новым command ID является новой подтверждённой правкой. Stale fresh command
+не пишет receipt, поэтому тот же command ID можно retry с новой expected
+revision/fingerprint. `GetDraftQuery({ trustedActor, targetMonth })` выполняет
+member authorization без receipt и возвращает `null` или exact draft view.
+Оба pair member имеют равные права; fresh system actor возвращает
+`PlanningAuthorizationDeniedError` без effect/history/receipt.
+
+Named query возвращает `null` либо ровно:
+
+```ts
+{
+  readonly planMonthId: string;
+  readonly spaceId: string;
+  readonly targetMonth: string;
+  readonly status: "draft";
+  readonly focus: string;
+  readonly planMonthRevision: bigint;
+  readonly draftRevision: bigint;
+}
+```
+
+P01 public errors finite: `CommandValidationError`,
+`CommandFingerprintConflictError`, `PlanningAuthorizationDeniedError`,
+`PlanMonthAlreadyExistsError` с safe existing draft ref,
+`PlanDraftNotFoundError`, `PlanDraftNotEditableError`,
+`DraftRevisionConflictError { expectedRevision, currentRevision }` и
+`PlanningDependencyUnavailableError`. Same-key conflict/exact replay всегда
+предшествуют permission/CAS. Fresh stale command не пишет receipt, поэтому тот
+же command ID может быть повторён с новой revision и новым fingerprint.
 
 ## 11. Progress policy
 

@@ -11,9 +11,9 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id         String      @id @default(uuid()) @db.Uuid
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
   membership Membership?
 
   @@map("users")
@@ -24,6 +24,7 @@ model Space {
   singletonKey Int          @unique @default(1) @map("singleton_key") @db.SmallInt
   createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   memberships  Membership[]
+  planMonths   PlanMonth[]
 
   @@map("spaces")
 }
@@ -35,9 +36,10 @@ model Membership {
   slot      Int      @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  space     Space                    @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  user      User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  allowlist TelegramAccessAllowlist?
+  space           Space                    @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  allowlist       TelegramAccessAllowlist?
+  planningActions PlanningActionGroup[]
 
   @@unique([spaceId, slot])
   @@unique([spaceId, userId])
@@ -70,4 +72,82 @@ model TelegramExternalIdentity {
   @@unique([issuer, providerUserId])
   @@unique([issuer, userId])
   @@map("telegram_external_identities")
+}
+
+model PlanMonth {
+  id         String   @id @default(uuid()) @db.Uuid
+  spaceId    String   @map("space_id") @db.Uuid
+  monthStart DateTime @map("month_start") @db.Date
+  status     String   @db.VarChar(16)
+  revision   BigInt   @db.BigInt
+  createdAt  DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @map("updated_at") @db.Timestamptz(3)
+
+  space   Space                 @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  draft   PlanDraft?
+  actions PlanningActionGroup[]
+
+  @@unique([spaceId, monthStart])
+  @@map("plan_months")
+}
+
+model PlanDraft {
+  planMonthId String   @id @map("plan_month_id") @db.Uuid
+  focus       String   @db.Text
+  revision    BigInt   @db.BigInt
+  createdAt   DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @map("updated_at") @db.Timestamptz(3)
+
+  planMonth PlanMonth @relation(fields: [planMonthId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@map("plan_drafts")
+}
+
+model CommandReceipt {
+  actorScope        String   @map("actor_scope") @db.VarChar(64)
+  commandType       String   @map("command_type") @db.VarChar(128)
+  commandId         String   @map("command_id") @db.Uuid
+  fingerprint       String   @db.Char(64)
+  resultKind        String   @map("result_kind") @db.VarChar(128)
+  aggregateId       String   @map("aggregate_id") @db.Uuid
+  aggregateRevision BigInt   @map("aggregate_revision") @db.BigInt
+  completedAt       DateTime @map("completed_at") @db.Timestamptz(3)
+
+  planningActions PlanningActionGroup[]
+
+  @@id([actorScope, commandType, commandId])
+  @@map("command_receipts")
+}
+
+model PlanningActionGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  actionKind     String   @map("action_kind") @db.VarChar(32)
+  actorKind      String   @map("actor_kind") @db.VarChar(16)
+  actorScope     String   @map("actor_scope") @db.VarChar(64)
+  memberId       String?  @map("member_id") @db.Uuid
+  systemActorId  String?  @map("system_actor_id") @db.VarChar(32)
+  planMonthId    String   @map("plan_month_id") @db.Uuid
+  commandType    String   @map("command_type") @db.VarChar(128)
+  commandId      String   @map("command_id") @db.Uuid
+  beforeRevision BigInt?  @map("before_revision") @db.BigInt
+  afterRevision  BigInt   @map("after_revision") @db.BigInt
+  occurredAt     DateTime @map("occurred_at") @db.Timestamptz(3)
+
+  member         Membership?               @relation(fields: [memberId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  planMonth      PlanMonth                 @relation(fields: [planMonthId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  commandReceipt CommandReceipt            @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
+  focusChange    PlanningMonthFocusChange?
+
+  @@unique([actorScope, commandType, commandId])
+  @@map("planning_action_groups")
+}
+
+model PlanningMonthFocusChange {
+  actionId    String  @id @map("action_id") @db.Uuid
+  beforeFocus String? @map("before_focus") @db.Text
+  afterFocus  String  @map("after_focus") @db.Text
+
+  action PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@map("planning_month_focus_changes")
 }

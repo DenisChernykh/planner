@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 
 import { RuntimeConfigService } from '@/platform/config/runtime-config.service'
 import { DATABASE_TRANSACTION_PORT } from '@/shared/application/database-transaction.port'
+import { COMMAND_RECEIPT_PORT } from '@/shared/application/command-receipt.port'
 
 import {
   DATABASE_LIFECYCLE,
@@ -10,6 +11,7 @@ import {
 } from './database.tokens'
 import { PostgresReadinessProbe } from './postgres-readiness.probe'
 import { PrismaClientProvider } from './prisma-client.provider'
+import { PrismaCommandReceiptAdapter } from './prisma-command-receipt.adapter'
 import { PrismaDatabaseLifecycle } from './prisma-database.lifecycle'
 import { PrismaTransactionAdapter } from './prisma-transaction.adapter'
 import { PrismaTransactionContext } from './prisma-transaction.context'
@@ -26,6 +28,7 @@ import { PrismaTransactionContext } from './prisma-transaction.context'
     PrismaClientProvider,
     PrismaDatabaseLifecycle,
     PrismaTransactionAdapter,
+    PrismaCommandReceiptAdapter,
     {
       provide: PostgresReadinessProbe,
       inject: [PrismaClientProvider, DATABASE_RUNTIME_CONFIG],
@@ -41,6 +44,10 @@ import { PrismaTransactionContext } from './prisma-transaction.context'
       provide: DATABASE_TRANSACTION_PORT,
       useExisting: PrismaTransactionAdapter,
     },
+    {
+      provide: COMMAND_RECEIPT_PORT,
+      useExisting: PrismaCommandReceiptAdapter,
+    },
   ],
   exports: [
     PrismaClientProvider,
@@ -48,6 +55,7 @@ import { PrismaTransactionContext } from './prisma-transaction.context'
     DATABASE_LIFECYCLE,
     DATABASE_READINESS_PROBE,
     DATABASE_TRANSACTION_PORT,
+    COMMAND_RECEIPT_PORT,
   ],
 })
 export class DatabaseModule {}
