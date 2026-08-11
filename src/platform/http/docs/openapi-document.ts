@@ -38,6 +38,7 @@ export function createOpenApiDocument(
     .addServer('/', 'Current API origin.')
     .addTag('health', 'Process lifecycle and dependency health probes.')
     .addTag('auth', 'Opaque browser session operations.')
+    .addTag('planning', 'Versioned goal catalog and monthly planning.')
     .addCookieAuth(
       config.auth.sessionCookieName,
       {
@@ -63,7 +64,11 @@ export function createOpenApiDocument(
     deepScanRoutes: true,
   })
   const problemCodes = problems.map(({ code }) => code).sort()
-  for (const componentName of findProblemComponentNames(document)) {
+  const componentNames = findProblemComponentNames(document)
+  const conflictCodes = new Set(
+    problemCodeEnum(document, 'GoalDefinitionConflictProblemResponseDto'),
+  )
+  for (const componentName of componentNames) {
     const problemSchema = document.components?.schemas?.[componentName]
     const codeSchema =
       problemSchema === undefined || '$ref' in problemSchema
@@ -72,9 +77,25 @@ export function createOpenApiDocument(
     if (codeSchema === undefined || '$ref' in codeSchema) {
       throw new Error(`OpenAPI ${componentName}.code schema is unavailable`)
     }
-    codeSchema.enum = [...problemCodes]
+    codeSchema.enum =
+      componentName === 'GoalDefinitionConflictProblemResponseDto'
+        ? problemCodes.filter((code) => conflictCodes.has(code))
+        : problemCodes.filter((code) => !conflictCodes.has(code))
   }
   return document
+}
+
+function problemCodeEnum(
+  document: OpenAPIObject,
+  componentName: string,
+): readonly string[] {
+  const schema = document.components?.schemas?.[componentName]
+  if (schema === undefined || '$ref' in schema) return []
+  const code = schema.properties?.['code']
+  if (code === undefined || '$ref' in code || !Array.isArray(code.enum)) {
+    return []
+  }
+  return code.enum.filter((value): value is string => typeof value === 'string')
 }
 
 function findProblemComponentNames(document: OpenAPIObject): readonly string[] {

@@ -6,15 +6,22 @@ import { DurableCommandExecutor } from '@/shared/application/durable-command.exe
 import type { ProductClock } from '@/shared/application/product-clock'
 
 import { CreateEmptyDraftCommand } from '../application/create-empty-draft.command'
+import {
+  ArchiveGoalDefinitionCommand,
+  CopyGoalDefinitionCommand,
+  CreateGoalDefinitionCommand,
+  CreateGoalDefinitionVersionCommand,
+  RestoreGoalDefinitionCommand,
+} from '../application/goal-catalog.commands'
+import {
+  GetGoalDefinitionQuery,
+  ListGoalDefinitionsQuery,
+} from '../application/goal-catalog.queries'
 import { GetDraftQuery } from '../application/get-draft.query'
+import type { PlanningApplication } from '../application/planning-application'
 import { UpdateMonthFocusCommand } from '../application/update-month-focus.command'
 import { PrismaPlanDraftPersistence } from '../infrastructure/prisma-plan-draft.persistence'
-
-export type PlanningApplication = {
-  readonly createEmptyDraft: CreateEmptyDraftCommand
-  readonly updateMonthFocus: UpdateMonthFocusCommand
-  readonly getDraft: GetDraftQuery
-}
+import { PrismaGoalCatalogPersistence } from '../infrastructure/prisma-goal-catalog.persistence'
 
 export function createPlanningApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -23,6 +30,7 @@ export function createPlanningApplication(dependencies: {
   readonly clock: ProductClock
 }): PlanningApplication {
   const drafts = new PrismaPlanDraftPersistence(dependencies.database)
+  const catalog = new PrismaGoalCatalogPersistence(dependencies.database)
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -40,5 +48,38 @@ export function createPlanningApplication(dependencies: {
       drafts,
     ),
     getDraft: new GetDraftQuery(dependencies.workspaceMembers, drafts),
+    createGoalDefinition: new CreateGoalDefinitionCommand(
+      executor,
+      dependencies.workspaceMembers,
+      catalog,
+    ),
+    createGoalDefinitionVersion: new CreateGoalDefinitionVersionCommand(
+      executor,
+      dependencies.workspaceMembers,
+      catalog,
+    ),
+    archiveGoalDefinition: new ArchiveGoalDefinitionCommand(
+      executor,
+      dependencies.workspaceMembers,
+      catalog,
+    ),
+    restoreGoalDefinition: new RestoreGoalDefinitionCommand(
+      executor,
+      dependencies.workspaceMembers,
+      catalog,
+    ),
+    copyGoalDefinition: new CopyGoalDefinitionCommand(
+      executor,
+      dependencies.workspaceMembers,
+      catalog,
+    ),
+    listGoalDefinitions: new ListGoalDefinitionsQuery(
+      dependencies.workspaceMembers,
+      catalog,
+    ),
+    getGoalDefinition: new GetGoalDefinitionQuery(
+      dependencies.workspaceMembers,
+      catalog,
+    ),
   })
 }

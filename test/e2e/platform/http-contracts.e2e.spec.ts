@@ -58,6 +58,31 @@ interface OpenApiParameter {
     readonly pattern?: string
     readonly minLength?: number
     readonly maxLength?: number
+    readonly enum?: readonly string[]
+  }
+}
+
+interface OpenApiSchema {
+  readonly $ref?: string
+  readonly type?: string
+  readonly pattern?: string
+  readonly minLength?: number
+  readonly maxLength?: number
+  readonly enum?: readonly string[]
+  readonly example?: unknown
+  readonly additionalProperties?: boolean
+  readonly properties?: Record<string, OpenApiSchema>
+  readonly required?: readonly string[]
+  readonly oneOf?: readonly OpenApiSchema[]
+}
+
+interface OpenApiOperation {
+  readonly responses?: Record<string, OpenApiResponse>
+  readonly security?: readonly Record<string, readonly unknown[]>[]
+  readonly parameters?: readonly OpenApiParameter[]
+  readonly requestBody?: {
+    readonly required?: boolean
+    readonly content?: Record<string, { readonly schema?: OpenApiSchema }>
   }
 }
 
@@ -346,28 +371,20 @@ describe('S03 HTTP contracts', () => {
     expect(typeof (body as { requestId?: unknown }).requestId).toBe('string')
   })
 
-  it('generates the exact production health and auth graph with the complete Problem catalog', async () => {
-    // Stale health-only paths, arbitrary problem codes, or manual auth responses must fail.
-    const document = JSON.parse(await generateOpenApiArtifact()) as {
+  it('publishes the exact committed production HTTP graph, request schemas and finite Problem union', async () => {
+    // In-process metadata that is absent from the committed tsx artifact must fail.
+    const document = JSON.parse(
+      await readFile('docs/api/openapi.json', 'utf8'),
+    ) as {
       paths: Record<
         string,
         {
-          get?: {
-            responses?: Record<string, OpenApiResponse>
-            security?: readonly Record<string, readonly unknown[]>[]
-            parameters?: readonly OpenApiParameter[]
-          }
-          post?: {
-            responses?: Record<string, OpenApiResponse>
-            security?: readonly Record<string, readonly unknown[]>[]
-          }
+          get?: OpenApiOperation
+          post?: OpenApiOperation
         }
       >
       components?: {
-        schemas?: Record<
-          string,
-          { properties?: Record<string, { enum?: readonly string[] }> }
-        >
+        schemas?: Record<string, OpenApiSchema>
         securitySchemes?: Record<string, unknown>
       }
     }
@@ -380,6 +397,12 @@ describe('S03 HTTP contracts', () => {
       '/health/live',
       '/health/ready',
       '/health/startup',
+      '/planning/catalog/goal-definitions',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}/archive',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}/copy',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}/restore',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}/versions',
     ])
     expect(document.paths['/auth/issue']).toBeUndefined()
     expect(Object.keys(document.paths['/auth/me'] ?? {})).toEqual(['get'])
@@ -528,17 +551,20 @@ describe('S03 HTTP contracts', () => {
         'ValidationProblemResponseDto',
       ]),
     )
-    const exactProblemCodes = [
+    const exactBaseProblemCodes = [
       'AUTHENTICATION_REQUIRED',
       'AUTHORIZATION_DENIED',
+      'COMMAND_FINGERPRINT_CONFLICT',
       'CONFLICT',
       'DEPENDENCY_UNAVAILABLE',
+      'GOAL_DEFINITION_NOT_FOUND',
       'INTERNAL_ERROR',
       'MALFORMED_REQUEST',
       'NOT_FOUND',
       'OIDC_ACCESS_DENIED',
       'OIDC_LOGIN_REJECTED',
       'PAYLOAD_TOO_LARGE',
+      'PLANNING_AUTHORIZATION_DENIED',
       'RATE_LIMIT_EXCEEDED',
       'UNSUPPORTED_MEDIA_TYPE',
       'VALIDATION_FAILED',
@@ -546,7 +572,16 @@ describe('S03 HTTP contracts', () => {
     expect(
       document.components?.schemas?.['ProblemResponseDto']?.properties?.['code']
         ?.enum,
-    ).toEqual(exactProblemCodes)
+    ).toEqual(exactBaseProblemCodes)
+    expect(
+      document.components?.schemas?.['ValidationProblemResponseDto']
+        ?.properties?.['conflict'],
+    ).toBeUndefined()
+    expect(
+      document.components?.schemas?.['ProblemResponseDto']?.properties?.[
+        'conflict'
+      ],
+    ).toBeUndefined()
     expect(document.components?.securitySchemes?.['sessionCookie']).toEqual({
       type: 'apiKey',
       in: 'cookie',
@@ -615,6 +650,224 @@ describe('S03 HTTP contracts', () => {
     expect(document.paths['/auth/logout']?.post?.security).toEqual([
       { sessionCookie: [], csrfToken: [] },
     ])
+
+    const catalogCollection =
+      document.paths['/planning/catalog/goal-definitions']
+    expect(Object.keys(catalogCollection ?? {}).sort()).toEqual(['get', 'post'])
+    expect(catalogCollection?.get?.security).toEqual([{ sessionCookie: [] }])
+    expect(catalogCollection?.post?.security).toEqual([
+      { sessionCookie: [], csrfToken: [] },
+    ])
+    expect(Object.keys(catalogCollection?.get?.responses ?? {}).sort()).toEqual(
+      ['200', '401', '403', '422', '503'],
+    )
+    expect(
+      Object.keys(catalogCollection?.post?.responses ?? {}).sort(),
+    ).toEqual(['201', '400', '401', '403', '409', '413', '415', '422', '503'])
+    expect(catalogCollection?.get?.parameters).toEqual([
+      {
+        in: 'query',
+        name: 'state',
+        required: false,
+        schema: {
+          enum: ['active', 'archived', 'all'],
+          type: 'string',
+        },
+      },
+    ])
+    for (const suffix of ['versions', 'copy']) {
+      expect(
+        Object.keys(
+          document.paths[
+            `/planning/catalog/goal-definitions/{goalDefinitionId}/${suffix}`
+          ]?.post?.responses ?? {},
+        ).sort(),
+      ).toEqual([
+        '201',
+        '400',
+        '401',
+        '403',
+        '404',
+        '409',
+        '413',
+        '415',
+        '422',
+        '503',
+      ])
+    }
+    for (const suffix of ['archive', 'restore']) {
+      expect(
+        Object.keys(
+          document.paths[
+            `/planning/catalog/goal-definitions/{goalDefinitionId}/${suffix}`
+          ]?.post?.responses ?? {},
+        ).sort(),
+      ).toEqual([
+        '200',
+        '400',
+        '401',
+        '403',
+        '404',
+        '409',
+        '413',
+        '415',
+        '422',
+        '503',
+      ])
+    }
+    const schemas = document.components?.schemas ?? {}
+    const uuidPattern =
+      '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    const uuidSchema = { pattern: uuidPattern, type: 'string' }
+    const revisionSchema = { pattern: '^[1-9][0-9]*$', type: 'string' }
+    const metadataProperties = {
+      category: {
+        maxLength: 100,
+        minLength: 1,
+        pattern: '\\S',
+        type: 'string',
+      },
+      title: {
+        maxLength: 200,
+        minLength: 1,
+        pattern: '\\S',
+        type: 'string',
+      },
+      why: {
+        maxLength: 2_000,
+        minLength: 1,
+        pattern: '\\S',
+        type: 'string',
+      },
+    }
+    const requestSchemas: ReadonlyArray<{
+      readonly path: string
+      readonly schema: OpenApiSchema
+    }> = [
+      {
+        path: '/planning/catalog/goal-definitions',
+        schema: {
+          additionalProperties: false,
+          properties: { commandId: uuidSchema, ...metadataProperties },
+          required: ['commandId', 'title', 'why', 'category'],
+          type: 'object',
+        },
+      },
+      {
+        path: '/planning/catalog/goal-definitions/{goalDefinitionId}/versions',
+        schema: {
+          additionalProperties: false,
+          properties: {
+            commandId: uuidSchema,
+            ...metadataProperties,
+            expectedRevision: revisionSchema,
+            seriesDecision: {
+              enum: ['continue', 'new'],
+              type: 'string',
+            },
+          },
+          required: [
+            'commandId',
+            'title',
+            'why',
+            'category',
+            'expectedRevision',
+            'seriesDecision',
+          ],
+          type: 'object',
+        },
+      },
+      ...['archive', 'restore', 'copy'].map((suffix) => ({
+        path: `/planning/catalog/goal-definitions/{goalDefinitionId}/${suffix}`,
+        schema: {
+          additionalProperties: false,
+          properties: {
+            commandId: uuidSchema,
+            expectedRevision: revisionSchema,
+          },
+          required: ['commandId', 'expectedRevision'],
+          type: 'object',
+        },
+      })),
+    ]
+    for (const { path, schema } of requestSchemas) {
+      expect(document.paths[path]?.post?.requestBody).toEqual({
+        content: { 'application/json': { schema } },
+        required: true,
+      })
+    }
+    for (const path of [
+      '/planning/catalog/goal-definitions/{goalDefinitionId}',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}/archive',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}/copy',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}/restore',
+      '/planning/catalog/goal-definitions/{goalDefinitionId}/versions',
+    ]) {
+      const operation = path.endsWith('goalDefinitionId}')
+        ? document.paths[path]?.get
+        : document.paths[path]?.post
+      const parameter = operation?.parameters?.find(
+        (candidate) => candidate.name === 'goalDefinitionId',
+      )
+      expect(parameter).toMatchObject({
+        in: 'path',
+        name: 'goalDefinitionId',
+        required: true,
+        schema: uuidSchema,
+      })
+    }
+    expect(schemas['GoalDefinitionResultResponseDto']).toMatchObject({
+      properties: {
+        aggregateRevision: { pattern: '^[1-9][0-9]*$', type: 'string' },
+      },
+    })
+    expect(schemas['ProblemConflictResponseDto']).toMatchObject({
+      properties: {
+        currentRevision: { pattern: '^[1-9][0-9]*$', type: 'string' },
+        currentState: { enum: ['active', 'archived'] },
+        nextAction: { enum: ['reload-goal-definition-and-retry'] },
+      },
+      required: ['currentRevision', 'currentState', 'nextAction'],
+    })
+    expect(schemas['GoalDefinitionConflictProblemResponseDto']).toMatchObject({
+      properties: {
+        code: {
+          enum: [
+            'GOAL_DEFINITION_REVISION_CONFLICT',
+            'GOAL_DEFINITION_STATE_CONFLICT',
+          ],
+          example: 'GOAL_DEFINITION_REVISION_CONFLICT',
+        },
+        conflict: { $ref: '#/components/schemas/ProblemConflictResponseDto' },
+      },
+      required: [
+        'type',
+        'title',
+        'status',
+        'detail',
+        'instance',
+        'code',
+        'requestId',
+        'conflict',
+      ],
+    })
+    const baseProblemRef = { $ref: '#/components/schemas/ProblemResponseDto' }
+    const conflictProblemRef = {
+      $ref: '#/components/schemas/GoalDefinitionConflictProblemResponseDto',
+    }
+    expect(
+      catalogCollection?.post?.responses?.['409']?.content?.[
+        'application/problem+json'
+      ]?.schema,
+    ).toEqual(baseProblemRef)
+    for (const suffix of ['versions', 'archive', 'restore', 'copy']) {
+      expect(
+        document.paths[
+          `/planning/catalog/goal-definitions/{goalDefinitionId}/${suffix}`
+        ]?.post?.responses?.['409']?.content?.['application/problem+json']
+          ?.schema,
+      ).toEqual({ oneOf: [baseProblemRef, conflictProblemRef] })
+    }
   })
 
   it('publishes an RFC 6901 pointer schema for nested escaped segments', async () => {

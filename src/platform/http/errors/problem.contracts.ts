@@ -13,6 +13,13 @@ export interface ProblemDocument {
   readonly code: string
   readonly requestId: string
   readonly errors?: readonly ProblemFieldError[]
+  readonly conflict?: ProblemConflict
+}
+
+export interface ProblemConflict {
+  readonly currentRevision: string
+  readonly currentState: 'active' | 'archived'
+  readonly nextAction: 'reload-goal-definition-and-retry'
 }
 
 export interface ProblemDefinition {
@@ -30,6 +37,7 @@ export interface RegisteredProblemDefinition extends ProblemDefinition {
 export interface HttpProblemMapping {
   readonly code: string
   readonly errors?: readonly ProblemFieldError[]
+  readonly conflict?: ProblemConflict
 }
 
 export type HttpProblemMapper = (
@@ -45,5 +53,6 @@ export interface HttpProblemContribution {
 export interface MappedHttpProblem {
   readonly definition: RegisteredProblemDefinition
   readonly errors?: readonly ProblemFieldError[]
+  readonly conflict?: ProblemConflict
   readonly unexpected: boolean
 }

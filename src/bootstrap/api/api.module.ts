@@ -2,6 +2,8 @@ import { Module, type DynamicModule } from '@nestjs/common'
 
 import { AUTH_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/auth/composition/auth-http-problem.contribution'
 import { AuthModule } from '@/modules/auth/composition/auth.module'
+import { PlanningModule } from '@/modules/planning/composition/planning.module'
+import { PLANNING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/planning/composition/planning-http-problem.contribution'
 import type { ApplicationRuntimeConfig } from '@/platform/config/runtime-config.types'
 import { RuntimeConfigModule } from '@/platform/config/runtime-config.module'
 import { DatabaseModule } from '@/platform/database/database.module'
@@ -24,9 +26,11 @@ export class ApiModule {
         HttpErrorsModule.forRoot([
           CORE_HTTP_PROBLEM_CONTRIBUTION,
           AUTH_HTTP_PROBLEM_CONTRIBUTION,
+          PLANNING_HTTP_PROBLEM_CONTRIBUTION,
         ]),
         HealthModule,
         AuthModule,
+        PlanningModule,
       ],
     }
   }

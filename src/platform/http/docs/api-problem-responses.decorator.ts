@@ -8,7 +8,9 @@ import {
 import type { RegisteredProblemDefinition } from '@/platform/http/errors/problem.contracts'
 
 import {
+  GoalDefinitionConflictProblemResponseDto,
   ProblemFieldErrorResponseDto,
+  ProblemConflictResponseDto,
   ProblemResponseDto,
   ValidationProblemResponseDto,
 } from './problem-response.dto'
@@ -29,11 +31,16 @@ export function ApiProblemResponses(
   const responses = [...definitionsByStatus].map(([status, definitions]) => {
     const responseTypes = [
       ...new Set(
-        definitions.map(({ code }) =>
-          code === 'VALIDATION_FAILED'
-            ? ValidationProblemResponseDto
-            : ProblemResponseDto,
-        ),
+        definitions.map(({ code }) => {
+          if (code === 'VALIDATION_FAILED') return ValidationProblemResponseDto
+          if (
+            code === 'GOAL_DEFINITION_REVISION_CONFLICT' ||
+            code === 'GOAL_DEFINITION_STATE_CONFLICT'
+          ) {
+            return GoalDefinitionConflictProblemResponseDto
+          }
+          return ProblemResponseDto
+        }),
       ),
     ]
     const schemas = responseTypes.map((responseType) => ({
@@ -62,7 +69,9 @@ export function ApiProblemResponses(
   return applyDecorators(
     ApiExtraModels(
       ProblemFieldErrorResponseDto,
+      ProblemConflictResponseDto,
       ProblemResponseDto,
+      GoalDefinitionConflictProblemResponseDto,
       ValidationProblemResponseDto,
     ),
     ...responses,
@@ -87,6 +96,16 @@ function problemExample(definition: RegisteredProblemDefinition): object {
               detail: 'Field has an invalid type.',
             },
           ],
+        }
+      : {}),
+    ...(definition.code === 'GOAL_DEFINITION_REVISION_CONFLICT' ||
+    definition.code === 'GOAL_DEFINITION_STATE_CONFLICT'
+      ? {
+          conflict: {
+            currentRevision: '2',
+            currentState: 'active',
+            nextAction: 'reload-goal-definition-and-retry',
+          },
         }
       : {}),
   }

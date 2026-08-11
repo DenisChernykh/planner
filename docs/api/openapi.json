@@ -30,6 +30,225 @@
         ],
         "type": "object"
       },
+      "GoalDefinitionConflictProblemResponseDto": {
+        "properties": {
+          "code": {
+            "enum": [
+              "GOAL_DEFINITION_REVISION_CONFLICT",
+              "GOAL_DEFINITION_STATE_CONFLICT"
+            ],
+            "example": "GOAL_DEFINITION_REVISION_CONFLICT",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/ProblemConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
+      "GoalDefinitionDetailResponseDto": {
+        "properties": {
+          "currentVersion": {
+            "$ref": "#/components/schemas/GoalDefinitionVersionResponseDto"
+          },
+          "goalDefinitionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/GoalDefinitionVersionResponseDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "goalDefinitionId",
+          "state",
+          "revision",
+          "currentVersion",
+          "versions"
+        ],
+        "type": "object"
+      },
+      "GoalDefinitionResultResponseDto": {
+        "properties": {
+          "aggregateId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "aggregateRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "planning.goal-definition.v1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "aggregateId",
+          "aggregateRevision"
+        ],
+        "type": "object"
+      },
+      "GoalDefinitionSummaryResponseDto": {
+        "properties": {
+          "currentVersion": {
+            "$ref": "#/components/schemas/GoalDefinitionVersionResponseDto"
+          },
+          "goalDefinitionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "goalDefinitionId",
+          "state",
+          "revision",
+          "currentVersion"
+        ],
+        "type": "object"
+      },
+      "GoalDefinitionVersionResponseDto": {
+        "properties": {
+          "category": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "goalDefinitionVersionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "goalSeriesId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "seriesDecision": {
+            "enum": [
+              "continue",
+              "new"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "versionNumber": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "why": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "goalDefinitionVersionId",
+          "versionNumber",
+          "goalSeriesId",
+          "seriesDecision",
+          "title",
+          "why",
+          "category"
+        ],
+        "type": "object"
+      },
+      "ProblemConflictResponseDto": {
+        "properties": {
+          "currentRevision": {
+            "example": "2",
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "currentState": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "nextAction": {
+            "enum": [
+              "reload-goal-definition-and-retry"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentRevision",
+          "currentState",
+          "nextAction"
+        ],
+        "type": "object"
+      },
       "ProblemFieldErrorResponseDto": {
         "properties": {
           "code": {
@@ -60,14 +279,17 @@
             "enum": [
               "AUTHENTICATION_REQUIRED",
               "AUTHORIZATION_DENIED",
+              "COMMAND_FINGERPRINT_CONFLICT",
               "CONFLICT",
               "DEPENDENCY_UNAVAILABLE",
+              "GOAL_DEFINITION_NOT_FOUND",
               "INTERNAL_ERROR",
               "MALFORMED_REQUEST",
               "NOT_FOUND",
               "OIDC_ACCESS_DENIED",
               "OIDC_LOGIN_REJECTED",
               "PAYLOAD_TOO_LARGE",
+              "PLANNING_AUTHORIZATION_DENIED",
               "RATE_LIMIT_EXCEEDED",
               "UNSUPPORTED_MEDIA_TYPE",
               "VALIDATION_FAILED"
@@ -121,14 +343,17 @@
             "enum": [
               "AUTHENTICATION_REQUIRED",
               "AUTHORIZATION_DENIED",
+              "COMMAND_FINGERPRINT_CONFLICT",
               "CONFLICT",
               "DEPENDENCY_UNAVAILABLE",
+              "GOAL_DEFINITION_NOT_FOUND",
               "INTERNAL_ERROR",
               "MALFORMED_REQUEST",
               "NOT_FOUND",
               "OIDC_ACCESS_DENIED",
               "OIDC_LOGIN_REJECTED",
               "PAYLOAD_TOO_LARGE",
+              "PLANNING_AUTHORIZATION_DENIED",
               "RATE_LIMIT_EXCEEDED",
               "UNSUPPORTED_MEDIA_TYPE",
               "VALIDATION_FAILED"
@@ -1142,6 +1367,1963 @@
           "health"
         ]
       }
+    },
+    "/planning/catalog/goal-definitions": {
+      "get": {
+        "operationId": "PlanningController_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "enum": [
+                "active",
+                "archived",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GoalDefinitionSummaryResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Planning authorization denied"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "List active or archived goal definitions.",
+        "tags": [
+          "planning"
+        ]
+      },
+      "post": {
+        "operationId": "PlanningController_create",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "category": {
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "pattern": "\\S",
+                    "type": "string"
+                  },
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "\\S",
+                    "type": "string"
+                  },
+                  "why": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "pattern": "\\S",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "title",
+                  "why",
+                  "category"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalDefinitionResultResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Planning authorization denied"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Command fingerprint conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Create a metadata-only goal definition.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
+    "/planning/catalog/goal-definitions/{goalDefinitionId}": {
+      "get": {
+        "operationId": "PlanningController_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goalDefinitionId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalDefinitionDetailResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Planning authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "GOAL_DEFINITION_NOT_FOUND": {
+                    "summary": "Goal definition not found",
+                    "value": {
+                      "code": "GOAL_DEFINITION_NOT_FOUND",
+                      "detail": "The requested goal definition was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Goal definition not found",
+                      "type": "https://planner.invalid/problems/goal-definition-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Goal definition not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read one goal definition and its versions.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
+    "/planning/catalog/goal-definitions/{goalDefinitionId}/archive": {
+      "post": {
+        "operationId": "PlanningController_archive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goalDefinitionId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "expectedRevision"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalDefinitionResultResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Planning authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "GOAL_DEFINITION_NOT_FOUND": {
+                    "summary": "Goal definition not found",
+                    "value": {
+                      "code": "GOAL_DEFINITION_NOT_FOUND",
+                      "detail": "The requested goal definition was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Goal definition not found",
+                      "type": "https://planner.invalid/problems/goal-definition-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Goal definition not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "GOAL_DEFINITION_REVISION_CONFLICT": {
+                    "summary": "Goal definition revision conflict",
+                    "value": {
+                      "code": "GOAL_DEFINITION_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "currentState": "active",
+                        "nextAction": "reload-goal-definition-and-retry"
+                      },
+                      "detail": "The goal definition changed before this request was applied.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Goal definition revision conflict",
+                      "type": "https://planner.invalid/problems/goal-definition-revision-conflict"
+                    }
+                  },
+                  "GOAL_DEFINITION_STATE_CONFLICT": {
+                    "summary": "Goal definition state conflict",
+                    "value": {
+                      "code": "GOAL_DEFINITION_STATE_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "currentState": "active",
+                        "nextAction": "reload-goal-definition-and-retry"
+                      },
+                      "detail": "The goal definition is not in the required state.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Goal definition state conflict",
+                      "type": "https://planner.invalid/problems/goal-definition-state-conflict"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GoalDefinitionConflictProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Goal definition revision conflict; Goal definition state conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Archive a goal definition without deletion.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
+    "/planning/catalog/goal-definitions/{goalDefinitionId}/copy": {
+      "post": {
+        "operationId": "PlanningController_copy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goalDefinitionId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "expectedRevision"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalDefinitionResultResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Planning authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "GOAL_DEFINITION_NOT_FOUND": {
+                    "summary": "Goal definition not found",
+                    "value": {
+                      "code": "GOAL_DEFINITION_NOT_FOUND",
+                      "detail": "The requested goal definition was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Goal definition not found",
+                      "type": "https://planner.invalid/problems/goal-definition-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Goal definition not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "GOAL_DEFINITION_REVISION_CONFLICT": {
+                    "summary": "Goal definition revision conflict",
+                    "value": {
+                      "code": "GOAL_DEFINITION_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "currentState": "active",
+                        "nextAction": "reload-goal-definition-and-retry"
+                      },
+                      "detail": "The goal definition changed before this request was applied.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Goal definition revision conflict",
+                      "type": "https://planner.invalid/problems/goal-definition-revision-conflict"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GoalDefinitionConflictProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Goal definition revision conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Copy current metadata into a new definition and series.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
+    "/planning/catalog/goal-definitions/{goalDefinitionId}/restore": {
+      "post": {
+        "operationId": "PlanningController_restore",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goalDefinitionId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "expectedRevision"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalDefinitionResultResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Planning authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "GOAL_DEFINITION_NOT_FOUND": {
+                    "summary": "Goal definition not found",
+                    "value": {
+                      "code": "GOAL_DEFINITION_NOT_FOUND",
+                      "detail": "The requested goal definition was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Goal definition not found",
+                      "type": "https://planner.invalid/problems/goal-definition-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Goal definition not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "GOAL_DEFINITION_REVISION_CONFLICT": {
+                    "summary": "Goal definition revision conflict",
+                    "value": {
+                      "code": "GOAL_DEFINITION_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "currentState": "active",
+                        "nextAction": "reload-goal-definition-and-retry"
+                      },
+                      "detail": "The goal definition changed before this request was applied.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Goal definition revision conflict",
+                      "type": "https://planner.invalid/problems/goal-definition-revision-conflict"
+                    }
+                  },
+                  "GOAL_DEFINITION_STATE_CONFLICT": {
+                    "summary": "Goal definition state conflict",
+                    "value": {
+                      "code": "GOAL_DEFINITION_STATE_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "currentState": "active",
+                        "nextAction": "reload-goal-definition-and-retry"
+                      },
+                      "detail": "The goal definition is not in the required state.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Goal definition state conflict",
+                      "type": "https://planner.invalid/problems/goal-definition-state-conflict"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GoalDefinitionConflictProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Goal definition revision conflict; Goal definition state conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Restore an archived goal definition.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
+    "/planning/catalog/goal-definitions/{goalDefinitionId}/versions": {
+      "post": {
+        "operationId": "PlanningController_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goalDefinitionId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "category": {
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "pattern": "\\S",
+                    "type": "string"
+                  },
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  "seriesDecision": {
+                    "enum": [
+                      "continue",
+                      "new"
+                    ],
+                    "type": "string"
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "pattern": "\\S",
+                    "type": "string"
+                  },
+                  "why": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "pattern": "\\S",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "title",
+                  "why",
+                  "category",
+                  "expectedRevision",
+                  "seriesDecision"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalDefinitionResultResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Planning authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "GOAL_DEFINITION_NOT_FOUND": {
+                    "summary": "Goal definition not found",
+                    "value": {
+                      "code": "GOAL_DEFINITION_NOT_FOUND",
+                      "detail": "The requested goal definition was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Goal definition not found",
+                      "type": "https://planner.invalid/problems/goal-definition-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Goal definition not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "GOAL_DEFINITION_REVISION_CONFLICT": {
+                    "summary": "Goal definition revision conflict",
+                    "value": {
+                      "code": "GOAL_DEFINITION_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "currentState": "active",
+                        "nextAction": "reload-goal-definition-and-retry"
+                      },
+                      "detail": "The goal definition changed before this request was applied.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Goal definition revision conflict",
+                      "type": "https://planner.invalid/problems/goal-definition-revision-conflict"
+                    }
+                  },
+                  "GOAL_DEFINITION_STATE_CONFLICT": {
+                    "summary": "Goal definition state conflict",
+                    "value": {
+                      "code": "GOAL_DEFINITION_STATE_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "currentState": "active",
+                        "nextAction": "reload-goal-definition-and-retry"
+                      },
+                      "detail": "The goal definition is not in the required state.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Goal definition state conflict",
+                      "type": "https://planner.invalid/problems/goal-definition-state-conflict"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GoalDefinitionConflictProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Goal definition revision conflict; Goal definition state conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Append an immutable metadata version.",
+        "tags": [
+          "planning"
+        ]
+      }
     }
   },
   "servers": [
@@ -1158,6 +3340,10 @@
     {
       "description": "Opaque browser session operations.",
       "name": "auth"
+    },
+    {
+      "description": "Versioned goal catalog and monthly planning.",
+      "name": "planning"
     }
   ]
 }

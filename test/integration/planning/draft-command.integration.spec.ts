@@ -242,6 +242,7 @@ describe('P01 draft commands with real PostgreSQL', () => {
       '20260811110000_pair_workspace',
       '20260811120000_telegram_external_identity',
       '20260811130000_plan_draft_kernel',
+      '20260811140000_goal_catalog',
     ]) {
       await applyMigration(admin, migration)
     }

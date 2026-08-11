@@ -588,6 +588,56 @@ names и ограничения ниже, следующие tasks добавл�
 Catalog archive никогда не удаляет historical versions. Published data не
 читает mutable current catalog definition.
 
+P02 фиксирует только version envelope и continuity mechanism. Его metadata —
+ровно `title`, `why`, `category`; typed `GoalConfig`, scope/owner/type/unit,
+precision/repetition/aggregation, children, draft attachment, publish
+validation и snapshots принадлежат P03 и следующим задачам. P02 выполняет
+только явное `SeriesDecision = 'continue' | 'new'` и не выводит semantic
+compatibility из metadata. Metadata-only P02 version не publishable и не
+attachable к draft до typed seam P03.
+
+Public identities и read views P02:
+
+```ts
+type GoalDefinitionId = string;
+type GoalDefinitionVersionId = string;
+type GoalSeriesId = string;
+type GoalDefinitionState = "active" | "archived";
+type SeriesDecision = "continue" | "new";
+
+type GoalDefinitionVersionView = {
+  goalDefinitionVersionId: GoalDefinitionVersionId;
+  versionNumber: bigint;
+  goalSeriesId: GoalSeriesId;
+  seriesDecision: SeriesDecision;
+  title: string;
+  why: string;
+  category: string;
+};
+
+type GoalDefinitionSummary = {
+  goalDefinitionId: GoalDefinitionId;
+  state: GoalDefinitionState;
+  revision: bigint;
+  currentVersion: GoalDefinitionVersionView;
+};
+
+type GoalDefinitionDetail = GoalDefinitionSummary & {
+  versions: readonly GoalDefinitionVersionView[];
+};
+```
+
+P02 migration `20260811140000_goal_catalog` создаёт четыре tables. Definition
+имеет UUID identity в одном space, finite state, positive consecutive revision,
+exact state/archive-time consistency и deterministic list index; identity,
+space и created time immutable, DELETE запрещён. Series immutable и принадлежит
+ровно одному definition. Version immutable, имеет positive sequential number,
+definition-owned series, finite decision и exact metadata; database continuity
+требует initial `1/new`, predecessor `+1`, predecessor series для `continue`,
+ранее неиспользованную series для `new` и active definition. Immutable
+`planning_goal_catalog_changes` хранит typed refs/state/decision для пяти
+catalog actions без metadata duplication или arbitrary JSON.
+
 ### 7.3. Month, draft и publication
 
 - `plan_months` с UUID PK, `space_id` FK RESTRICT, canonical month как первый
@@ -699,6 +749,15 @@ before focus и mandatory exact after focus. Composite action command key име
 deferred FK на completed receipt key: action допустим до insert receipt внутри
 одной transaction, но orphan не коммитится. Receipt и обе history tables
 запрещают ordinary UPDATE/DELETE database triggers.
+
+P02 делает `plan_month_id` nullable, добавляет `goal_definition_id` и расширяет
+finite action kind ровно
+`goal_definition_created|goal_definition_versioned|goal_definition_archived|goal_definition_restored|goal_definition_copied`.
+Exact target/action check требует только plan month для двух P01 kinds и только
+goal definition для пяти P02 kinds. P01 actor consistency, command key,
+revisions, deferred receipt FK и immutable trigger сохраняются. Product effect,
+typed catalog detail, action group и completed receipt используют одну
+transaction и один executor timestamp.
 
 ## 8. Temporal contract
 
@@ -1011,6 +1070,62 @@ P01 public errors finite: `CommandValidationError`,
 предшествуют permission/CAS. Fresh stale command не пишет receipt, поэтому тот
 же command ID может быть повторён с новой revision и новым fingerprint.
 
+P02 commands имеют exact contracts:
+
+```text
+planning.create-goal-definition.v1
+  expectedRevision absent
+  payload { title, why, category }
+planning.create-goal-definition-version.v1
+  positive expectedRevision required
+  payload { goalDefinitionId, title, why, category, seriesDecision }
+planning.archive-goal-definition.v1
+  positive expectedRevision required
+  payload { goalDefinitionId }
+planning.restore-goal-definition.v1
+  positive expectedRevision required
+  payload { goalDefinitionId }
+planning.copy-goal-definition.v1
+  positive expectedRevision required for the source
+  payload { sourceGoalDefinitionId }
+```
+
+Every mutation возвращает только
+`DurableCommandResultRef<'planning.goal-definition.v1'>`; `aggregateId` —
+target definition UUID, `aggregateRevision` — `goal_definitions.revision`.
+Copy проверяет source revision, но возвращает новый active target revision `1n`
+с новой version `1n` и новой series, не меняя source. Create создаёт initial
+`new`; create-version разрешён только active definition, `continue` использует
+series непосредственного predecessor, а `new` создаёт ранее неиспользованную
+definition-owned series. Same metadata под fresh command ID является реальной
+версией. Archive/restore меняют state и consecutive revision без новой version;
+один command timestamp устанавливает/очищает `archived_at`.
+
+Metadata — required primitive strings, exact bytes без trim/Unicode
+normalization, non-whitespace, bounds Unicode code points: title `1..200`, why
+`1..2_000`, category `1..100`. Exact snapshot до первого await rejects extra
+keys, boxed strings, unstable accessors, non-plain objects и injected actor/
+member/user/space IDs. Create запрещает `expectedRevision`; остальные P02
+commands требуют positive bigint. Replay/conflict precedes clock, permission,
+aggregate read, CAS и state validation. Fresh stale/state failure не оставляет
+completed receipt/history/effect и допускает retry того же command ID с новым
+fingerprint/revision.
+
+`ListGoalDefinitionsQuery({ trustedActor, state })` принимает
+`active|archived|all`, default `active`, сортирует по definition `created_at`,
+затем ID. `GetGoalDefinitionQuery` возвращает detail или `null`, versions
+descending. Оба разрешают только member, не пишут receipt/history, foreign
+identity неотличима от not found. External JSON сериализует bigint только как
+canonical positive decimal strings; TypeScript/PostgreSQL сохраняют
+`bigint`/`BIGINT`.
+
+P02 finite public errors добавляют `GoalDefinitionNotFoundError`,
+`GoalDefinitionRevisionConflictError { expectedRevision, currentRevision,
+currentState }` и `GoalDefinitionStateConflictError { requestedState,
+currentState, currentRevision }`; остальные — `CommandValidationError`,
+`CommandFingerprintConflictError`, `PlanningAuthorizationDeniedError` и
+`PlanningDependencyUnavailableError`.
+
 ## 11. Progress policy
 
 `progress` — чистый policy module. Он принимает immutable goal snapshot,
@@ -1272,6 +1387,43 @@ development docs возможны только при explicit enable, а produc
 system adapter читает `new Date()`; fake clock проверяет UTC-to-
 Asia/Yekaterinburg date boundary, а `progress` и product/domain logic остаются
 pure.
+
+### 15.2. P02 catalog HTTP contract
+
+Authenticated surface:
+
+```text
+GET  /planning/catalog/goal-definitions?state=active|archived|all
+GET  /planning/catalog/goal-definitions/{goalDefinitionId}
+POST /planning/catalog/goal-definitions
+POST /planning/catalog/goal-definitions/{goalDefinitionId}/versions
+POST /planning/catalog/goal-definitions/{goalDefinitionId}/archive
+POST /planning/catalog/goal-definitions/{goalDefinitionId}/restore
+POST /planning/catalog/goal-definitions/{goalDefinitionId}/copy
+```
+
+GET list default — active; missing/foreign detail — 404. POST body принимает
+canonical lowercase UUID `commandId`; CAS body принимает positive canonical
+decimal-string `expectedRevision`. Application payload исключает envelope и
+actor fields. Controller выводит actor только через public auth seam
+`CurrentPrincipal.userId -> WorkspaceMemberResolver.resolveUser -> member`.
+Create/version/copy возвращают 201, archive/restore — 200; response refs и view
+bigints сериализуются losslessly. POST security conjunctive
+`sessionCookie+csrfToken`, GET security — `sessionCookie`.
+
+Global parser outcomes документируются как strict malformed/scalar JSON 400,
+body above 1 MiB 413, unsupported media 415, field/extra-key validation 422.
+Planning contribution добавляет finite codes
+`PLANNING_AUTHORIZATION_DENIED` 403, `GOAL_DEFINITION_NOT_FOUND` 404,
+`COMMAND_FINGERPRINT_CONFLICT` 409,
+`GOAL_DEFINITION_REVISION_CONFLICT` 409 и
+`GOAL_DEFINITION_STATE_CONFLICT` 409; dependency остаётся core 503. RFC 9457
+body получает optional
+`conflict: { currentRevision, currentState, nextAction:
+'reload-goal-definition-and-retry' }` только для revision/state conflicts.
+Fingerprint conflict не раскрывает prior fingerprint/payload. Validation
+возвращает value-free `/body` или precise field pointer; unknown error остаётся
+constant `INTERNAL_ERROR`.
 
 ## 16. Failure model
 

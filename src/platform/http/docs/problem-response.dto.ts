@@ -23,6 +23,17 @@ export class ProblemFieldErrorResponseDto {
   public readonly detail!: string
 }
 
+export class ProblemConflictResponseDto {
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$', example: '2' })
+  public readonly currentRevision!: string
+
+  @ApiProperty({ enum: ['active', 'archived'] })
+  public readonly currentState!: 'active' | 'archived'
+
+  @ApiProperty({ enum: ['reload-goal-definition-and-retry'] })
+  public readonly nextAction!: 'reload-goal-definition-and-retry'
+}
+
 export class ProblemResponseDto {
   @ApiProperty({
     type: String,
@@ -62,6 +73,21 @@ export class ProblemResponseDto {
     example: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
   })
   public readonly requestId!: string
+}
+
+export class GoalDefinitionConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: [
+      'GOAL_DEFINITION_REVISION_CONFLICT',
+      'GOAL_DEFINITION_STATE_CONFLICT',
+    ],
+    example: 'GOAL_DEFINITION_REVISION_CONFLICT',
+  })
+  declare public readonly code:
+    'GOAL_DEFINITION_REVISION_CONFLICT' | 'GOAL_DEFINITION_STATE_CONFLICT'
+
+  @ApiProperty({ type: () => ProblemConflictResponseDto })
+  public readonly conflict!: ProblemConflictResponseDto
 }
 
 export class ValidationProblemResponseDto extends ProblemResponseDto {

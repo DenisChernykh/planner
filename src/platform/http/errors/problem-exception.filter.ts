@@ -47,6 +47,7 @@ export class ProblemExceptionFilter implements ExceptionFilter<unknown> {
       code: mapped.definition.code,
       requestId,
       ...(mapped.errors === undefined ? {} : { errors: mapped.errors }),
+      ...(mapped.conflict === undefined ? {} : { conflict: mapped.conflict }),
     }
     httpAdapter.setHeader(response, REQUEST_ID_HEADER, requestId)
     httpAdapter.setHeader(response, 'Content-Type', 'application/problem+json')

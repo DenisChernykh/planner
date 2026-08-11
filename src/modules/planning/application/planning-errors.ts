@@ -46,3 +46,32 @@ export class PlanningDependencyUnavailableError extends Error {
     this.name = 'PlanningDependencyUnavailableError'
   }
 }
+
+export class GoalDefinitionNotFoundError extends Error {
+  public constructor() {
+    super('Goal definition was not found')
+    this.name = 'GoalDefinitionNotFoundError'
+  }
+}
+
+export class GoalDefinitionRevisionConflictError extends Error {
+  public constructor(
+    public readonly expectedRevision: bigint,
+    public readonly currentRevision: bigint,
+    public readonly currentState: 'active' | 'archived',
+  ) {
+    super('Goal definition revision conflicts with the expected revision')
+    this.name = 'GoalDefinitionRevisionConflictError'
+  }
+}
+
+export class GoalDefinitionStateConflictError extends Error {
+  public constructor(
+    public readonly requestedState: 'active' | 'archived',
+    public readonly currentState: 'active' | 'archived',
+    public readonly currentRevision: bigint,
+  ) {
+    super('Goal definition state conflicts with the requested state')
+    this.name = 'GoalDefinitionStateConflictError'
+  }
+}

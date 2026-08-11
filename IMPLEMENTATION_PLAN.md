@@ -110,6 +110,32 @@ export type MemberId = string;
 export type PlanMonthId = string;
 export type PublicationId = string;
 export type PlanGoalId = string;
+export type GoalDefinitionId = string;
+export type GoalDefinitionVersionId = string;
+export type GoalSeriesId = string;
+export type GoalDefinitionState = "active" | "archived";
+export type SeriesDecision = "continue" | "new";
+
+export type GoalDefinitionVersionView = {
+  goalDefinitionVersionId: GoalDefinitionVersionId;
+  versionNumber: bigint;
+  goalSeriesId: GoalSeriesId;
+  seriesDecision: SeriesDecision;
+  title: string;
+  why: string;
+  category: string;
+};
+
+export type GoalDefinitionSummary = {
+  goalDefinitionId: GoalDefinitionId;
+  state: GoalDefinitionState;
+  revision: bigint;
+  currentVersion: GoalDefinitionVersionView;
+};
+
+export type GoalDefinitionDetail = GoalDefinitionSummary & {
+  versions: readonly GoalDefinitionVersionView[];
+};
 
 export type CanonicalJsonValue =
   | null
@@ -776,22 +802,50 @@ shared receipt contract later adopted by tracking.
 
 **Files:**
 
-- Create: `src/modules/planning/application/catalog.commands.ts`
+- Create: planning catalog application/domain/persistence/composition public
+  files and expand `createPlanningApplication`
 - Create: `src/modules/planning/presentation/planning.controller.ts`
-- Modify: `prisma/schema.prisma`
+- Modify: public auth current-principal export, bounded platform Problem
+  contract/filter/DTO, API module and deterministic OpenAPI artifact
+- Modify: `prisma/schema.prisma` and exact migration/table inventory
 - Create: `prisma/migrations/20260811140000_goal_catalog/migration.sql`
-- Test: `test/integration/planning/catalog-draft.integration.spec.ts`
+- Test: `test/unit/planning/catalog-contract.spec.ts`
+- Test: `test/integration/planning/goal-catalog.integration.spec.ts`
+- Test: `test/e2e/planning/goal-catalog.e2e.spec.ts`
+- Modify: exact HTTP/OpenAPI oracles
 
-**Produces:** catalog definition/version identity, archive semantics and
-`SeriesDecision = continue | new` consumed by P03.
+**Produces:** exact metadata envelope `title|why|category`, immutable catalog
+versions, definition revision/state, explicit `SeriesDecision = continue | new`
+and reusable analytical-series identity consumed by P03. P02 never infers
+semantic compatibility, and its metadata-only version is not attachable or
+publishable until P03 adds typed config.
 
-- [ ] Написать RED cases create/version/archive/restore, same-name versions,
-  series continuation and forced new series for semantic identity changes.
-- [ ] Реализовать catalog repository/commands and finite action history через
-  P01 command contract.
-- [ ] Проверить archive без physical delete и immutable historical links.
-- [ ] Запустить focused integration and OpenAPI drift.
-- [ ] Commit: `feat: add versioned goal catalog`.
+- [x] Написать approved unit/integration/E2E RED suites before production code:
+  exact one-read snapshots and payload/result projections; metadata
+  bounds/byte preservation; real-PostgreSQL create/version/archive/restore/copy,
+  replay/races/rollback/constraints; authenticated HTTP, RFC 9457 and exact
+  OpenAPI.
+- [x] Реализовать exact five command types; every mutation returns only
+  `DurableCommandResultRef<'planning.goal-definition.v1'>`, а copy проверяет
+  source expected revision и возвращает новый definition at revision `1n`.
+- [x] Реализовать member-authorized `ListGoalDefinitionsQuery` с
+  `active|archived|all`, default `active`, deterministic created-at/ID order и
+  `GetGoalDefinitionQuery` с descending versions; foreign identity неотличима
+  от not found, queries не пишут receipt/history.
+- [x] Добавить одной migration четыре P02 tables, immutable version/series/
+  catalog-detail history, database continuity and archive/delete guards, а
+  `planning_action_groups` расширить без ослабления P01 invariants.
+- [x] Добавить семь authenticated `/planning/catalog/goal-definitions` routes,
+  lossless decimal-string bigint JSON, session/CSRF security, finite RFC 9457
+  planning problems с conflict extension только для revision/state conflicts и
+  deterministic OpenAPI artifact.
+- [x] Доказать archive/restore без physical delete, copy без изменения source,
+  immutable historical links, replay-before-state/CAS и отсутствие P03 typed
+  config/draft/publication paths.
+- [x] Запустить focused unit/integration/E2E, Prisma/OpenAPI gates, затем format,
+  lint, source/test typecheck, architecture, build, full unit/contract/
+  integration/E2E и fresh `pnpm check:quick`.
+- [x] Commit: `feat: add versioned goal catalog`.
 
 ### P03 — Typed draft goals and publish validation
 
@@ -810,7 +864,10 @@ shared receipt contract later adopted by tracking.
 - Test: `test/integration/planning/draft-goal.integration.spec.ts`
 
 **Produces:** versioned `GoalConfig`, `sourceProvenance` and stable IDs for
-checkpoints/items/OR variants; P04/P05 evaluate these exact types.
+checkpoints/items/OR variants; P04/P05 evaluate these exact types. P03 owns
+typed semantic comparison for scope/owner/type/unit/precision/repetition/
+aggregation and children, forces `SeriesDecision = new` for PRD
+identity-changing axes, and creates the first draft-attachment/publishable seam.
 
 - [ ] Написать RED table tests всех types, frequencies, exact N, scope/owner,
   units, add/latest, checkpoints, checklist and OR.

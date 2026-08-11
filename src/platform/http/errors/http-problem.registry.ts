@@ -60,6 +60,9 @@ export class HttpProblemRegistry {
         return {
           definition,
           ...(mapped.errors === undefined ? {} : { errors: mapped.errors }),
+          ...(mapped.conflict === undefined
+            ? {}
+            : { conflict: mapped.conflict }),
           unexpected: false,
         }
       }

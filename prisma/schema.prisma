@@ -20,11 +20,12 @@ model User {
 }
 
 model Space {
-  id           String       @id @default(uuid()) @db.Uuid
-  singletonKey Int          @unique @default(1) @map("singleton_key") @db.SmallInt
-  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  memberships  Membership[]
-  planMonths   PlanMonth[]
+  id              String           @id @default(uuid()) @db.Uuid
+  singletonKey    Int              @unique @default(1) @map("singleton_key") @db.SmallInt
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  memberships     Membership[]
+  planMonths      PlanMonth[]
+  goalDefinitions GoalDefinition[]
 
   @@map("spaces")
 }
@@ -120,23 +121,26 @@ model CommandReceipt {
 }
 
 model PlanningActionGroup {
-  id             String   @id @default(uuid()) @db.Uuid
-  actionKind     String   @map("action_kind") @db.VarChar(32)
-  actorKind      String   @map("actor_kind") @db.VarChar(16)
-  actorScope     String   @map("actor_scope") @db.VarChar(64)
-  memberId       String?  @map("member_id") @db.Uuid
-  systemActorId  String?  @map("system_actor_id") @db.VarChar(32)
-  planMonthId    String   @map("plan_month_id") @db.Uuid
-  commandType    String   @map("command_type") @db.VarChar(128)
-  commandId      String   @map("command_id") @db.Uuid
-  beforeRevision BigInt?  @map("before_revision") @db.BigInt
-  afterRevision  BigInt   @map("after_revision") @db.BigInt
-  occurredAt     DateTime @map("occurred_at") @db.Timestamptz(3)
+  id               String   @id @default(uuid()) @db.Uuid
+  actionKind       String   @map("action_kind") @db.VarChar(32)
+  actorKind        String   @map("actor_kind") @db.VarChar(16)
+  actorScope       String   @map("actor_scope") @db.VarChar(64)
+  memberId         String?  @map("member_id") @db.Uuid
+  systemActorId    String?  @map("system_actor_id") @db.VarChar(32)
+  planMonthId      String?  @map("plan_month_id") @db.Uuid
+  goalDefinitionId String?  @map("goal_definition_id") @db.Uuid
+  commandType      String   @map("command_type") @db.VarChar(128)
+  commandId        String   @map("command_id") @db.Uuid
+  beforeRevision   BigInt?  @map("before_revision") @db.BigInt
+  afterRevision    BigInt   @map("after_revision") @db.BigInt
+  occurredAt       DateTime @map("occurred_at") @db.Timestamptz(3)
 
-  member         Membership?               @relation(fields: [memberId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  planMonth      PlanMonth                 @relation(fields: [planMonthId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  commandReceipt CommandReceipt            @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
-  focusChange    PlanningMonthFocusChange?
+  member            Membership?                @relation(fields: [memberId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  planMonth         PlanMonth?                 @relation(fields: [planMonthId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  goalDefinition    GoalDefinition?            @relation(fields: [goalDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  commandReceipt    CommandReceipt             @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
+  focusChange       PlanningMonthFocusChange?
+  goalCatalogChange PlanningGoalCatalogChange?
 
   @@unique([actorScope, commandType, commandId])
   @@map("planning_action_groups")
@@ -150,4 +154,80 @@ model PlanningMonthFocusChange {
   action PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@map("planning_month_focus_changes")
+}
+
+model GoalDefinition {
+  id         String    @id @default(uuid()) @db.Uuid
+  spaceId    String    @map("space_id") @db.Uuid
+  state      String    @db.VarChar(16)
+  revision   BigInt    @db.BigInt
+  createdAt  DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @map("updated_at") @db.Timestamptz(3)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+
+  space             Space                       @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  series            GoalSeries[]
+  versions          GoalDefinitionVersion[]
+  actions           PlanningActionGroup[]
+  catalogChanges    PlanningGoalCatalogChange[] @relation("CatalogChangeTarget")
+  copiedFromChanges PlanningGoalCatalogChange[] @relation("CatalogChangeSource")
+
+  @@unique([spaceId, id])
+  @@index([spaceId, state, createdAt, id])
+  @@map("goal_definitions")
+}
+
+model GoalSeries {
+  id               String   @id @default(uuid()) @db.Uuid
+  goalDefinitionId String   @map("goal_definition_id") @db.Uuid
+  createdAt        DateTime @map("created_at") @db.Timestamptz(3)
+
+  goalDefinition GoalDefinition          @relation(fields: [goalDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  versions       GoalDefinitionVersion[]
+
+  @@unique([goalDefinitionId, id])
+  @@map("goal_series")
+}
+
+model GoalDefinitionVersion {
+  id               String   @id @default(uuid()) @db.Uuid
+  goalDefinitionId String   @map("goal_definition_id") @db.Uuid
+  versionNumber    BigInt   @map("version_number") @db.BigInt
+  goalSeriesId     String   @map("goal_series_id") @db.Uuid
+  seriesDecision   String   @map("series_decision") @db.VarChar(16)
+  title            String   @db.Text
+  why              String   @db.Text
+  category         String   @db.Text
+  createdAt        DateTime @map("created_at") @db.Timestamptz(3)
+
+  goalDefinition           GoalDefinition              @relation(fields: [goalDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  goalSeries               GoalSeries                  @relation(fields: [goalDefinitionId, goalSeriesId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
+  catalogBeforeChanges     PlanningGoalCatalogChange[] @relation("CatalogBeforeVersion")
+  catalogAfterChanges      PlanningGoalCatalogChange[] @relation("CatalogAfterVersion")
+  catalogCopySourceChanges PlanningGoalCatalogChange[] @relation("CatalogCopySourceVersion")
+
+  @@unique([goalDefinitionId, versionNumber])
+  @@unique([goalDefinitionId, id])
+  @@map("goal_definition_versions")
+}
+
+model PlanningGoalCatalogChange {
+  actionId               String  @id @map("action_id") @db.Uuid
+  goalDefinitionId       String  @map("goal_definition_id") @db.Uuid
+  beforeState            String? @map("before_state") @db.VarChar(16)
+  afterState             String  @map("after_state") @db.VarChar(16)
+  beforeVersionId        String? @map("before_version_id") @db.Uuid
+  afterVersionId         String? @map("after_version_id") @db.Uuid
+  copySourceDefinitionId String? @map("copy_source_definition_id") @db.Uuid
+  copySourceVersionId    String? @map("copy_source_version_id") @db.Uuid
+  seriesDecision         String? @map("series_decision") @db.VarChar(16)
+
+  action               PlanningActionGroup    @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  goalDefinition       GoalDefinition         @relation("CatalogChangeTarget", fields: [goalDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  beforeVersion        GoalDefinitionVersion? @relation("CatalogBeforeVersion", fields: [goalDefinitionId, beforeVersionId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
+  afterVersion         GoalDefinitionVersion? @relation("CatalogAfterVersion", fields: [goalDefinitionId, afterVersionId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
+  copySourceDefinition GoalDefinition?        @relation("CatalogChangeSource", fields: [copySourceDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copySourceVersion    GoalDefinitionVersion? @relation("CatalogCopySourceVersion", fields: [copySourceDefinitionId, copySourceVersionId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("planning_goal_catalog_changes")
 }
