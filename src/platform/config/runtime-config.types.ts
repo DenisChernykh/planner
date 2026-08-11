@@ -50,6 +50,17 @@ export interface AuthRuntimeConfig {
   readonly idleTimeoutMs: number
   readonly absoluteTimeoutMs: number
   readonly touchIntervalMs: number
+  readonly telegramOidc: TelegramOidcRuntimeConfig
+}
+
+export interface TelegramOidcRuntimeConfig {
+  readonly clientId: string
+  readonly callbackUrl: string
+  readonly stateKeySecret: Uint8Array
+  readonly discoveryTimeoutMs: number
+  readonly discoveryBodyLimitBytes: number
+  readonly transactionTtlMs: number
+  readonly stateCookieMaxAgeMs: number
 }
 
 export interface ApplicationRuntimeConfig {

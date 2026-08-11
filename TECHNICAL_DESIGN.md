@@ -75,9 +75,10 @@ Backend имеет три runtime-роли:
 | `migrator` | одноразовое применение миграций до запуска runtime |
 
 PostgreSQL хранит продуктовые данные, расписания, idempotency receipts,
-module-owned history и отчёты. Redis пилота используется только для opaque
-web-сессий. Queue Redis, BullMQ и transactional outbox не подключаются без
-отдельно доказанной необходимости.
+module-owned history и отчёты. Auth Redis пилота используется только для
+opaque web-сессий и короткоживущих one-time Telegram OIDC transactions. Queue
+Redis, BullMQ и transactional outbox не подключаются без отдельно доказанной
+необходимости.
 
 ### 3.2. Почему не микросервисы
 
@@ -233,6 +234,76 @@ Provider contract:
 - `sub` является внешней OIDC identity;
 - numeric `id` из `profile` claim используется для Telegram allowlist и
   связывания с Bot API actor.
+
+Locked ceremony-start contract для A02:
+
+- public `GET /auth/telegram/start` не принимает caller-controlled body/query,
+  callback или post-login redirect: любое query field, parser-accepted JSON
+  object/array и non-JSON text wire body возвращают existing
+  `VALIDATION_FAILED` `422` до provider/Redis. Strict JSON scalar и malformed
+  JSON сохраняют общий `MALFORMED_REQUEST` `400`, а valid JSON body больше
+  `1_048_576 bytes` — общий `PAYLOAD_TOO_LARGE` `413`; обе parser-границы
+  срабатывают до controller. Success отвечает `302` без body, с
+  `Cache-Control: no-store`, `Pragma: no-cache`,
+  `Referrer-Policy: no-referrer` и request ID;
+- discovery всегда загружается только с фиксированного
+  `https://oauth.telegram.org/.well-known/openid-configuration`: redirects
+  запрещены, timeout равен `2_000 ms`; body до `16_384 bytes` включительно
+  разрешён, `16_385 bytes` отклоняется до полной буферизации;
+- metadata обязана содержать exact issuer `https://oauth.telegram.org`, exact
+  authorization endpoint `https://oauth.telegram.org/auth`, response type
+  `code`, PKCE method `S256` и scopes `openid`, `profile`,
+  `telegram:bot_access`; внешний provider не входит в readiness;
+- runtime принимает только `TELEGRAM_OIDC_CLIENT_ID` как canonical positive
+  decimal string, `TELEGRAM_OIDC_CALLBACK_URL` с exact path
+  `/auth/telegram/callback` и отдельный 32-byte canonical base64url secret
+  `AUTH_OIDC_STATE_KEY_SECRET`; production callback использует HTTPS, а
+  development/test дополнительно допускают HTTP только на literal loopback IP
+  `127.0.0.1` или `[::1]`; hostname `localhost` не считается canonical;
+- `state`, `nonce` и PKCE verifier независимо создаются из 32 CSPRNG bytes и
+  проходят decode/re-encode canonical validation как unpadded base64url length
+  `43`; PKCE challenge равен `base64url(SHA-256(ASCII(verifier)))` и проходит
+  ту же validation. Полный authorization URL строится до Redis create;
+  совпавший entropy tuple либо Redis state collision приводит к полной
+  повторной генерации, максимум три раза;
+- authorization query содержит ровно `client_id`, configured `redirect_uri`,
+  `response_type=code`, `scope=openid profile telegram:bot_access`, `state`,
+  `nonce`, `code_challenge`, `code_challenge_method=S256`; `phone` и
+  caller-controlled query отсутствуют;
+- Redis key равен
+  `planner:auth:v1:oidc-transaction:<HMAC-SHA-256(state)>`; raw `state` не
+  хранится ни в key, ни в value. Exact record:
+  `{ schema: 1, issuer: "https://oauth.telegram.org", clientId, nonce,
+  codeVerifier, callbackUrl, returnTo: "/" }`; encode валидирует и проецирует
+  ровно эти семь полей, а decode требует `clientId` и `callbackUrl`, равные
+  текущему runtime config;
+- transaction TTL равен `300_000 ms`; create использует `SET NX PX`, consume
+  использует atomic `GETDEL`; missing, expired и replayed state возвращают
+  отсутствие transaction, malformed record удаляется и fail-closed как auth
+  dependency failure;
+- start привязывается к инициировавшему браузеру transient cookie, равной raw
+  `state`: `planner-oidc-state` в development/test и
+  `__Host-planner-oidc-state` в production; `HttpOnly`, `SameSite=Lax`,
+  `Path=/`, no `Domain`, `Secure` в production, `Max-Age=300`; новый start в
+  том же браузере заменяет cookie, поэтому валиден последний start;
+- A03 до Redis consume обязана constant-time сравнить callback `state` с этой
+  cookie. Mismatch не consumes transaction и не очищает cookie другого
+  валидного concurrent start; matched terminal callback consumes transaction
+  один раз и очищает cookie;
+- discovery/Redis failure возвращает существующий safe
+  `DEPENDENCY_UNAVAILABLE` `503` без cookie, redirect и PostgreSQL writes.
+  Provider failure происходит до Redis create; неоднозначный Redis timeout
+  может оставить только inert TTL-record и всё равно отвечает `503`;
+- `state`, cookie, `nonce`, verifier, challenge, authorization `Location`,
+  code/tokens/provider payload и raw Telegram ID не логируются;
+- A02 не выполняет callback, token exchange, JWKS/claims validation, allowlist
+  lookup, identity binding, User/session creation — всё это принадлежит A03.
+
+Anonymous ceremony-start остаётся ограничен временем жизни Redis records, но
+не глобальной cardinality и не числом discovery requests. Это явно принятый
+риск локального закрытого пилота; отдельный доказанный ingress rate-limit
+contract обязателен до любого публичного deployment. A02 не переносит
+password-flow limiter и не вводит новый application-wide Redis abstraction.
 
 Актуальная внешняя спецификация: [Log In With Telegram](https://core.telegram.org/bots/telegram-login).
 

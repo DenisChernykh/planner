@@ -1,5 +1,6 @@
 import {
   createHmac,
+  createHash,
   randomBytes as nodeRandomBytes,
   timingSafeEqual,
 } from 'node:crypto'
@@ -33,6 +34,14 @@ export class NodeAuthCryptoAdapter {
 
   public generateCsrfSeed(): string {
     return this.randomBytes(32).toString('base64url')
+  }
+
+  public generateOidcToken(): string {
+    return this.randomBytes(32).toString('base64url')
+  }
+
+  public sha256Base64Url(value: string): string {
+    return createHash('sha256').update(value, 'ascii').digest('base64url')
   }
 
   public hmac(key: Uint8Array, value: string): string {

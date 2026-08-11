@@ -23,6 +23,12 @@ export const runtimeDefaults = Object.freeze({
     idleTimeoutMs: 604_800_000,
     absoluteTimeoutMs: 2_592_000_000,
     touchIntervalMs: 300_000,
+    telegramOidc: Object.freeze({
+      discoveryTimeoutMs: 2_000,
+      discoveryBodyLimitBytes: 16_384,
+      transactionTtlMs: 300_000,
+      stateCookieMaxAgeMs: 300_000,
+    }),
   }),
   observability: Object.freeze({
     exporterTimeoutMs: 1_000,

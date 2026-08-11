@@ -23,6 +23,7 @@ import {
 } from '@/modules/auth/presentation/session-csrf.guard'
 import { readCanonicalSessionToken } from '@/modules/auth/presentation/session-cookie'
 import { buildApiRuntimeConfig } from '@/platform/config/runtime-environment'
+import { RuntimeConfigService } from '@/platform/config/runtime-config.service'
 import { PublicEndpoint } from '@/platform/http/policy/public-endpoint.decorator'
 import type { RedisManagedClient } from '@/platform/redis/redis-client.factory'
 import { RedisCommandExecutor } from '@/platform/redis/redis-command.executor'
@@ -87,7 +88,10 @@ function runtimeInput(
     REDIS_KEY_PREFIX: 'planner',
     AUTH_SESSION_KEY_SECRET: Buffer.alloc(32, 5).toString('base64url'),
     AUTH_CSRF_SECRET: Buffer.alloc(32, 6).toString('base64url'),
+    AUTH_OIDC_STATE_KEY_SECRET: Buffer.alloc(32, 7).toString('base64url'),
     AUTH_CSRF_ORIGINS: 'http://127.0.0.1:3000',
+    TELEGRAM_OIDC_CLIENT_ID: '123456789',
+    TELEGRAM_OIDC_CALLBACK_URL: 'http://127.0.0.1:3000/auth/telegram/callback',
     ...overrides,
   }
 }
@@ -320,6 +324,18 @@ describe('S04 local User and opaque session foundation', () => {
 
     expect(config.auth.sessionKeySecret[0]).toBe(5)
     expect(config.auth.csrfSecret[0]).toBe(6)
+    const firstOidcSecret = config.auth.telegramOidc.stateKeySecret
+    firstOidcSecret[0] = 255
+    expect(config.auth.telegramOidc.stateKeySecret[0]).toBe(7)
+    const runtimeService = new RuntimeConfigService(config)
+    const firstServiceOidcSecret =
+      runtimeService.auth.telegramOidc.stateKeySecret
+    firstServiceOidcSecret[0] = 255
+    expect(runtimeService.auth.telegramOidc.stateKeySecret[0]).toBe(7)
+    expect(config.auth.telegramOidc).toMatchObject({
+      clientId: '123456789',
+      callbackUrl: 'http://127.0.0.1:3000/auth/telegram/callback',
+    })
     expect(config.auth.sessionCookieName).toBe('planner-session')
     expect(config.auth).toMatchObject({
       idleTimeoutMs: 604_800_000,
@@ -339,6 +355,13 @@ describe('S04 local User and opaque session foundation', () => {
         }),
       ),
     ).toThrow()
+    for (const collision of [
+      { AUTH_OIDC_STATE_KEY_SECRET: runtimeInput()['AUTH_SESSION_KEY_SECRET'] },
+      { AUTH_OIDC_STATE_KEY_SECRET: runtimeInput()['AUTH_CSRF_SECRET'] },
+      { AUTH_CSRF_SECRET: runtimeInput()['AUTH_OIDC_STATE_KEY_SECRET'] },
+    ]) {
+      expect(() => buildApiRuntimeConfig(runtimeInput(collision))).toThrow()
+    }
     expect(() =>
       buildApiRuntimeConfig(
         runtimeInput({ AUTH_CSRF_ORIGINS: 'ftp://planner.example' }),
@@ -354,6 +377,13 @@ describe('S04 local User and opaque session foundation', () => {
     expect(() =>
       buildApiRuntimeConfig(
         runtimeInput({
+          AUTH_OIDC_STATE_KEY_SECRET: Buffer.alloc(31).toString('base64url'),
+        }),
+      ),
+    ).toThrow()
+    expect(() =>
+      buildApiRuntimeConfig(
+        runtimeInput({
           NODE_ENV: 'production',
           AUTH_CSRF_ORIGINS: 'http://planner.example',
         }),
@@ -362,8 +392,48 @@ describe('S04 local User and opaque session foundation', () => {
     expect(
       buildApiRuntimeConfig(
         runtimeInput({
+          TELEGRAM_OIDC_CALLBACK_URL:
+            'http://[::1]:3000/auth/telegram/callback',
+        }),
+      ).auth.telegramOidc.callbackUrl,
+    ).toBe('http://[::1]:3000/auth/telegram/callback')
+    for (const invalidOidc of [
+      { TELEGRAM_OIDC_CLIENT_ID: '0' },
+      { TELEGRAM_OIDC_CLIENT_ID: '0123' },
+      { TELEGRAM_OIDC_CLIENT_ID: ' 123' },
+      {
+        TELEGRAM_OIDC_CALLBACK_URL:
+          'http://evil.example/auth/telegram/callback',
+      },
+      {
+        TELEGRAM_OIDC_CALLBACK_URL:
+          'http://localhost:3000/auth/telegram/callback',
+      },
+      { TELEGRAM_OIDC_CALLBACK_URL: 'http://127.0.0.1:3000/other' },
+      {
+        TELEGRAM_OIDC_CALLBACK_URL:
+          'http://127.0.0.1:3000/auth/telegram/callback?returnTo=/evil',
+      },
+    ]) {
+      expect(() => buildApiRuntimeConfig(runtimeInput(invalidOidc))).toThrow()
+    }
+    expect(() =>
+      buildApiRuntimeConfig(
+        runtimeInput({
           NODE_ENV: 'production',
           AUTH_CSRF_ORIGINS: 'https://planner.example',
+          TELEGRAM_OIDC_CALLBACK_URL:
+            'http://127.0.0.1:3000/auth/telegram/callback',
+        }),
+      ),
+    ).toThrow()
+    expect(
+      buildApiRuntimeConfig(
+        runtimeInput({
+          NODE_ENV: 'production',
+          AUTH_CSRF_ORIGINS: 'https://planner.example',
+          TELEGRAM_OIDC_CALLBACK_URL:
+            'https://planner.example/auth/telegram/callback',
         }),
       ).auth.sessionCookieName,
     ).toBe('__Host-planner-session')

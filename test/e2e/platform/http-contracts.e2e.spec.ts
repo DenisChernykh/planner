@@ -360,6 +360,7 @@ describe('S03 HTTP contracts', () => {
       '/auth/csrf',
       '/auth/logout',
       '/auth/me',
+      '/auth/telegram/start',
       '/health/live',
       '/health/ready',
       '/health/startup',
@@ -368,6 +369,9 @@ describe('S03 HTTP contracts', () => {
     expect(Object.keys(document.paths['/auth/me'] ?? {})).toEqual(['get'])
     expect(Object.keys(document.paths['/auth/csrf'] ?? {})).toEqual(['get'])
     expect(Object.keys(document.paths['/auth/logout'] ?? {})).toEqual(['post'])
+    expect(Object.keys(document.paths['/auth/telegram/start'] ?? {})).toEqual([
+      'get',
+    ])
     expect(Object.keys(document.components?.schemas ?? {}).sort()).toEqual(
       expect.arrayContaining([
         'ProblemFieldErrorResponseDto',

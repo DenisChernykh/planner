@@ -523,19 +523,92 @@ never requests phone.
 - Create: `src/modules/auth/application/start-telegram-oidc-login.use-case.ts`
 - Create: `src/modules/auth/application/telegram-oidc.ports.ts`
 - Create: `src/modules/auth/infrastructure/redis-oidc-transaction.store.ts`
+- Create: `src/modules/auth/infrastructure/oidc-transaction.codec.ts`
 - Create: `src/modules/auth/infrastructure/telegram-oidc.provider.ts`
+- Create: `src/modules/auth/presentation/oidc-state-cookie.adapter.ts`
 - Create: `src/modules/auth/presentation/telegram-oidc.controller.ts`
+- Modify: auth public barrels, crypto adapter and
+  `src/modules/auth/composition/auth.module.ts`
+- Modify: auth runtime config/schema/service/defaults, API/OpenAPI config
+  fixtures and local `docker-compose.yml`
+- Create: `jest.contract.config.mjs`; Modify: `package.json` test scripts
+- Create: `.redocly.lint-ignore.yaml` with one exact
+  `operation-2xx-response` pointer
+  `#/paths/~1auth~1telegram~1start/get/responses` for redirect-only Telegram
+  start; keep the rule globally `error` in `redocly.yaml`
+- Modify: `docs/api/openapi.json` and affected unit/E2E contract fixtures
 - Test: `test/contract/auth/telegram-oidc.contract.spec.ts`
+- Test: `test/integration/auth/oidc-transaction.integration.spec.ts`
+- Test: `test/e2e/auth/telegram-oidc-start.e2e.spec.ts`
 
 **Produces:** `OidcTransactionStore` and `TelegramOidcProvider` consumed by A03.
 
-- [ ] Написать RED contract cases for discovery/authorization endpoint, state,
-  nonce, PKCE S256, TTL, exact scopes and provider outage.
-- [ ] Реализовать one-time Redis transaction with TTL and atomic consume port.
-- [ ] Проверить scopes `openid profile telegram:bot_access`, отсутствие `phone`
-  and safe redirect allowlist.
-- [ ] Запустить contract/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: start Telegram OIDC ceremony`.
+**Locked A02 contract:** public `GET /auth/telegram/start` returns bodyless `302`
+with `Cache-Control: no-store`, `Pragma: no-cache`,
+`Referrer-Policy: no-referrer` and request ID. Any query field, including
+`returnTo`, parser-accepted JSON object/array and non-JSON text wire body return
+existing `VALIDATION_FAILED` `422` before provider/Redis. Strict JSON scalar or
+malformed JSON retains global `MALFORMED_REQUEST` `400`; valid JSON above
+`1_048_576 bytes` retains global `PAYLOAD_TOO_LARGE` `413`; both parser errors
+occur before controller dispatch. Caller input cannot choose callback or
+post-login redirect. Fixed Telegram
+discovery is fetched exactly once per start with no redirects, `2_000 ms`
+timeout and inclusive `16_384-byte` streaming body limit (`16_385` is rejected),
+then exact issuer, authorization endpoint, `code`, `S256` and required scopes
+are verified before Redis create. There is no
+automatic provider/Redis retry other than bounded `SET NX` collision handling.
+Provider metadata is not a readiness dependency.
+
+`TELEGRAM_OIDC_CLIENT_ID` is a canonical positive decimal string;
+`TELEGRAM_OIDC_CALLBACK_URL` has exact path `/auth/telegram/callback`; separate
+`AUTH_OIDC_STATE_KEY_SECRET` is canonical 32-byte base64url and differs from
+session/CSRF secrets. Production callback is HTTPS; development/test may use
+HTTPS or HTTP on literal loopback IP `127.0.0.1`/`[::1]`; `localhost` is
+rejected as non-canonical. The fixed return target is `/`.
+
+State, nonce and verifier are independent 32-byte CSPRNG values accepted only
+after decode/re-encode canonical validation as 43-character unpadded base64url.
+Challenge is S256, receives the same validation and the full authorization URL
+is constructed before Redis create. Authorization query is exactly
+`client_id`, `redirect_uri`, `response_type=code`,
+`scope=openid profile telegram:bot_access`, `state`, `nonce`, `code_challenge`
+and `code_challenge_method=S256`; `phone` is absent. A full tuple is retried at
+most three times for duplicate entropy or `SET NX` collision.
+
+Redis key uses HMAC-SHA256 state and stores no raw state. Record is exactly
+`{ schema: 1, issuer: "https://oauth.telegram.org", clientId, nonce,
+codeVerifier, callbackUrl, returnTo: "/" }`; encode validates and exact-projects
+these seven fields, while decode requires clientId/callbackUrl equal to current
+runtime config. TTL is `300_000 ms`; create is `SET NX PX`, consume is atomic
+`GETDEL`. Corrupt records are deleted and fail closed. Start also sets raw
+state in a browser-binding
+HttpOnly, SameSite=Lax, Path=/ cookie (`planner-oidc-state` outside production,
+`__Host-planner-oidc-state` with Secure in production), Max-Age `300`. A new
+start replaces that browser's cookie. A03 must constant-time compare query state
+to this cookie before consume; mismatch neither consumes nor clears a different
+valid cookie, while a matched terminal callback consumes once and clears it.
+
+Provider/Redis failure maps to safe `DEPENDENCY_UNAVAILABLE` `503` with no
+cookie/redirect/PostgreSQL write. Secrets, OIDC values, provider payload and
+authorization Location are never logged. A02 excludes callback/token/JWKS,
+identity/allowlist/User/session work. Anonymous start cardinality/discovery
+rate limiting is an accepted local closed-pilot residual risk and a separate
+required pre-public-deployment ingress contract; this task only bounds record
+lifetime and does not import password-flow limiting.
+
+- [x] Написать RED contract cases for discovery/authorization endpoint, state,
+  browser binding, nonce, RFC 7636 PKCE S256 vector, TTL, exact scopes and
+  provider outage.
+- [x] Реализовать one-time Redis transaction with TTL and atomic consume port.
+- [x] Проверить scopes `openid profile telegram:bot_access`, отсутствие `phone`
+  and safe redirect allowlist; доказать HMAC key, collision/replay and corrupt
+  record behavior с real Redis.
+- [x] Подключить исполняемый contract Jest layer и проверить public 302/cookie,
+  parser-owned 400/413, endpoint-owned 422, safe 503, readiness isolation and
+  exact OpenAPI contract E2E.
+- [x] Запустить contract/integration/E2E, OpenAPI drift and
+  `pnpm check:quick`.
+- [x] Commit: `feat: start Telegram OIDC ceremony`.
 
 ### A03 — Telegram OIDC callback and identity binding
 

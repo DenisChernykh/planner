@@ -234,7 +234,10 @@ describe('S04 protected opaque-session HTTP contract', () => {
       REDIS_KEY_PREFIX: 'planner',
       AUTH_SESSION_KEY_SECRET: sessionKeySecret.toString('base64url'),
       AUTH_CSRF_SECRET: csrfSecret.toString('base64url'),
+      AUTH_OIDC_STATE_KEY_SECRET: Buffer.alloc(32, 23).toString('base64url'),
       AUTH_CSRF_ORIGINS: origin,
+      TELEGRAM_OIDC_CLIENT_ID: '123456789',
+      TELEGRAM_OIDC_CALLBACK_URL: `${origin}/auth/telegram/callback`,
     })
     runtime = new ApiRuntime()
     await runtime.start()
@@ -262,7 +265,10 @@ describe('S04 protected opaque-session HTTP contract', () => {
       'REDIS_KEY_PREFIX',
       'AUTH_SESSION_KEY_SECRET',
       'AUTH_CSRF_SECRET',
+      'AUTH_OIDC_STATE_KEY_SECRET',
       'AUTH_CSRF_ORIGINS',
+      'TELEGRAM_OIDC_CLIENT_ID',
+      'TELEGRAM_OIDC_CALLBACK_URL',
     ])
       delete process.env[key]
   })

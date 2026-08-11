@@ -127,7 +127,10 @@ describe('Planner foundation API health and shutdown', () => {
       REDIS_KEY_PREFIX: 'planner',
       AUTH_SESSION_KEY_SECRET: sessionKeySecret,
       AUTH_CSRF_SECRET: csrfSecret,
+      AUTH_OIDC_STATE_KEY_SECRET: Buffer.alloc(32, 13).toString('base64url'),
       AUTH_CSRF_ORIGINS: baseUrl,
+      TELEGRAM_OIDC_CLIENT_ID: '123456789',
+      TELEGRAM_OIDC_CALLBACK_URL: `${baseUrl}/auth/telegram/callback`,
     })
   })
 
@@ -144,7 +147,10 @@ describe('Planner foundation API health and shutdown', () => {
       'REDIS_KEY_PREFIX',
       'AUTH_SESSION_KEY_SECRET',
       'AUTH_CSRF_SECRET',
+      'AUTH_OIDC_STATE_KEY_SECRET',
       'AUTH_CSRF_ORIGINS',
+      'TELEGRAM_OIDC_CLIENT_ID',
+      'TELEGRAM_OIDC_CALLBACK_URL',
     ]) {
       delete process.env[key]
     }
