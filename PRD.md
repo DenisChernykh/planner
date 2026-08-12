@@ -407,6 +407,36 @@ typed-axis change создаёт новую series, compatible update сохра
 
 Во всех формулах `round_half_up` означает обычное арифметическое округление половины вверх.
 
+### 12.0. Calendar eligibility
+
+Все календарные расчёты пилота используют локальные даты
+`Asia/Yekaterinburg`, переданные явно, и proleptic Gregorian calendar с годами
+`0001..9999`. Дата активации обязана находиться в target month. Правила
+повторения применяются так:
+
+- daily ожидается на каждой дате от activation включительно; weekdays — только
+  на выбранных weekdays от activation. One-off due date валидна внутри target
+  month: она создаёт expectation только при `dueDate >= activation`, иначе
+  означает `not_applicable`; due date вне target month блокирует публикацию.
+- weekly и monthly имеют active и eligible dates от activation включительно.
+  Month — один период. Week — календарная Monday–Sunday week, пересечённая с
+  target month: первая и последняя недели могут быть partial, но знаменатель
+  weekly proration остаётся `7`. Все недели месяца сохраняются, включая
+  pre-activation weeks с target `0`; deficit/surplus между ними не переносится.
+- weekly planned task выбирает одну month-bounded calendar week по ordinal
+  `1..5`; leading partial week имеет ordinal `1`. В месяце с шестью segments
+  ordinal `5` выбирает пятый, шестой не получает задачу. Отсутствующий ordinal
+  в четырёхсегментном месяце блокирует публикацию. Выбранная полностью
+  pre-activation week означает `not_applicable`; activation внутри выбранной
+  week сохраняет одну цель на эту week с исходными clipped bounds. Это одна
+  week-level цель с target `1`, без daily expectations и равномерного daily
+  pace.
+
+Calendar incompatibility возвращается как безопасные blocker data, а не
+подменяется ближайшей датой/неделей. Calendar-target behavior имеет version
+`planner.calendar-targets.v1`; изменение перечисленных правил создаёт новую
+версию и не переписывает закрытые отчёты.
+
 ### 12.1. Неполная неделя
 
 Для гибкой цели `N` раз в неделю:

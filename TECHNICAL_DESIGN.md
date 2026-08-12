@@ -684,8 +684,12 @@ Pure validator возвращает discriminated result: `{ publishable: true, 
 GoalConfigV1, blockers: [] }` либо `{ publishable: false, config: null,
 blockers: nonEmptyTuple }`. `GoalConfigV1` дополнительно имеет private
 unique-symbol compile-time brand, который не существует в runtime JSON; только
-validator может создать refined value. Поэтому P04/P05 не принимают unchecked
-structural draft с, например, non-daily checkpoints.
+validator может создать refined value. Planning orchestration, вызывающая
+P04/P05, принимает только этот refined `GoalConfigV1` и проецирует его в
+complete exact structural DTO соответствующего low-level progress seam.
+Сами pure progress seams не принимают на себя доказательство publishability:
+они валидируют только полноту/exact shape собственного DTO, не очищают P03
+blockers и не должны вызываться с unchecked `DraftGoalConfigV1`.
 Public refinement boundary повторно снимает exact stored-form snapshot: она не
 брендирует caller-owned object, отклоняет accessor/extra/null child ID и
 возвращает recursively frozen clone, не зависящий от последующей мутации input.
@@ -1302,6 +1306,176 @@ response data, never RFC 9457 Problems.
 
 `progress` — чистый policy module. Он принимает immutable goal snapshot,
 expectations/periods, facts, calendar и явный `asOf`.
+
+### 11.1. P04 calendar-targets boundary
+
+P04 создаёт public framework-free seam `src/modules/progress` с exact
+`CALENDAR_TARGETS_FORMULA_VERSION = "planner.calendar-targets.v1"` и тремя
+pure functions: `calculateEligibleCalendar`, `calculatePeriodTarget` и
+`calculateExpectedPace`. Модуль владеет structural union
+`CalendarRepetitionV1`; последующий planning adapter проецирует в него уже
+validated `GoalConfigV1`, поэтому `progress` не импортирует `planning`, другие
+product modules, platform/shared/bootstrap, framework/Prisma/HTTP adapters,
+`Date`, `Intl` или системные часы.
+
+Граница намеренно двухуровневая: planning orchestration допускает к mapper
+только refined `GoalConfigV1`, а low-level `calculateEligibleCalendar` принимает
+любой complete exact structural `CalendarTargetsInput`. Он не видит private
+planning brand, не доказывает publishability всей цели и не удаляет/переопределяет
+P03 blockers. `GoalConfigV1['repetition']` структурно совместим с
+`CalendarRepetitionV1`, но mapper всё равно создаёт новый exact object и удаляет
+не календарные поля, например `taskText`; nullable
+`DraftGoalConfigV1['repetition']` с low-level seam несовместим. Такое разделение
+сохраняет dependency direction `planning → progress`, не создавая обратного
+импорта.
+
+Calendar context exact: canonical реальный `targetMonth: YYYY-MM` с годом
+`0001..9999`, canonical реальный `activeLocalDate: YYYY-MM-DD` строго внутри
+target month и literal `timeZone: "Asia/Yekaterinburg"`. Это уже вычисленная
+локальная дата; P04 не конвертирует instant и использует manual proleptic
+Gregorian arithmetic. Invalid shape/context/math вызывает
+`CalendarTargetsInputError` с finite value-free issues `{ pointer, code,
+detail }`; inputs не coercе-ятся. Calendar incompatibility является normal
+discriminated data: `{ eligible: false, calendar: null, issues }`, а успешный
+результат — `{ eligible: true, calendar, issues: [] }`. One-off вне target
+month имеет pointer `/repetition/dueDate`, code `incompatible`; отсутствующий
+ordinal weekly planned task — `/repetition/weekOrdinal`, `incompatible`.
+Outputs являются detached recursively frozen plain data; dates ascending и
+unique.
+
+Calendar branches:
+
+- `daily|weekdays|one_off` возвращают fixed `expectationDates`; даты до
+  activation исключаются. One-off внутри месяца, но до activation, — успешный
+  not-applicable результат без expectation; one-off вне месяца — blocker data.
+- `weekly|monthly` возвращают quota periods с `activeDates == eligibleDates`.
+  Month имеет один period. Week — chronological Monday–Sunday segment,
+  пересечённый month bounds; `periodStart/periodEnd` clipped, но denominator
+  всегда `periodDays = 7`. Возвращаются все weekly segments, включая полностью
+  pre-activation с пустыми eligible dates и target `0`; каждый segment
+  рассчитывается независимо, без debt carry.
+- `weekly_planned_task` выбирает максимум один week-level segment с target `1`,
+  без daily expectation и even pace. Ordinal `1..5` считает month-bounded
+  segments, включая leading partial как `1`; в шестисегментном месяце ordinal
+  `5` выбирает пятый, а шестой не назначается. Если ordinal отсутствует в
+  четырёхсегментном месяце, возвращается calendar incompatibility. Полностью
+  pre-activation выбранный segment — успешный not-applicable результат без
+  period; если activation попадает внутрь выбранного segment, один week-level
+  period сохраняет исходные clipped start/end и target `1`.
+
+`calculatePeriodTarget({ n, periodDays, activeDays, eligibleDays })` принимает
+canonical positive decimal string произвольной длины и safe integers с
+`1 <= periodDays <= 366` и `0 <= eligibleDays <= activeDays <= periodDays`.
+Нулевой active/eligible count даёт `0`; иначе функция exact integer
+`round_half_up` считает `min(max(1, rounded), eligibleDays)`. Она не вызывает
+`Number(n)`/unbounded `BigInt(n)`: oversized decimal насыщается относительно
+малой доказуемой границы до bounded conversion.
+
+`calculateExpectedPace({ period, asOfLocalDate })` принимает только quota
+weekly/monthly period, проверяет unique ascending eligible dates внутри его
+bounds, их exact equality с active dates и contiguous active suffix исходного
+calendar segment, затем считает текущую eligible date включительно. До первой eligible date
+результат `0`, после последней — `periodTarget`, при пустом denominator — `0`;
+результат exact half-up и capped target. Функция не принимает previous-period
+debt и не читает clock.
+
+Exact public TypeScript ledger P04:
+
+```ts
+type CalendarWeekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+
+type CalendarRepetitionV1 =
+  | { kind: 'daily' }
+  | { kind: 'weekdays'; weekdays: readonly CalendarWeekday[] }
+  | { kind: 'weekly'; n: string }
+  | { kind: 'monthly'; n: string }
+  | { kind: 'one_off'; dueDate: string }
+  | { kind: 'weekly_planned_task'; weekOrdinal: '1' | '2' | '3' | '4' | '5' }
+
+type CalendarTargetsInput = {
+  targetMonth: string
+  activeLocalDate: string
+  timeZone: 'Asia/Yekaterinburg'
+  repetition: CalendarRepetitionV1
+}
+
+type QuotaCalendarPeriod = {
+  cadence: 'weekly' | 'monthly'
+  ordinal: number
+  periodStart: string
+  periodEnd: string
+  periodDays: number
+  activeDates: readonly string[]
+  eligibleDates: readonly string[]
+  periodTarget: number
+}
+
+type FixedCalendar = CalendarContext & {
+  kind: 'fixed'
+  expectationDates: readonly string[]
+}
+type QuotaCalendar = CalendarContext & {
+  kind: 'quota'
+  cadence: 'weekly' | 'monthly'
+  periods: readonly QuotaCalendarPeriod[]
+}
+type WeeklyPlannedTaskCalendar = CalendarContext & {
+  kind: 'weekly_planned_task'
+  periods: readonly {
+    cadence: 'weekly'
+    ordinal: number
+    periodStart: string
+    periodEnd: string
+    periodTarget: 1
+  }[]
+}
+type CalendarContext = Pick<
+  CalendarTargetsInput,
+  'targetMonth' | 'activeLocalDate' | 'timeZone'
+>
+
+type EligibleCalendarResult =
+  | {
+      formulaVersion: 'planner.calendar-targets.v1'
+      eligible: true
+      calendar: FixedCalendar | QuotaCalendar | WeeklyPlannedTaskCalendar
+      issues: readonly []
+    }
+  | {
+      formulaVersion: 'planner.calendar-targets.v1'
+      eligible: false
+      calendar: null
+      issues: readonly [CalendarEligibilityIssue]
+    }
+
+declare function calculateEligibleCalendar(
+  input: CalendarTargetsInput,
+): EligibleCalendarResult
+declare function calculatePeriodTarget(input: {
+  n: string
+  periodDays: number
+  activeDays: number
+  eligibleDays: number
+}): number
+declare function calculateExpectedPace(input: {
+  period: QuotaCalendarPeriod
+  asOfLocalDate: string
+}): number
+```
+
+`CalendarTargetsInputError.issues` — frozen non-empty array. Его exact finite
+codes: `invalid_type|invalid_value|unexpected_property`; pointers:
+`""|/targetMonth|/activeLocalDate|/timeZone|/repetition|/repetition/kind|
+/repetition/weekdays|/repetition/n|/repetition/dueDate|
+/repetition/weekOrdinal|/n|/periodDays|/activeDays|/eligibleDays|/period|
+/period/cadence|/period/ordinal|/period/periodStart|/period/periodEnd|
+/period/periodDays|/period/activeDates|/period/eligibleDates|
+/period/periodTarget|/asOfLocalDate`. `detail` принадлежит экспортируемому
+finite literal union и никогда не включает rejected value. Normal
+`CalendarEligibilityIssue` имеет только два exact варианта:
+`{/repetition/dueDate, incompatible, due date is outside target month}` либо
+`{/repetition/weekOrdinal, incompatible, week ordinal is not present in target
+month}`.
 
 Обязательные свойства:
 

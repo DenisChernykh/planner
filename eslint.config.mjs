@@ -279,6 +279,46 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/modules/progress/**/*.ts'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        ...[
+          'Date',
+          'Intl',
+          'Temporal',
+          'performance',
+          'process',
+          'setInterval',
+          'setTimeout',
+          'globalThis',
+          'global',
+        ].map((name) => ({
+          name,
+          message:
+            'Progress policy receives local dates and asOf explicitly and cannot read clocks or runtime calendar APIs.',
+        })),
+      ],
+      'no-eval': 'error',
+      'no-new-func': 'error',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'MemberExpression[object.name=/^(globalThis|global)$/][computed=false][property.name=/^(Date|Intl|Temporal|performance|process|setInterval|setTimeout)$/]',
+          message:
+            'Progress policy cannot reach clocks or runtime calendar APIs through a global object.',
+        },
+        {
+          selector:
+            'MemberExpression[object.name=/^(globalThis|global)$/][computed=true][property.value=/^(Date|Intl|Temporal|performance|process|setInterval|setTimeout)$/]',
+          message:
+            'Progress policy cannot reach clocks or runtime calendar APIs through a global object.',
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.{js,mjs,cjs}'],
     languageOptions: {
       globals: globals.node,

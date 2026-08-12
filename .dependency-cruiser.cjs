@@ -2,6 +2,14 @@
 module.exports = {
   forbidden: [
     {
+      name: 'progress-must-be-self-contained-policy',
+      severity: 'error',
+      from: { path: '(^|/)modules/progress(/|$)' },
+      to: {
+        pathNot: '(^|/)modules/progress(/|$)',
+      },
+    },
+    {
       name: 'bootstrap-must-not-import-database-drivers',
       severity: 'error',
       from: { path: '(^|/)bootstrap(/|$)' },

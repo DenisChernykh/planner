@@ -1141,8 +1141,11 @@ The pure validator returns a discriminated `GoalConfigValidationResult`:
 publishable branch contains the only normally constructible opaque/branded
 `GoalConfigV1` and an empty blocker tuple; incomplete branch contains null
 config and a non-empty blocker tuple. The private compile-time brand is never a
-serialized field. P04/P05 accept only this refined config, so structural TS
-construction cannot bypass compatibility rules such as daily-only checkpoints.
+serialized field. Planning orchestration invoking P04/P05 accepts only this
+refined config and projects it into each low-level progress seam's complete
+exact structural DTO. Low-level progress functions validate their own DTO but
+do not prove whole-goal publishability, clear P03 blockers or accept unchecked
+nullable `DraftGoalConfigV1` as orchestration input.
 
 `weekly_planned_task` is repetition with nullable ordinal `1..5` and nullable
 task text, requires boolean measurement, permits personal/shared scope and never
@@ -1218,20 +1221,33 @@ period targets, proration and expected pace только из explicit inputs.
 
 **Files:**
 
+- Modify: `TECHNICAL_DESIGN.md`
+- Modify: `PRD.md`
+- Modify: `IMPLEMENTATION_PLAN.md`
+- Modify: `.dependency-cruiser.cjs`
+- Modify: `eslint.config.mjs`
 - Create: `src/modules/progress/calendar-targets.ts`
 - Create: `src/modules/progress/index.ts`
 - Test: `test/unit/progress/calendar-targets.spec.ts`
 
-**Produces:** `calculatePeriodTarget`, `calculateExpectedPace` and eligible
-calendar periods; no Nest, Prisma, HTTP or clock imports.
+**Produces:** exact versioned `calculateEligibleCalendar`,
+`calculatePeriodTarget`, `calculateExpectedPace`, progress-owned repetition
+input and detached recursively frozen fixed/quota/weekly-task calendar output;
+no planning/product/platform/shared/framework, Nest, Prisma, HTTP, `Date`,
+`Intl` or clock imports.
 
-- [ ] Написать RED fixtures round_half_up, Monday-Sunday month-bounded weeks,
-  late month, selected weekdays, one-off deadline and no debt carry.
-- [ ] Реализовать minimal calendar/pacing functions with decimal-safe math.
-- [ ] Доказать `3/week` with 5 active days = 2, with 3 days = 1 и
-  late monthly target proportion.
-- [ ] Запустить calendar unit tests and architecture check.
-- [ ] Commit: `feat: calculate planner period targets`.
+- [x] Синхронизировать P04 public shapes, finite input/calendar issues,
+  activation/ordinal boundaries and exact formula version in canonical docs.
+- [x] Написать literal RED fixtures exact half-up/bounds/huge decimal,
+  manual Gregorian dates, Monday-Sunday month-bounded weeks, late month,
+  selected weekdays, one-off, weekly planned task, pace, freeze and no debt.
+- [x] Реализовать minimal calendar/pacing functions without binary float,
+  unbounded decimal conversion, system time or cross-module imports.
+- [x] Доказать `3/week` with 5 active days = 2, with 3 days = 1, late monthly
+  target `5`, four/five/six-segment months and target-month edge years.
+- [x] Запустить focused calendar unit/type/lint/format, mutation-resistant
+  architecture rule/check and independent review before broad gates.
+- [x] Commit: `feat: calculate planner period targets`.
 
 ### P05 — Goal evaluators, score and coverage
 
