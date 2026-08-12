@@ -1,4 +1,5 @@
 import type { CreateEmptyDraftCommand } from './create-empty-draft.command'
+import type { BuildPublicationPreviewQuery } from './build-publication-preview.query'
 import type { GetDraftQuery } from './get-draft.query'
 import type {
   AddDraftGoalCommand,
@@ -29,6 +30,7 @@ export type PlanningApplication = {
   readonly updateMonthFocus: UpdateMonthFocusCommand
   readonly getDraft: GetDraftQuery
   readonly getDraftEditor: GetDraftEditorQuery
+  readonly buildPublicationPreview: BuildPublicationPreviewQuery
   readonly addDraftGoal: AddDraftGoalCommand
   readonly updateDraftGoal: UpdateDraftGoalCommand
   readonly removeDraftGoal: RemoveDraftGoalCommand

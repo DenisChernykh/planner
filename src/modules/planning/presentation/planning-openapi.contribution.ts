@@ -678,6 +678,293 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
       'blockers',
     ],
   )
+  schemas['PublicationPreviewBlockerV1'] = object(
+    {
+      planGoalId: { ...uuid, nullable: true },
+      pointer: {
+        type: 'string',
+        pattern: '^(?:/(?:[^~/]|~0|~1)*)+$',
+      },
+      code: {
+        type: 'string',
+        enum: ['required', 'empty_collection', 'incompatible'],
+      },
+      detail: {
+        type: 'string',
+        enum: [
+          'Required value is missing.',
+          'At least one item is required.',
+          'Values are incompatible.',
+          'due date is outside target month',
+          'week ordinal is not present in target month',
+          'Target month is not current or next.',
+        ],
+      },
+    },
+    ['planGoalId', 'pointer', 'code', 'detail'],
+  )
+  schemas['PublicationPreviewGoalBlockerV1'] = object(
+    {
+      planGoalId: uuid,
+      pointer: {
+        type: 'string',
+        pattern: '^(?:/(?:[^~/]|~0|~1)*)+$',
+      },
+      code: {
+        type: 'string',
+        enum: ['required', 'empty_collection', 'incompatible'],
+      },
+      detail: {
+        type: 'string',
+        enum: [
+          'Required value is missing.',
+          'At least one item is required.',
+          'Values are incompatible.',
+          'due date is outside target month',
+          'week ordinal is not present in target month',
+        ],
+      },
+    },
+    ['planGoalId', 'pointer', 'code', 'detail'],
+  )
+  schemas['PublicationPreviewActivationV1'] = object(
+    {
+      mode: {
+        type: 'string',
+        enum: ['immediate', 'scheduled', 'blocked'],
+      },
+      activeLocalDate: {
+        type: 'string',
+        format: 'date',
+        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$',
+      },
+      latePublication: { type: 'boolean' },
+    },
+    ['mode', 'activeLocalDate', 'latePublication'],
+  )
+  schemas['FixedEligibleCalendarV1'] = object(
+    {
+      targetMonth: {
+        type: 'string',
+        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+      },
+      activeLocalDate: { type: 'string', format: 'date' },
+      timeZone: { type: 'string', enum: ['Asia/Yekaterinburg'] },
+      kind: { type: 'string', enum: ['fixed'] },
+      expectationDates: {
+        type: 'array',
+        maxItems: 31,
+        items: { type: 'string', format: 'date' },
+      },
+    },
+    ['targetMonth', 'activeLocalDate', 'timeZone', 'kind', 'expectationDates'],
+  )
+  schemas['QuotaCalendarPeriodV1'] = object(
+    {
+      cadence: { type: 'string', enum: ['weekly', 'monthly'] },
+      ordinal: { type: 'integer', minimum: 1, maximum: 6 },
+      periodStart: { type: 'string', format: 'date' },
+      periodEnd: { type: 'string', format: 'date' },
+      periodDays: { type: 'integer', minimum: 1, maximum: 31 },
+      activeDates: {
+        type: 'array',
+        maxItems: 31,
+        items: { type: 'string', format: 'date' },
+      },
+      eligibleDates: {
+        type: 'array',
+        maxItems: 31,
+        items: { type: 'string', format: 'date' },
+      },
+      periodTarget: { type: 'integer', minimum: 0, maximum: 31 },
+    },
+    [
+      'cadence',
+      'ordinal',
+      'periodStart',
+      'periodEnd',
+      'periodDays',
+      'activeDates',
+      'eligibleDates',
+      'periodTarget',
+    ],
+  )
+  schemas['QuotaEligibleCalendarV1'] = object(
+    {
+      targetMonth: {
+        type: 'string',
+        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+      },
+      activeLocalDate: { type: 'string', format: 'date' },
+      timeZone: { type: 'string', enum: ['Asia/Yekaterinburg'] },
+      kind: { type: 'string', enum: ['quota'] },
+      cadence: { type: 'string', enum: ['weekly', 'monthly'] },
+      periods: {
+        type: 'array',
+        maxItems: 6,
+        items: { $ref: '#/components/schemas/QuotaCalendarPeriodV1' },
+      },
+    },
+    [
+      'targetMonth',
+      'activeLocalDate',
+      'timeZone',
+      'kind',
+      'cadence',
+      'periods',
+    ],
+  )
+  schemas['WeeklyPlannedTaskPeriodV1'] = object(
+    {
+      cadence: { type: 'string', enum: ['weekly'] },
+      ordinal: { type: 'integer', minimum: 1, maximum: 5 },
+      periodStart: { type: 'string', format: 'date' },
+      periodEnd: { type: 'string', format: 'date' },
+      periodTarget: { type: 'integer', enum: [1] },
+    },
+    ['cadence', 'ordinal', 'periodStart', 'periodEnd', 'periodTarget'],
+  )
+  schemas['WeeklyPlannedTaskEligibleCalendarV1'] = object(
+    {
+      targetMonth: {
+        type: 'string',
+        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+      },
+      activeLocalDate: { type: 'string', format: 'date' },
+      timeZone: { type: 'string', enum: ['Asia/Yekaterinburg'] },
+      kind: { type: 'string', enum: ['weekly_planned_task'] },
+      periods: {
+        type: 'array',
+        maxItems: 1,
+        items: {
+          $ref: '#/components/schemas/WeeklyPlannedTaskPeriodV1',
+        },
+      },
+    },
+    ['targetMonth', 'activeLocalDate', 'timeZone', 'kind', 'periods'],
+  )
+  schemas['EligibleCalendarV1'] = discriminator(
+    [
+      'FixedEligibleCalendarV1',
+      'QuotaEligibleCalendarV1',
+      'WeeklyPlannedTaskEligibleCalendarV1',
+    ],
+    {
+      fixed: '#/components/schemas/FixedEligibleCalendarV1',
+      quota: '#/components/schemas/QuotaEligibleCalendarV1',
+      weekly_planned_task:
+        '#/components/schemas/WeeklyPlannedTaskEligibleCalendarV1',
+    },
+  )
+  schemas['PublicationCalculatedTargetV1'] = object(
+    {
+      planGoalId: uuid,
+      formulaVersion: {
+        type: 'string',
+        enum: ['planner.calendar-targets.v1'],
+      },
+      calendar: { $ref: '#/components/schemas/EligibleCalendarV1' },
+    },
+    ['planGoalId', 'formulaVersion', 'calendar'],
+  )
+  schemas['PublicationPreviewFormulaVersionsV1'] = object(
+    {
+      calendarTargets: {
+        type: 'string',
+        enum: ['planner.calendar-targets.v1'],
+      },
+      goalEvaluation: {
+        type: 'string',
+        enum: ['planner.goal-evaluation.v1'],
+      },
+      scoreCoverage: {
+        type: 'string',
+        enum: ['planner.score-coverage.v1'],
+      },
+    },
+    ['calendarTargets', 'goalEvaluation', 'scoreCoverage'],
+  )
+  const draftGoalView = schemas['DraftGoalViewV1'] as {
+    readonly properties: Record<string, unknown>
+    readonly required: readonly string[]
+  }
+  schemas['PublicationPreviewGoalV1'] = object(
+    {
+      ...draftGoalView.properties,
+      blockers: {
+        type: 'array',
+        items: {
+          $ref: '#/components/schemas/PublicationPreviewGoalBlockerV1',
+        },
+      },
+    },
+    draftGoalView.required,
+  )
+  schemas['PublicationPreviewResponseV1'] = object(
+    {
+      schemaVersion: {
+        type: 'string',
+        enum: ['planner.publication-preview.v1'],
+      },
+      planMonthId: uuid,
+      spaceId: uuid,
+      targetMonth: {
+        type: 'string',
+        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+      },
+      status: { type: 'string', enum: ['draft'] },
+      planMonthRevision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+      draftRevision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+      previewHashVersion: {
+        type: 'string',
+        enum: ['planner.publication-preview-hash.v1'],
+      },
+      previewHash: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+      activation: {
+        $ref: '#/components/schemas/PublicationPreviewActivationV1',
+      },
+      focus: {
+        type: 'string',
+        pattern: '\\S',
+        minLength: 1,
+        maxLength: 500,
+      },
+      goals: {
+        type: 'array',
+        maxItems: 200,
+        items: { $ref: '#/components/schemas/PublicationPreviewGoalV1' },
+      },
+      calculatedTargets: {
+        type: 'array',
+        maxItems: 200,
+        items: { $ref: '#/components/schemas/PublicationCalculatedTargetV1' },
+      },
+      blockers: {
+        type: 'array',
+        items: { $ref: '#/components/schemas/PublicationPreviewBlockerV1' },
+      },
+      formulaVersions: {
+        $ref: '#/components/schemas/PublicationPreviewFormulaVersionsV1',
+      },
+    },
+    [
+      'schemaVersion',
+      'planMonthId',
+      'spaceId',
+      'targetMonth',
+      'status',
+      'planMonthRevision',
+      'draftRevision',
+      'previewHashVersion',
+      'previewHash',
+      'activation',
+      'focus',
+      'goals',
+      'calculatedTargets',
+      'blockers',
+      'formulaVersions',
+    ],
+  )
   schemas['DraftMutationResponseV1'] = object(
     {
       kind: { type: 'string', enum: ['planning.plan-draft.v1'] },

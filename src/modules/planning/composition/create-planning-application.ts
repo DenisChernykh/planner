@@ -6,6 +6,7 @@ import { DurableCommandExecutor } from '@/shared/application/durable-command.exe
 import type { ProductClock } from '@/shared/application/product-clock'
 
 import { CreateEmptyDraftCommand } from '../application/create-empty-draft.command'
+import { BuildPublicationPreviewQuery } from '../application/build-publication-preview.query'
 import {
   AddDraftGoalCommand,
   RemoveDraftGoalCommand,
@@ -60,6 +61,11 @@ export function createPlanningApplication(dependencies: {
     getDraftEditor: new GetDraftEditorQuery(
       dependencies.workspaceMembers,
       draftGoals,
+    ),
+    buildPublicationPreview: new BuildPublicationPreviewQuery(
+      dependencies.workspaceMembers,
+      draftGoals,
+      dependencies.clock,
     ),
     addDraftGoal: new AddDraftGoalCommand(
       executor,

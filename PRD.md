@@ -130,6 +130,7 @@
 ### 7.3. Публикация, активация и блокировка
 
 - Публикация требует preview и явного подтверждения.
+- Preview привязан к exact draft revision, local activation date и deterministic hash; он показывает фокус, ordered goals, owners, весь typed config/provenance, рассчитанный calendar и все blockers, но не меняет план.
 - Публиковать разрешено только план текущего или следующего календарного месяца по `Asia/Yekaterinburg`; неопубликованный план прошедшего месяца публиковать нельзя.
 - План следующего месяца публикуется как зафиксированная будущая конфигурация и активируется ровно в `00:00` первого дня своего месяца. До этого момента записи и уведомления по нему недоступны.
 - План текущего месяца активируется при публикации; правила поздней публикации применяются с даты публикации.
@@ -611,6 +612,23 @@ Informational и `N/A` score исключаются; нулевой score denomi
 `N/A`, как и нулевой fixed coverage denominator. Пример `100/50/130` считается
 как exact `(100 + 50 + 100) / 3 = 83,33%`; coverage `1/1` и `0/9` равна
 `1/10 = 10%`, а не среднему `50%`.
+
+### 12.8. Publication preview
+
+Preview пересчитывает P03 validation и P04 calendar для каждой
+publishable цели. Текущий month активируется на сегодня, а
+следующий — на первое число. Иной month всё равно даёт
+revision-bound preview с blocker на `targetMonth`, чтобы UI мог показать
+точную причину. Empty goals сами по себе не блокируют
+публикацию.
+
+Расчёт не имеет facts и не синтезирует progress, score, coverage или
+`no_data`; versions P05 передаются как явная compatibility
+metadata. Два участника пространства получают одинаковый actor-free
+preview и hash. Hash включает всё показанное и рассчитанное состояние,
+включая revisions, activation, provenance, blockers и formula versions. Любая
+значимая правка draft или смена local date изменяет hash; повтор
+без изменений byte-stable.
 
 ## 13. Веб-интерфейс
 

@@ -725,6 +725,68 @@
         ],
         "type": "object"
       },
+      "EligibleCalendarV1": {
+        "discriminator": {
+          "mapping": {
+            "fixed": "#/components/schemas/FixedEligibleCalendarV1",
+            "quota": "#/components/schemas/QuotaEligibleCalendarV1",
+            "weekly_planned_task": "#/components/schemas/WeeklyPlannedTaskEligibleCalendarV1"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FixedEligibleCalendarV1"
+          },
+          {
+            "$ref": "#/components/schemas/QuotaEligibleCalendarV1"
+          },
+          {
+            "$ref": "#/components/schemas/WeeklyPlannedTaskEligibleCalendarV1"
+          }
+        ]
+      },
+      "FixedEligibleCalendarV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLocalDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "expectationDates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "maxItems": 31,
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          },
+          "timeZone": {
+            "enum": [
+              "Asia/Yekaterinburg"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetMonth",
+          "activeLocalDate",
+          "timeZone",
+          "kind",
+          "expectationDates"
+        ],
+        "type": "object"
+      },
       "GoalDefinitionConflictProblemResponseDto": {
         "properties": {
           "code": {
@@ -1100,6 +1162,342 @@
         ],
         "type": "object"
       },
+      "PublicationCalculatedTargetV1": {
+        "additionalProperties": false,
+        "properties": {
+          "calendar": {
+            "$ref": "#/components/schemas/EligibleCalendarV1"
+          },
+          "formulaVersion": {
+            "enum": [
+              "planner.calendar-targets.v1"
+            ],
+            "type": "string"
+          },
+          "planGoalId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "planGoalId",
+          "formulaVersion",
+          "calendar"
+        ],
+        "type": "object"
+      },
+      "PublicationPreviewActivationV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "latePublication": {
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "immediate",
+              "scheduled",
+              "blocked"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "activeLocalDate",
+          "latePublication"
+        ],
+        "type": "object"
+      },
+      "PublicationPreviewBlockerV1": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "required",
+              "empty_collection",
+              "incompatible"
+            ],
+            "type": "string"
+          },
+          "detail": {
+            "enum": [
+              "Required value is missing.",
+              "At least one item is required.",
+              "Values are incompatible.",
+              "due date is outside target month",
+              "week ordinal is not present in target month",
+              "Target month is not current or next."
+            ],
+            "type": "string"
+          },
+          "planGoalId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "pointer": {
+            "pattern": "^(?:/(?:[^~/]|~0|~1)*)+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "planGoalId",
+          "pointer",
+          "code",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "PublicationPreviewFormulaVersionsV1": {
+        "additionalProperties": false,
+        "properties": {
+          "calendarTargets": {
+            "enum": [
+              "planner.calendar-targets.v1"
+            ],
+            "type": "string"
+          },
+          "goalEvaluation": {
+            "enum": [
+              "planner.goal-evaluation.v1"
+            ],
+            "type": "string"
+          },
+          "scoreCoverage": {
+            "enum": [
+              "planner.score-coverage.v1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "calendarTargets",
+          "goalEvaluation",
+          "scoreCoverage"
+        ],
+        "type": "object"
+      },
+      "PublicationPreviewGoalBlockerV1": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "required",
+              "empty_collection",
+              "incompatible"
+            ],
+            "type": "string"
+          },
+          "detail": {
+            "enum": [
+              "Required value is missing.",
+              "At least one item is required.",
+              "Values are incompatible.",
+              "due date is outside target month",
+              "week ordinal is not present in target month"
+            ],
+            "type": "string"
+          },
+          "planGoalId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "pointer": {
+            "pattern": "^(?:/(?:[^~/]|~0|~1)*)+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "planGoalId",
+          "pointer",
+          "code",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "PublicationPreviewGoalV1": {
+        "additionalProperties": false,
+        "properties": {
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationPreviewGoalBlockerV1"
+            },
+            "type": "array"
+          },
+          "category": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/StoredDraftGoalConfigV1"
+          },
+          "configRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "displayOrder": {
+            "maximum": 199,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "goalDefinitionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "goalDefinitionVersionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "goalSeriesId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "planGoalId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "sourceProvenance": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SourceProvenanceV1"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "why": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          }
+        },
+        "required": [
+          "planGoalId",
+          "goalDefinitionId",
+          "goalDefinitionVersionId",
+          "goalSeriesId",
+          "title",
+          "why",
+          "category",
+          "displayOrder",
+          "configRevision",
+          "config",
+          "sourceProvenance",
+          "blockers"
+        ],
+        "type": "object"
+      },
+      "PublicationPreviewResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activation": {
+            "$ref": "#/components/schemas/PublicationPreviewActivationV1"
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationPreviewBlockerV1"
+            },
+            "type": "array"
+          },
+          "calculatedTargets": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationCalculatedTargetV1"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "draftRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "focus": {
+            "maxLength": 500,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "formulaVersions": {
+            "$ref": "#/components/schemas/PublicationPreviewFormulaVersionsV1"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationPreviewGoalV1"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "planMonthId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "planMonthRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "previewHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "previewHashVersion": {
+            "enum": [
+              "planner.publication-preview-hash.v1"
+            ],
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "planner.publication-preview.v1"
+            ],
+            "type": "string"
+          },
+          "spaceId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "planMonthId",
+          "spaceId",
+          "targetMonth",
+          "status",
+          "planMonthRevision",
+          "draftRevision",
+          "previewHashVersion",
+          "previewHash",
+          "activation",
+          "focus",
+          "goals",
+          "calculatedTargets",
+          "blockers",
+          "formulaVersions"
+        ],
+        "type": "object"
+      },
       "PublishBlockerV1": {
         "additionalProperties": false,
         "properties": {
@@ -1211,6 +1609,116 @@
           "precision",
           "aggregation",
           "target"
+        ],
+        "type": "object"
+      },
+      "QuotaCalendarPeriodV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activeDates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "maxItems": 31,
+            "type": "array"
+          },
+          "cadence": {
+            "enum": [
+              "weekly",
+              "monthly"
+            ],
+            "type": "string"
+          },
+          "eligibleDates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "maxItems": 31,
+            "type": "array"
+          },
+          "ordinal": {
+            "maximum": 6,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "periodDays": {
+            "maximum": 31,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "periodEnd": {
+            "format": "date",
+            "type": "string"
+          },
+          "periodStart": {
+            "format": "date",
+            "type": "string"
+          },
+          "periodTarget": {
+            "maximum": 31,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cadence",
+          "ordinal",
+          "periodStart",
+          "periodEnd",
+          "periodDays",
+          "activeDates",
+          "eligibleDates",
+          "periodTarget"
+        ],
+        "type": "object"
+      },
+      "QuotaEligibleCalendarV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLocalDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "cadence": {
+            "enum": [
+              "weekly",
+              "monthly"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "quota"
+            ],
+            "type": "string"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaCalendarPeriodV1"
+            },
+            "maxItems": 6,
+            "type": "array"
+          },
+          "targetMonth": {
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          },
+          "timeZone": {
+            "enum": [
+              "Asia/Yekaterinburg"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetMonth",
+          "activeLocalDate",
+          "timeZone",
+          "kind",
+          "cadence",
+          "periods"
         ],
         "type": "object"
       },
@@ -1931,6 +2439,84 @@
         "required": [
           "kind",
           "weekdays"
+        ],
+        "type": "object"
+      },
+      "WeeklyPlannedTaskEligibleCalendarV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLocalDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "weekly_planned_task"
+            ],
+            "type": "string"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyPlannedTaskPeriodV1"
+            },
+            "maxItems": 1,
+            "type": "array"
+          },
+          "targetMonth": {
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          },
+          "timeZone": {
+            "enum": [
+              "Asia/Yekaterinburg"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetMonth",
+          "activeLocalDate",
+          "timeZone",
+          "kind",
+          "periods"
+        ],
+        "type": "object"
+      },
+      "WeeklyPlannedTaskPeriodV1": {
+        "additionalProperties": false,
+        "properties": {
+          "cadence": {
+            "enum": [
+              "weekly"
+            ],
+            "type": "string"
+          },
+          "ordinal": {
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "periodEnd": {
+            "format": "date",
+            "type": "string"
+          },
+          "periodStart": {
+            "format": "date",
+            "type": "string"
+          },
+          "periodTarget": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cadence",
+          "ordinal",
+          "periodStart",
+          "periodEnd",
+          "periodTarget"
         ],
         "type": "object"
       },
@@ -5089,6 +5675,194 @@
           }
         ],
         "summary": "Read the typed monthly draft editor.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
+    "/planning/drafts/publication-preview": {
+      "get": {
+        "operationId": "PlanningDraftController_publicationPreview",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "targetMonth",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationPreviewResponseV1"
+                }
+              }
+            },
+            "description": "Publication preview with blockers as data."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Planning authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PLAN_DRAFT_NOT_FOUND": {
+                    "summary": "Plan draft not found",
+                    "value": {
+                      "code": "PLAN_DRAFT_NOT_FOUND",
+                      "detail": "The requested plan draft was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Plan draft not found",
+                      "type": "https://planner.invalid/problems/plan-draft-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Plan draft not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PLAN_DRAFT_NOT_EDITABLE": {
+                    "summary": "Plan draft not editable",
+                    "value": {
+                      "code": "PLAN_DRAFT_NOT_EDITABLE",
+                      "detail": "The plan month is not an editable draft.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Plan draft not editable",
+                      "type": "https://planner.invalid/problems/plan-draft-not-editable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Plan draft not editable"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Build a revision-bound publication preview.",
         "tags": [
           "planning"
         ]

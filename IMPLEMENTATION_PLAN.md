@@ -1346,20 +1346,48 @@ validation errors before confirmation.
 
 **Files:**
 
+- Modify: `TECHNICAL_DESIGN.md`
+- Modify: `PRD.md`
+- Modify: `USER_FLOWS.md`
+- Modify: `SCREEN_MAP.md`
+- Modify: `IMPLEMENTATION_PLAN.md`
 - Create: `src/modules/planning/application/build-publication-preview.query.ts`
+- Create: `src/modules/planning/application/publication-preview.ts`
+- Modify: `src/modules/planning/application/index.ts`
+- Modify: `src/modules/planning/application/planning-application.ts`
+- Modify: `src/modules/planning/composition/create-planning-application.ts`
+- Create: `src/modules/planning/presentation/publication-preview.response.ts`
 - Modify: `src/modules/planning/presentation/planning.controller.ts`
-- Test: `test/e2e/planning/publication-preview.e2e-spec.ts`
+- Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
+- Modify: `docs/api/openapi.json`
+- Test: `test/unit/planning/publication-preview.spec.ts`
+- Test: `test/e2e/planning/publication-preview.e2e.spec.ts`
+- Modify: `test/e2e/planning/draft-goal.e2e.spec.ts`
+- Modify: `test/e2e/platform/http-contracts.e2e.spec.ts`
 
-**Produces:** `PublicationPreview { draftRevision, previewHash, blockers,
-calculatedTargets }`; P07 confirms exact revision/hash and recomputes validation.
+**Produces:** exact frozen `planner.publication-preview.v1` projection with
+actor-independent `planner.publication-preview-hash.v1`, current/next/blocked
+activation, ordered full draft goals, entire eligible P04 calendars, finite
+P03/P04/window blockers and all three formula versions. It reuses exactly one
+existing editor read, has no write or new persistence seam and never invokes
+P05 evaluation without facts. P07 confirms exact revision/hash/version and
+recomputes the same projector inside its transaction.
 
-- [ ] Написать RED E2E valid/invalid draft cases with focus, owners, exact N,
-  checkpoints and prorated targets.
-- [ ] Реализовать bounded preview query using P04/P05 without persistence
-  mutation.
-- [ ] Добавить OpenAPI contract and explicit blocking problem states.
-- [ ] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: preview monthly plan publication`.
+- [x] Написать RED unit/query and real PG+Redis E2E oracles: current/next/
+  blocked activation, monthly late and weekly targets, P03 skip-P04,
+  one-off/ordinal blockers, stable/change hash matrix, exact/freeze/accessor,
+  both-member actor-free parity, cookie-only GET, `200` invalid/blocked,
+  `404/409/422`, no-write rows/xmin/count and deterministic repeat.
+- [x] Реализовать pure reusable projector/hash plus bounded query: one clock read,
+  one `resolveUser`, zero controller resolver calls, one existing editor
+  statement, public P03 refinement before exactly one P04 call per refined
+  goal, no P05 evaluation and no persistence mutation.
+- [x] Добавить exact OpenAPI path/query/security/status/response schemas and
+  explicit RFC Problems only for request/auth/not-found/not-editable/dependency;
+  config/calendar/window blockers remain `200` data.
+- [x] После independent review запустить E2E/OpenAPI drift and
+  `pnpm check:quick`; pre-review focused/static gates GREEN.
+- [x] Commit: `feat: preview monthly plan publication`.
 
 ### P07 — Atomic publish and activation
 

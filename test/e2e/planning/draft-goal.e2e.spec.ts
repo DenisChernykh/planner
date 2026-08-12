@@ -880,6 +880,7 @@ describe('P03 authenticated typed draft-goal HTTP', () => {
         .sort(),
     ).toEqual([
       '/planning/drafts',
+      '/planning/drafts/publication-preview',
       '/planning/drafts/{planMonthId}/goals',
       '/planning/drafts/{planMonthId}/goals/reorder',
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/remove',

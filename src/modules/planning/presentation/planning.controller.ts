@@ -91,6 +91,10 @@ import {
   type DraftEditorResponse,
   type DraftMutationResponse,
 } from './draft-goal.response'
+import {
+  toPublicationPreviewResponse,
+  type PublicationPreviewResponse,
+} from './publication-preview.response'
 
 const uuidSchema = {
   type: 'string' as const,
@@ -173,6 +177,9 @@ const draftMutationResponseSchema = {
 }
 const draftEditorResponseSchema = {
   $ref: '#/components/schemas/DraftEditorResponseV1',
+}
+const publicationPreviewResponseSchema = {
+  $ref: '#/components/schemas/PublicationPreviewResponseV1',
 }
 const metadataProperties = {
   title: {
@@ -515,6 +522,30 @@ export class PlanningDraftController {
     })
     if (value === null) throw new PlanDraftNotFoundError()
     return toDraftEditorResponse(value)
+  }
+
+  @Get('publication-preview')
+  @ApiOperation({ summary: 'Build a revision-bound publication preview.' })
+  @ApiQuery({
+    name: 'targetMonth',
+    required: true,
+    schema: { type: 'string', pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$' },
+  })
+  @ApiOkResponse({
+    description: 'Publication preview with blockers as data.',
+    schema: publicationPreviewResponseSchema,
+  })
+  @ApiProblemResponses(...draftReadProblems)
+  public async publicationPreview(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Query() query: DraftMonthQueryDto,
+  ): Promise<PublicationPreviewResponse> {
+    const value = await this.planning.buildPublicationPreview.execute({
+      trustedUserId: principal.userId,
+      targetMonth: query.targetMonth,
+    })
+    if (value === null) throw new PlanDraftNotFoundError()
+    return toPublicationPreviewResponse(value)
   }
 
   @Post(':planMonthId/goals')

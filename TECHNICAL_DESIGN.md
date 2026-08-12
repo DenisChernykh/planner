@@ -1866,6 +1866,67 @@ percentages. Zero denominators дают normal reasons `no_scored_goals` и
 acceptance-contract. Изменение формулы создаёт новую `formulaVersion`; старые
 закрытые report revisions не переписываются.
 
+### 11.3. P06 publication-preview boundary
+
+P06 добавляет ровно один authenticated safe-read endpoint:
+`GET /planning/drafts/publication-preview?targetMonth=YYYY-MM`. Controller
+передаёт в exact `BuildPublicationPreviewQuery({ trustedUserId, targetMonth })`
+только `CurrentPrincipal.userId` из проверенной session и сам не вызывает
+workspace resolver; Origin и CSRF для GET не требуются. Query валидирует exact
+input, вызывает `WorkspaceMemberResolver.resolveUser(trustedUserId)` ровно один
+раз, читает `today('Asia/Yekaterinburg')` ровно один раз и получает весь editor
+ровно одним существующим
+`DraftGoalPersistencePort.findEditor` statement. P06 не вводит новый DB
+read, schema, migration, transaction, write, command receipt или history.
+
+Activation в preview выводится из exact target month и одной trusted
+local date:
+
+- current month: `mode: immediate`, `activeLocalDate: today`,
+  `latePublication: day(today) > 1`;
+- next month: `mode: scheduled`, `activeLocalDate: targetMonth-01`,
+  `latePublication: false`;
+- любой другой month: `mode: blocked`, `activeLocalDate: targetMonth-01`,
+  `latePublication: false` и plan blocker `{ planGoalId: null,
+  pointer: '/targetMonth', code: 'incompatible', detail: 'Target month is not
+  current or next.' }`.
+
+Оконные и calendar/config blockers возвращаются как `200` preview
+data, а не как RFC Problem. Missing draft остаётся `404`, non-draft
+`409`, malformed query `422`, authentication/authorization `401/403`,
+dependency failure `503`. Empty goal list publishable и не порождает
+искусственный blocker.
+
+Для каждой цели projector сначала вызывает public
+`validateGoalConfig`. Только refined `GoalConfigV1` проецируется в
+`CalendarRepetitionV1`; `weekly_planned_task.taskText` остаётся display
+metadata и не попадает в P04 input. `calculateEligibleCalendar` вызывается
+ровно один раз на refined goal. Successful P04 result целиком становится
+calculated target; ineligible result становится goal blocker и не создаёт
+target. Invalid P03 config никогда не передаётся в P04. P06 не имеет facts,
+поэтому не вызывает P05 `evaluateGoalProgress`/
+`calculateScoreCoverage` и не синтезирует `no_data`, score или coverage.
+
+Public response — exact recursively frozen detached
+`planner.publication-preview.v1`: `planMonthId`, `spaceId`, `targetMonth`,
+`status`, decimal-string `draftRevision`/`planMonthRevision`, activation,
+focus, ordered full draft goals, calculated targets, aggregate blockers и
+exact `formulaVersions` для calendar/evaluation/score-coverage. Owner остаётся
+scope plus `ownerMemberId`; actor и profile names в preview отсутствуют.
+Blockers сортируются: plan-level первым, затем display order,
+`planGoalId`, pointer, code. Они имеют finite P03/P04/window details и
+nullable `planGoalId`.
+
+`previewHashVersion` равен `planner.publication-preview-hash.v1`.
+`previewHash` — lowercase SHA-256 от `canonicalJsonStringify` всего exact
+HTTP-like response, кроме самого `previewHash`: schema/hash versions, IDs,
+string revisions, formula versions, activation, focus, ordered goals/config/
+provenance, targets и blockers. Arrays и Unicode не нормализуются. Hash actor-
+independent и возвращается даже при blockers. P07 внутри одной
+transaction повторно строит exact projector после locked read, отклоняет
+blockers и проверяет revision/hash/version; смена local date делает
+старый preview stale.
+
 ## 12. Reporting
 
 ### 12.1. Active и grace

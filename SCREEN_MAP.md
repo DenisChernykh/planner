@@ -351,9 +351,10 @@ flowchart LR
 - display-only provenance исходного значения и принятого resolution, если оно есть;
 - блокирующие ошибки конфигурации с переходом к форме;
 - последствия поздней публикации;
+- revision/hash marker, который обновляется при любой правке draft или смене local activation date;
 - явное подтверждение.
 
-**Состояния:** blockers present; готово к публикации; подтверждение; published; duplicate command; запрещённый прошедший месяц.
+**Состояния:** blockers present в `200` preview; готово к публикации; scheduled next month; immediate/late current month; blocked прошедший или дальний month; stale revision/hash; подтверждение; published; duplicate command.
 
 **Переходы:** исправить → `W-09` или `W-10`; подтвердить → `W-02` для активного месяца либо `W-07` для будущего; отменить → `W-09`.
 
