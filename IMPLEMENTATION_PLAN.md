@@ -1258,22 +1258,83 @@ and overperformance for every pilot goal type.
 
 **Files:**
 
+- Modify: `TECHNICAL_DESIGN.md`
+- Modify: `PRD.md`
+- Modify: `IMPLEMENTATION_PLAN.md`
 - Create: `src/modules/progress/goal-evaluators.ts`
 - Create: `src/modules/progress/score-coverage.ts`
 - Modify: `src/modules/progress/index.ts`
 - Test: `test/unit/progress/goal-evaluators.spec.ts`
 - Test: `test/unit/progress/score-coverage.spec.ts`
 
-**Produces:** `evaluateGoalProgress` and `calculateScoreCoverage`; consumers
-pass snapshot/facts/calendar/asOf explicitly.
+**Produces:** versioned `evaluateGoalProgress` and `calculateScoreCoverage`;
+consumers pass a progress-owned exact snapshot, exact `CalendarTargetsInput`
+provenance paired with its successful P04 calendar/version, authoritative
+current facts and canonical `asOfLocalDate`. P05 recalculates P04 and requires
+structural equality, so a forged/truncated/inconsistent successful DTO is not
+trusted. Planning must explicitly project refined `GoalConfigV1`; P05 does not
+import planning or accept the P03 config/draft directly.
 
-- [ ] Написать RED fixtures Boolean, add/latest, cross-midnight time, rating,
-  text, checklist, checkpoints, OR max, coverage, cap and overperformance.
-- [ ] Реализовать evaluators without persistence or system clock imports.
-- [ ] Доказать `100/50/130 → 83.33%`, separate overperformance and
-  `not_applicable` exclusion.
-- [ ] Запустить evaluator/score tests and architecture check.
-- [ ] Commit: `feat: evaluate planner goal progress`.
+Public constants are exact
+`GOAL_EVALUATION_FORMULA_VERSION = "planner.goal-evaluation.v1"` and
+`SCORE_COVERAGE_FORMULA_VERSION = "planner.score-coverage.v1"`. Snapshot
+discriminator is exact
+`schemaVersion: "planner.goal-evaluation-snapshot.v1"`. Goal output preserves
+P04 calendar version and exposes exact ratio plus one-boundary half-up
+`basisPoints`, where `100%="10000"`; unavailable goal reasons are
+`informational|no_applicable_units`. Aggregate unavailable reasons are
+`no_scored_goals|no_fixed_units`.
+
+P05 owns complete exact measurement/checkpoint and normalized fact unions from
+Technical Design §11.2. Facts are current effective state without actor,
+persistence identity/terms, revision history or timestamps. Exact validation
+rejects extra/accessor/prototype/sparse/duplicate/mismatched/future or
+out-of-calendar data with frozen value-free finite issues. Absence computes
+`no_data`; `not_applicable` only comes from calendar/as-of; output and errors
+are detached recursively frozen.
+
+Fixed score semantics, independent/all checkpoints, informational quantity,
+weekly planned task, flexible per-period cap/no-debt and coverage units are
+locked by PRD §§12.4–12.7 and TD §11.2. Independent child score caps each child
+before exact mean. Weekly planned task is scored once after period start but
+contributes `0/0` coverage. Aggregate score is equal-weight available goal
+score; aggregate coverage sums counts.
+
+Exact math stays rational through aggregation. Product decimals never use
+binary float or unbounded `BigInt` conversion of caller strings; no silent new
+per-field decimal bound. Deterministic exact-work budget is `250000` numeric
+input digits, `10000` terms, `250000` output digits, `25000000`
+multiplication and `50000000` divmod digit-work units; over-budget input is
+typed `input_too_complex`, never approximation or a wall-time timeout. Opaque
+`contributionId` is projection-wide unique domain current-state identity, not
+a DB/revision ID. Internal graph is `goal-evaluators → score-coverage +
+calendar-targets`; score-coverage is independent and internals never import the
+barrel. Existing dependency-cruiser/ESLint P04 guards are sufficient and are
+not changed without a failing architecture oracle.
+
+Raw numeric digits are charged before normalization; one shared term ledger
+rejects top-level and nested oversized arrays before key/descriptor traversal
+or mapping. Accepted ratios are fully reduced by bounded string GCD regardless
+of digit length, or rejected by the same deterministic budget. Measurement
+item/variant IDs and checkpoint IDs are unique across the complete snapshot.
+
+- [x] Синхронизировать P05 exact public DTO, finite errors, as-of, versions and
+  every formula/coverage branch in canonical docs before RED.
+- [x] Написать оба approved unit specs before production и доказать literal RED
+  на отсутствующих modules/exports.
+- [x] Доказать Boolean `1/3` + coverage `2/3`, add/latest including `.1+.2`,
+  inclusive overnight time, rating bounds, text, checklist `2/4` + `3/4`
+  coverage, OR max, independent/all checkpoints, informational branches,
+  weekly task and flexible target-zero/no-debt.
+- [x] Доказать child mean `1/2 + 1/6 → 3333`, independent `130/50 →
+  progress 90, score 75, over 15`, month `100/50/130 → 8333`, coverage
+  `1/1 + 0/9 → 1000`, exact half-up and huge-decimal no-drift.
+- [x] Доказать authentic P04 provenance/result pairing, full ratio reduction,
+  early shared work preflight, snapshot-wide identity and nested
+  exact/freeze/mutation/accessor matrices; затем P04 regression,
+  source/test typecheck, focused lint/format, architecture and full unit before
+  independent review.
+- [x] Commit: `feat: evaluate planner goal progress`.
 
 ### P06 — Publication preview
 

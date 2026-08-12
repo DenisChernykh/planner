@@ -1477,6 +1477,378 @@ finite literal union и никогда не включает rejected value. Nor
 `{/repetition/weekOrdinal, incompatible, week ordinal is not present in target
 month}`.
 
+### 11.2. P05 goal evaluation boundary
+
+P05 добавляет два pure public seams с независимыми версиями
+`GOAL_EVALUATION_FORMULA_VERSION = "planner.goal-evaluation.v1"` и
+`SCORE_COVERAGE_FORMULA_VERSION = "planner.score-coverage.v1"`:
+`evaluateGoalProgress` вычисляет одну цель, а `calculateScoreCoverage`
+агрегирует уже разделённую personal/shared секцию. Внутренний граф зависимостей
+ровно `goal-evaluators → score-coverage + calendar-targets`;
+`score-coverage` не импортирует evaluator, а внутренние файлы не импортируют
+public barrel.
+
+Модуль остаётся framework-free и self-contained: без planning/tracking,
+БД/HTTP/Nest/Prisma, `Date`, `Intl`, `Temporal`, системных часов, `process`,
+global objects и timers. Planning orchestration допускает к mapper только
+refined `GoalConfigV1` и создаёт новый progress-owned
+`GoalEvaluationSnapshotV1`. Его literal discriminator
+`schemaVersion: "planner.goal-evaluation-snapshot.v1"` не совпадает с P03
+schema, поэтому ни refined config целиком, ни nullable draft нельзя передать в
+P05 без явной проекции. Mapper удаляет scope/repetition, labels, units,
+deadlines и другие поля, не участвующие в формуле. P05 валидирует exact
+low-level DTO, но не доказывает publishability и не очищает P03/P04 blockers.
+
+`evaluateGoalProgress` принимает exact `CalendarTargetsInput` provenance и
+парный successful P04 result вместе с его `formulaVersion`, snapshot,
+authoritative current fact projection и явную canonical `asOfLocalDate`. P05
+повторно вызывает P04 policy на provenance и требует exact structural equality
+с supplied result; ineligible provenance и forged/truncated/inconsistent
+result отвергаются, а формулы календаря не дублируются в P05. Actor,
+persistence record IDs/термины, revisions, tombstones/history и timestamps в
+DTO отсутствуют. `contributionId` — opaque domain identity текущего active
+contribution для projection-wide dedupe, а не ID строки БД или revision.
+Отсутствие fact row означает
+вычисляемый `no_data`; пользователь не передаёт `no_data` и
+`not_applicable`. Явный `not_done` является заполненным fixed unit с нулевым
+achievement. `not_applicable` выводится только из calendar/as-of.
+
+Exact public ledger P05:
+
+```ts
+type CanonicalExactRatio = {
+  readonly numerator: string
+  readonly denominator: string
+}
+
+type EvaluationMetric =
+  | {
+      readonly available: true
+      readonly exact: CanonicalExactRatio
+      readonly basisPoints: string
+    }
+  | {
+      readonly available: false
+      readonly exact: null
+      readonly basisPoints: null
+      readonly reason: 'informational' | 'no_applicable_units'
+    }
+
+type EvaluationMeasurementV1 =
+  | { readonly kind: 'boolean' }
+  | {
+      readonly kind: 'quantity'
+      readonly mode: 'targeted' | 'informational'
+      readonly precision: 0 | 1 | 2 | 3
+      readonly aggregation: 'add' | 'latest'
+      readonly target: string | null
+    }
+  | {
+      readonly kind: 'actual_time'
+      readonly start: string
+      readonly end: string
+    }
+  | {
+      readonly kind: 'rating'
+      readonly minimum: number
+      readonly maximum: number
+    }
+  | { readonly kind: 'text' }
+  | {
+      readonly kind: 'checklist'
+      readonly items: readonly [
+        { readonly itemId: string },
+        ...{ readonly itemId: string }[],
+      ]
+    }
+  | {
+      readonly kind: 'any_of'
+      readonly variants: readonly [
+        {
+          readonly variantId: string
+          readonly precision: 0 | 1 | 2 | 3
+          readonly target: string
+        },
+        ...{
+          readonly variantId: string
+          readonly precision: 0 | 1 | 2 | 3
+          readonly target: string
+        }[],
+      ]
+    }
+
+type EvaluationCheckpointSatisfactionV1 =
+  | { readonly kind: 'boolean' }
+  | { readonly kind: 'quantity'; readonly target: string }
+  | {
+      readonly kind: 'actual_time'
+      readonly start: string
+      readonly end: string
+    }
+  | { readonly kind: 'rating' }
+  | { readonly kind: 'text' }
+  | { readonly kind: 'checklist' }
+  | { readonly kind: 'any_of' }
+
+type GoalEvaluationSnapshotV1 = {
+  readonly schemaVersion: 'planner.goal-evaluation-snapshot.v1'
+  readonly measurement: EvaluationMeasurementV1
+  readonly checkpoints: {
+    readonly aggregation: 'independent' | 'all'
+    readonly items: readonly [
+      {
+        readonly checkpointId: string
+        readonly satisfaction: EvaluationCheckpointSatisfactionV1
+      },
+      ...{
+        readonly checkpointId: string
+        readonly satisfaction: EvaluationCheckpointSatisfactionV1
+      }[],
+    ]
+  } | null
+}
+
+type GoalFactValueV1 =
+  | { readonly kind: 'boolean'; readonly result: 'done' | 'not_done' }
+  | { readonly kind: 'not_done' }
+  | {
+      readonly kind: 'quantity_add'
+      readonly contributions: readonly [
+        { readonly contributionId: string; readonly value: string },
+        ...{ readonly contributionId: string; readonly value: string }[],
+      ]
+    }
+  | { readonly kind: 'quantity_latest'; readonly value: string }
+  | { readonly kind: 'actual_time'; readonly value: string }
+  | { readonly kind: 'rating'; readonly value: number }
+  | {
+      readonly kind: 'text'
+      readonly text: string
+      readonly result: 'done' | 'not_done'
+    }
+  | {
+      readonly kind: 'checklist'
+      readonly items: readonly {
+        readonly itemId: string
+        readonly state: 'done' | 'not_done'
+      }[]
+    }
+  | {
+      readonly kind: 'any_of'
+      readonly variants: readonly {
+        readonly variantId: string
+        readonly value: string
+      }[]
+    }
+
+type GoalEvaluationFactV1 =
+  | {
+      readonly kind: 'fixed'
+      readonly expectationDate: string
+      readonly value: GoalFactValueV1
+    }
+  | {
+      readonly kind: 'fixed_checkpoints'
+      readonly expectationDate: string
+      readonly checkpoints: readonly {
+        readonly checkpointId: string
+        readonly value: GoalFactValueV1
+      }[]
+    }
+  | {
+      readonly kind: 'quota_occurrence'
+      readonly localDate: string
+      readonly value: GoalFactValueV1
+    }
+  | {
+      readonly kind: 'weekly_planned_task'
+      readonly periodStart: string
+      readonly periodEnd: string
+      readonly result: 'done' | 'not_done'
+    }
+
+type SuccessfulEligibleCalendarResult = Extract<
+  EligibleCalendarResult,
+  { readonly eligible: true }
+>
+
+type EvaluateGoalProgressInput = {
+  readonly snapshot: GoalEvaluationSnapshotV1
+  readonly calendarInput: CalendarTargetsInput
+  readonly calendar: SuccessfulEligibleCalendarResult
+  readonly facts: readonly GoalEvaluationFactV1[]
+  readonly asOfLocalDate: string
+}
+
+type ScoreCoverageContributionV1 = {
+  readonly score: CanonicalExactRatio | null
+  readonly coverage: {
+    readonly filled: string
+    readonly applicable: string
+  }
+}
+
+type FlexiblePeriodEvaluationV1 = {
+  readonly periodStart: string
+  readonly periodEnd: string
+  readonly periodTarget: string
+  readonly actualEquivalentOccurrences: CanonicalExactRatio
+  readonly creditedOccurrences: CanonicalExactRatio
+  readonly overperformanceOccurrences: CanonicalExactRatio
+}
+
+type GoalProgressResult = {
+  readonly formulaVersions: {
+    readonly calendar: 'planner.calendar-targets.v1'
+    readonly evaluation: 'planner.goal-evaluation.v1'
+  }
+  readonly progress: EvaluationMetric
+  readonly score: EvaluationMetric
+  readonly overperformance: EvaluationMetric
+  readonly coverage: {
+    readonly filled: string
+    readonly applicable: string
+  }
+  readonly contribution: ScoreCoverageContributionV1
+  readonly periods: readonly FlexiblePeriodEvaluationV1[]
+}
+
+type AggregateMetric =
+  | {
+      readonly available: true
+      readonly exact: CanonicalExactRatio
+      readonly basisPoints: string
+    }
+  | {
+      readonly available: false
+      readonly exact: null
+      readonly basisPoints: null
+      readonly reason: 'no_scored_goals' | 'no_fixed_units'
+    }
+
+type ScoreCoverageResult = {
+  readonly formulaVersion: 'planner.score-coverage.v1'
+  readonly monthScore: AggregateMetric
+  readonly coverage: AggregateMetric
+  readonly totals: {
+    readonly scoredGoals: string
+    readonly filled: string
+    readonly applicable: string
+  }
+}
+
+declare function evaluateGoalProgress(
+  input: EvaluateGoalProgressInput,
+): GoalProgressResult
+declare function calculateScoreCoverage(input: {
+  readonly contributions: readonly ScoreCoverageContributionV1[]
+}): ScoreCoverageResult
+```
+
+Canonical ratio полностью сокращён независимо от размера принятого значения,
+содержит nonnegative numerator и positive denominator без leading zeroes; zero
+canonicalized как `0/1`. `basisPoints` — canonical
+nonnegative integer string, где `100% = "10000"`, `83.33% = "8333"`, а
+`130% = "13000"`. Exact rational сохраняется до последней границы метрики;
+`round_half_up` вызывается один раз, поэтому среднее `1/2` и `1/6` даёт
+`3333`, а не `3334`. Product decimals не проходят через binary float или
+unbounded `BigInt(callerString)`. Отдельное decimal field не получает скрытый
+length bound. Вместо approximation P05 применяет deterministic public
+exact-work budget до дорогой allocation: не более `250000` canonical numeric
+input digits, `10000` exact terms и `250000` projected output digits; одна
+schoolbook multiplication допускает не более `25000000`, exact divmod — не
+более `50000000` digit-work units. Equality/identity/linear normalization fast
+paths учитываются до budgeted quadratic operation, поэтому один exact
+`100000`-digit ratio остаётся допустим. Превышение возвращает typed value-free
+`input_too_complex` на `/facts` либо `/contributions`; результат всегда exact
+или rejected до materialization, никогда approximate и никогда wall-time
+dependent. Raw canonical digit lengths начисляются до rational normalization;
+один shared term ledger проверяет длины top-level и nested arrays до
+`Set`/`Reflect.ownKeys`/descriptor traversal или `.map()`. Bounded string GCD и
+полное сокращение используют тот же deterministic divmod budget: размер числа
+никогда не переключает canonicalization в частичный режим.
+
+Structural mismatch бросает `GoalEvaluationInputError` либо независимый
+`ScoreCoverageInputError`. Их `issues` — frozen non-empty array exact
+`{pointer, code, detail}`. Codes finite:
+`invalid_type|invalid_value|unexpected_property|incompatible|input_too_complex`;
+detail —
+value-free literal union. Pointer принадлежит finite families `""`,
+`/snapshot[/measurement|/checkpoints]`, `/calendarInput`, `/calendar`, `/facts`,
+`/facts/{index}[/expectationDate|/localDate|/periodStart|/periodEnd|
+/checkpointId|/value|/checkpoints]`, `/asOfLocalDate`, `/contributions` и
+`/contributions/{index}[/score|/coverage]`. Exact shape отклоняет extras,
+symbols, prototypes/accessors, sparse arrays, duplicate keys/IDs/dates,
+measurement/calendar/component mismatch, facts вне P04 calendar либо позже
+as-of. Measurement item/variant IDs и checkpoint IDs уникальны во всём
+snapshot, не только внутри отдельных arrays. Ошибки, successful results и normal unavailable data detached и
+recursively frozen.
+
+As-of policy: fixed expectations становятся applicable при
+`expectationDate <= asOfLocalDate`. Quota и weekly task period входит целиком
+при `periodStart <= asOfLocalDate`; его сохранённый target не prorate-ится
+повторно, но учитываются только eligible facts до as-of. Future period не
+создаёт `no_data`. До первой applicable unit результат unavailable; после
+месяца участвует весь месяц. Факт из будущего, за календарём или с неверной
+period identity — incompatible input.
+
+Fact projection является текущим effective state. `add` содержит
+projection-wide unique opaque `contributionId/value` и суммируется exact;
+`latest` содержит не более одного
+актуального value и никогда не превращается в history sum. Decimal facts
+canonical nonnegative и не превышают snapshot precision. Text non-whitespace,
+rating safe integer внутри range, time canonical `HH:mm`, checklist/OR IDs
+stable и unique. Actual-time endpoints inclusive; обычный range использует
+`start <= value <= end`, overnight — `value >= start || value <= end`.
+
+Fixed evaluation:
+
+- Boolean: done ratio; missing/not-done — zero achievement.
+- Targeted quantity: exact actual/target для каждой даты и exact mean дат;
+  fixed progress uncapped. Informational quantity не имеет progress/score, но
+  valid fixed measurement добавляет filled coverage unit. Informational quota
+  не имеет ни score, ни coverage.
+- Time засчитывается только внутри inclusive target; любое введённое valid
+  время filled. Rating любой valid magnitude, включая minimum, satisfied и
+  filled. Text filled только с nonempty text, achievement только `done`.
+- Checklist: каждый обязательный item является progress и coverage unit;
+  parent unit отсутствует. Any-of: maximum variant actual/target, не сумма;
+  один parent coverage unit filled при измерении хотя бы одного variant либо
+  explicit `not_done`.
+- Non-flex score cap равен one, overperformance = raw progress − score.
+
+Checkpoints возможны только в fixed projection. При `independent` raw parent
+progress — exact mean child raw ratios, score — exact mean каждого child после
+individual cap one; перевыполнение одного child не компенсирует другой.
+Overperformance равен raw minus score. Для checklist child coverage units —
+его items, для остальных — сам child на каждую дату. При `all` одна
+parent-date unit satisfied только когда все children satisfied, а filled —
+когда все children fully filled. Checklist child fully filled только при
+state каждого item; any-of child filled при хотя бы одном измеренном variant
+либо explicit not-done. Rating child satisfied любым valid value; quantity
+при `actual >= target`, time внутри range, boolean/text при done, checklist при
+всех items done, any-of при max ratio `>= 1`.
+
+Flexible occurrence ratio всегда capped `[0,1]`. Для каждого entered period:
+`actualEquivalent = sum(occurrenceRatio)`, `credited = min(actualEquivalent,
+periodTarget)`, `over = actualEquivalent - credited`. Month progress делит
+sum actual на sum targets, score — sum credited, overperformance — sum over.
+Cap применяется отдельно к каждому period, поэтому surplus не закрывает debt
+другой недели. Target-zero period не входит; zero total target означает
+`no_applicable_units`. Quota не имеет coverage. Flexible rating occurrence
+равен one при любом valid value. System daily `not_done` для quota не
+синтезируется; валидный boolean/text `not_done` остаётся zero occurrence.
+
+`weekly_planned_task` — одна scored week-level boolean unit, когда P04 period
+entered. `done` даёт one, explicit `not_done` или отсутствие — zero. Этот тип
+не создаёт fixed/day coverage units: его evaluation coverage всегда `0/0`.
+
+Aggregate принимает только exact contributions одной уже разделённой секции.
+Month score — equal-weight mean available capped goal scores; null score
+исключается. Coverage — `sum(filled)/sum(applicable)`, а не mean goal
+percentages. Zero denominators дают normal reasons `no_scored_goals` и
+`no_fixed_units`. Outputs никогда не смешивают personal и shared сами.
+
 Обязательные свойства:
 
 - decimal arithmetic без binary floating-point для продуктовых значений;

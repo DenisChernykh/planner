@@ -530,6 +530,88 @@ coverage = filledFixedExpectations / applicableFixedExpectations
 
 Личная coverage и личный порог 80% используют только личные цели соответствующего владельца. Совместная coverage рассчитывается отдельным разделом и не входит в личные 80%. Применимый личный день содержит хотя бы одно причитающееся владельцу фиксированное ожидание; он успешен, когда владелец закрыл день либо заполнил все такие ожидания. Личный показатель полноты дней: `successfulApplicableDays / applicablePersonalDays`.
 
+### 12.7. Exact evaluation, as-of и версии формул
+
+Goal evaluation имеет version `planner.goal-evaluation.v1`, а агрегирование
+monthScore/coverage — независимую version `planner.score-coverage.v1`. Каждый
+результат цели также сохраняет exact calendar provenance
+`planner.calendar-targets.v1`; изменение одной формулы не переименовывает две
+другие и не переписывает закрытые отчёты.
+
+Вычисление получает exact `CalendarTargetsInput` рядом с successful P04
+calendar. Pure evaluator повторно применяет P04 policy и требует полного
+structural совпадения результатов: forged, truncated или inconsistent calendar
+не может изменить denominator/target, а ineligible provenance не оценивается.
+P05 не копирует календарные формулы и не принимает один только unchecked
+successful DTO.
+
+Все проценты вычисляются как exact nonnegative rational. Внешнее отображение
+имеет integer basis points: `100% = 10000`, `83,33% = 8333`,
+`130% = 13000`. `round_half_up` применяется ровно один раз к итоговой метрике,
+а не к children, occurrences или целям перед агрегированием. Поэтому среднее
+`1/2` и `1/6` равно `33,33%`, не `33,34%`. Decimal facts и targets не
+преобразуются через binary floating-point. Для защиты pure synchronous
+boundary действует deterministic exact-work budget: до `250000` canonical
+numeric input digits, `10000` exact terms, `250000` projected output digits,
+`25000000` multiplication и `50000000` divmod digit-work units. Это не
+per-field decimal limit и не timeout: допустимый результат всегда exact, а
+превышение до дорогой allocation возвращает typed `input_too_complex` без
+approximation. Один equality-fast-path ratio с `100000` digits остаётся
+допустим. Raw digit lengths начисляются до сокращения даже для equal ratio;
+единый `10000`-term ledger отклоняет oversized top-level/nested arrays до
+обхода keys/descriptors и allocation. Каждый принятый rational полностью
+сокращён bounded string arithmetic независимо от длины либо rejected тем же
+deterministic budget.
+
+Расчёт принимает явную локальную дату `asOf`:
+
+- fixed expectation входит начиная со своей даты; будущая expectation не
+  считается `no_data`;
+- quota или weekly planned task period входит целиком, когда наступил его
+  `periodStart`, но facts после `asOf` не учитываются;
+- до первой применимой единицы показатели равны `N/A`, после месяца участвует
+  весь month calendar;
+- `not_applicable` определяется только опубликованным календарём и `asOf`, а не
+  пользовательским фактом.
+
+Facts являются текущим authoritative state. Для `add` суммируются active
+projection-wide unique contributions с opaque domain `contributionId` (не ID
+строки БД/revision), для `latest` берётся одно текущее значение. Отсутствие fact —
+`no_data`; explicit `not_done` заполнен для fixed coverage, но даёт нулевое
+достижение. Время сравнивается с inclusive endpoints; overnight value попадает
+при `value >= start` или `value <= end`. Любой valid rating, включая minimum,
+является заполнением и достижением: magnitude не означает успех или провал.
+
+Для independent checkpoints raw progress равен exact mean raw child ratios, а
+goalScore — exact mean child ratios после отдельного cap `100%` каждого child.
+Перевыполнение одного child не компенсирует другой; разность остаётся отдельным
+overperformance. Checklist child даёт coverage unit на каждый item, остальные
+children — по одной unit на дату. Для `all` одна parent-date unit выполнена
+только при удовлетворении всех children и заполнена только при полном
+заполнении всех children. Any-of считается заполненным при хотя бы одном
+variant value либо explicit `not_done`; его progress остаётся максимумом, не
+суммой.
+
+Для flexible quota occurrence ratio ограничен `[0,1]`. Каждый наступивший
+period отдельно вычисляет actual equivalent, credited capped его target и
+overperformance. Итоги делят суммы на сумму targets наступивших ненулевых
+periods; surplus одной недели не переносится. Flexible quota, включая
+informational quantity, не входит в coverage. Fixed informational quantity
+остаётся coverage unit при valid measurement, но не получает progress/score.
+
+`weekly_planned_task` после начала своей недели является одной scored
+week-level boolean unit: `done = 100%`, `not_done/no_data = 0%`. Она не входит
+в fixed/day coverage и не добавляет coverage denominator.
+
+Goal result хранит uncapped progress, capped score, separate overperformance,
+exact ratios, basis points и fixed coverage counts. Агрегатор принимает цели
+одного уже выбранного personal/shared раздела: monthScore — exact равновесное
+среднее доступных goalScore, coverage — отношение сумм filled/applicable.
+Informational и `N/A` score исключаются; нулевой score denominator даёт
+`N/A`, как и нулевой fixed coverage denominator. Пример `100/50/130` считается
+как exact `(100 + 50 + 100) / 3 = 83,33%`; coverage `1/1` и `0/9` равна
+`1/10 = 10%`, а не среднему `50%`.
+
 ## 13. Веб-интерфейс
 
 Веб должен быть адаптивным и содержать:

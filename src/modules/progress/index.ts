@@ -22,3 +22,38 @@ export {
   type WeeklyPlannedTaskCalendar,
   type WeeklyPlannedTaskPeriod,
 } from './calendar-targets'
+
+export {
+  GOAL_EVALUATION_FORMULA_VERSION,
+  GoalEvaluationInputError,
+  evaluateGoalProgress,
+  type EvaluateGoalProgressInput,
+  type EvaluationCheckpointSatisfactionV1,
+  type EvaluationCheckpointV1,
+  type EvaluationMeasurementV1,
+  type EvaluationMetric,
+  type FlexiblePeriodEvaluationV1,
+  type GoalEvaluationFactV1,
+  type GoalEvaluationInputIssue,
+  type GoalEvaluationInputIssueCode,
+  type GoalEvaluationInputIssueDetail,
+  type GoalEvaluationInputIssuePointer,
+  type GoalEvaluationSnapshotV1,
+  type GoalFactValueV1,
+  type GoalProgressResult,
+  type SuccessfulEligibleCalendarResult,
+} from './goal-evaluators'
+
+export {
+  SCORE_COVERAGE_FORMULA_VERSION,
+  ScoreCoverageInputError,
+  calculateScoreCoverage,
+  type AggregateMetric,
+  type CanonicalExactRatio,
+  type ScoreCoverageContributionV1,
+  type ScoreCoverageInputIssue,
+  type ScoreCoverageInputIssueCode,
+  type ScoreCoverageInputIssueDetail,
+  type ScoreCoverageInputIssuePointer,
+  type ScoreCoverageResult,
+} from './score-coverage'
