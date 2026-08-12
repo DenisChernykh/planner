@@ -41,8 +41,10 @@ model Membership {
   user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   allowlist       TelegramAccessAllowlist?
   planningActions PlanningActionGroup[]
+  ownedDraftGoalRevisions PlanDraftGoalRevision[]
 
   @@unique([spaceId, slot])
+  @@unique([spaceId, id])
   @@unique([spaceId, userId])
   @@map("memberships")
 }
@@ -87,8 +89,10 @@ model PlanMonth {
   space   Space                 @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   draft   PlanDraft?
   actions PlanningActionGroup[]
+  draftGoals PlanDraftGoal[]
 
   @@unique([spaceId, monthStart])
+  @@unique([spaceId, id])
   @@map("plan_months")
 }
 
@@ -141,6 +145,7 @@ model PlanningActionGroup {
   commandReceipt    CommandReceipt             @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
   focusChange       PlanningMonthFocusChange?
   goalCatalogChange PlanningGoalCatalogChange?
+  draftGoalChange   PlanningDraftGoalChange?
 
   @@unique([actorScope, commandType, commandId])
   @@map("planning_action_groups")
@@ -171,6 +176,7 @@ model GoalDefinition {
   actions           PlanningActionGroup[]
   catalogChanges    PlanningGoalCatalogChange[] @relation("CatalogChangeTarget")
   copiedFromChanges PlanningGoalCatalogChange[] @relation("CatalogChangeSource")
+  draftGoals        PlanDraftGoal[]
 
   @@unique([spaceId, id])
   @@index([spaceId, state, createdAt, id])
@@ -184,6 +190,7 @@ model GoalSeries {
 
   goalDefinition GoalDefinition          @relation(fields: [goalDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   versions       GoalDefinitionVersion[]
+  draftGoalRevisions PlanDraftGoalRevision[]
 
   @@unique([goalDefinitionId, id])
   @@map("goal_series")
@@ -205,6 +212,7 @@ model GoalDefinitionVersion {
   catalogBeforeChanges     PlanningGoalCatalogChange[] @relation("CatalogBeforeVersion")
   catalogAfterChanges      PlanningGoalCatalogChange[] @relation("CatalogAfterVersion")
   catalogCopySourceChanges PlanningGoalCatalogChange[] @relation("CatalogCopySourceVersion")
+  draftGoalRevisions      PlanDraftGoalRevision[]
 
   @@unique([goalDefinitionId, versionNumber])
   @@unique([goalDefinitionId, id])
@@ -230,4 +238,71 @@ model PlanningGoalCatalogChange {
   copySourceVersion    GoalDefinitionVersion? @relation("CatalogCopySourceVersion", fields: [copySourceDefinitionId, copySourceVersionId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
 
   @@map("planning_goal_catalog_changes")
+}
+
+model PlanDraftGoal {
+  id                 String    @id @default(uuid()) @db.Uuid
+  spaceId            String    @map("space_id") @db.Uuid
+  planMonthId        String    @map("plan_month_id") @db.Uuid
+  goalDefinitionId   String    @map("goal_definition_id") @db.Uuid
+  displayOrder       Int       @map("display_order")
+  currentRevisionId  String?   @map("current_revision_id") @db.Uuid
+  attachedAt         DateTime  @map("attached_at") @db.Timestamptz(3)
+  detachedAt         DateTime? @map("detached_at") @db.Timestamptz(3)
+  createdAt          DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @map("updated_at") @db.Timestamptz(3)
+
+  planMonth       PlanMonth      @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  goalDefinition  GoalDefinition @relation(fields: [spaceId, goalDefinitionId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  revisions       PlanDraftGoalRevision[] @relation("DraftGoalRevisions")
+  currentRevision PlanDraftGoalRevision? @relation("CurrentDraftGoalRevision", fields: [id, currentRevisionId], references: [planGoalId, id], onDelete: Restrict, onUpdate: Restrict)
+  changes         PlanningDraftGoalChange[]
+
+  @@unique([id, spaceId, goalDefinitionId])
+  @@unique([id, currentRevisionId])
+  @@map("plan_draft_goals")
+}
+
+model PlanDraftGoalRevision {
+  id                      String   @id @default(uuid()) @db.Uuid
+  planGoalId              String   @map("plan_goal_id") @db.Uuid
+  spaceId                 String   @map("space_id") @db.Uuid
+  goalDefinitionId        String   @map("goal_definition_id") @db.Uuid
+  revisionNumber          BigInt   @map("revision_number") @db.BigInt
+  goalDefinitionVersionId String   @map("goal_definition_version_id") @db.Uuid
+  goalSeriesId            String   @map("goal_series_id") @db.Uuid
+  scopeKind               String   @map("scope_kind") @db.VarChar(16)
+  ownerMemberId           String?  @map("owner_member_id") @db.Uuid
+  config                  Json     @db.JsonB
+  sourceProvenance        Json?    @map("source_provenance") @db.JsonB
+  createdAt               DateTime @map("created_at") @db.Timestamptz(3)
+
+  planGoal             PlanDraftGoal @relation("DraftGoalRevisions", fields: [planGoalId, spaceId, goalDefinitionId], references: [id, spaceId, goalDefinitionId], onDelete: Restrict, onUpdate: Restrict)
+  currentFor           PlanDraftGoal? @relation("CurrentDraftGoalRevision")
+  goalDefinitionVersion GoalDefinitionVersion @relation(fields: [goalDefinitionId, goalDefinitionVersionId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
+  goalSeries          GoalSeries @relation(fields: [goalDefinitionId, goalSeriesId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
+  owner               Membership? @relation(fields: [spaceId, ownerMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  beforeChanges       PlanningDraftGoalChange[] @relation("DraftGoalBeforeRevision")
+  afterChanges        PlanningDraftGoalChange[] @relation("DraftGoalAfterRevision")
+
+  @@unique([planGoalId, revisionNumber])
+  @@unique([planGoalId, id])
+  @@map("plan_draft_goal_revisions")
+}
+
+model PlanningDraftGoalChange {
+  actionId           String @id @map("action_id") @db.Uuid
+  planGoalId         String? @map("plan_goal_id") @db.Uuid
+  beforeRevisionId   String? @map("before_revision_id") @db.Uuid
+  afterRevisionId    String? @map("after_revision_id") @db.Uuid
+  reorderedGoalCount Int? @map("reordered_goal_count")
+  beforeOrder        String[] @default([]) @map("before_order") @db.Uuid
+  afterOrder         String[] @default([]) @map("after_order") @db.Uuid
+
+  action         PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  planGoal       PlanDraftGoal? @relation(fields: [planGoalId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  beforeRevision PlanDraftGoalRevision? @relation("DraftGoalBeforeRevision", fields: [planGoalId, beforeRevisionId], references: [planGoalId, id], onDelete: Restrict, onUpdate: Restrict)
+  afterRevision  PlanDraftGoalRevision? @relation("DraftGoalAfterRevision", fields: [planGoalId, afterRevisionId], references: [planGoalId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("planning_draft_goal_changes")
 }

@@ -66,7 +66,7 @@ describe('Planner foundation database runtime', () => {
     await container?.stop()
   })
 
-  it('deploys accepted foundation, local-User, pair-workspace and external-identity migrations', async () => {
+  it('deploys the exact accepted migration and production-table inventory through P03', async () => {
     const migration = deployMigrations(container.getConnectionUri())
 
     expect(migration).toMatchObject({ exitCode: 0 })
@@ -80,6 +80,7 @@ describe('Planner foundation database runtime', () => {
       { migration_name: '20260811120000_telegram_external_identity' },
       { migration_name: '20260811130000_plan_draft_kernel' },
       { migration_name: '20260811140000_goal_catalog' },
+      { migration_name: '20260811150000_typed_draft_goals' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name
@@ -94,9 +95,12 @@ describe('Planner foundation database runtime', () => {
       { table_name: 'goal_definitions' },
       { table_name: 'goal_series' },
       { table_name: 'memberships' },
+      { table_name: 'plan_draft_goal_revisions' },
+      { table_name: 'plan_draft_goals' },
       { table_name: 'plan_drafts' },
       { table_name: 'plan_months' },
       { table_name: 'planning_action_groups' },
+      { table_name: 'planning_draft_goal_changes' },
       { table_name: 'planning_goal_catalog_changes' },
       { table_name: 'planning_month_focus_changes' },
       { table_name: 'spaces' },

@@ -243,6 +243,7 @@ describe('P01 draft commands with real PostgreSQL', () => {
       '20260811120000_telegram_external_identity',
       '20260811130000_plan_draft_kernel',
       '20260811140000_goal_catalog',
+      '20260811150000_typed_draft_goals',
     ]) {
       await applyMigration(admin, migration)
     }
@@ -260,8 +261,11 @@ describe('P01 draft commands with real PostgreSQL', () => {
 
   beforeEach(async () => {
     await admin.query(`
-      TRUNCATE planning_month_focus_changes, planning_action_groups,
-        command_receipts, plan_drafts, plan_months,
+      TRUNCATE planning_draft_goal_changes, planning_goal_catalog_changes,
+        planning_month_focus_changes, planning_action_groups,
+        command_receipts, plan_draft_goal_revisions, plan_draft_goals,
+        goal_definition_versions, goal_series, goal_definitions,
+        plan_drafts, plan_months,
         telegram_external_identities, telegram_access_allowlist,
         memberships, spaces, users CASCADE;
       INSERT INTO users (id, created_at, updated_at) VALUES

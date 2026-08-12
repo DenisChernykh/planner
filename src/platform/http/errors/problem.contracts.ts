@@ -16,10 +16,18 @@ export interface ProblemDocument {
   readonly conflict?: ProblemConflict
 }
 
-export interface ProblemConflict {
+export type ProblemConflict =
+  GoalDefinitionProblemConflict | DraftProblemConflict
+
+export interface GoalDefinitionProblemConflict {
   readonly currentRevision: string
   readonly currentState: 'active' | 'archived'
   readonly nextAction: 'reload-goal-definition-and-retry'
+}
+
+export interface DraftProblemConflict {
+  readonly expectedRevision: string
+  readonly currentRevision: string
 }
 
 export interface ProblemDefinition {

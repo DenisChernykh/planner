@@ -40,3 +40,44 @@ export const GOAL_DEFINITION_STATE_CONFLICT_PROBLEM = defineProblemDefinition({
   title: 'Goal definition state conflict',
   detail: 'The goal definition is not in the required state.',
 })
+
+export const PLAN_DRAFT_NOT_FOUND_PROBLEM = defineProblemDefinition({
+  slug: 'plan-draft-not-found',
+  code: 'PLAN_DRAFT_NOT_FOUND',
+  status: 404,
+  title: 'Plan draft not found',
+  detail: 'The requested plan draft was not found.',
+})
+
+export const DRAFT_GOAL_NOT_FOUND_PROBLEM = defineProblemDefinition({
+  slug: 'draft-goal-not-found',
+  code: 'DRAFT_GOAL_NOT_FOUND',
+  status: 404,
+  title: 'Draft goal not found',
+  detail: 'The requested draft goal was not found.',
+})
+
+export const GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM =
+  defineProblemDefinition({
+    slug: 'goal-definition-version-not-found',
+    code: 'GOAL_DEFINITION_VERSION_NOT_FOUND',
+    status: 404,
+    title: 'Goal definition version not found',
+    detail: 'The requested goal definition version was not found.',
+  })
+
+export const PLAN_DRAFT_NOT_EDITABLE_PROBLEM = defineProblemDefinition({
+  slug: 'plan-draft-not-editable',
+  code: 'PLAN_DRAFT_NOT_EDITABLE',
+  status: 409,
+  title: 'Plan draft not editable',
+  detail: 'The plan month is not an editable draft.',
+})
+
+export const DRAFT_REVISION_CONFLICT_PROBLEM = defineProblemDefinition({
+  slug: 'draft-revision-conflict',
+  code: 'DRAFT_REVISION_CONFLICT',
+  status: 409,
+  title: 'Plan draft revision conflict',
+  detail: 'The plan draft changed before this request completed.',
+})

@@ -230,6 +230,73 @@ metadata-версии и не пытается вывести его автом�
 
 Сравнение месяцев для одной линии выполняется по нормализованному проценту, поэтому изменение нормы не разрывает историю.
 
+### 8.3. Exact P03 draft contract
+
+Редактор сохраняет structurally valid, но ещё неполный `DraftGoalConfigV1` и
+отдельно вычисляет publishable `GoalConfigV1`. Не выбранный owner, nullable
+required leaf или пустой required collection сохраняются и возвращаются как
+value-free blocker `required|empty_collection|incompatible`. Неверный
+discriminator/type, extra field, non-canonical UUID/date/time/decimal,
+duplicate/forged child ID или превышение bound отклоняет весь запрос с `422` и
+zero writes. Blockers возвращаются все сразу в стабильном порядке и не являются
+HTTP Problem.
+
+Publish validator является единственной обычной точкой создания refined
+`GoalConfigV1`: он возвращает либо publishable config без blockers, либо null
+config и непустой blocker list. Compile-time opaque marker не сериализуется;
+следующие расчёты не могут принять непроверенный draft обычным вызовом API.
+
+Exact repetitions: `daily`; unique canonical Monday-order weekdays;
+`weekly|monthly` с canonical positive integer string `N`; `one_off` с canonical
+date; `weekly_planned_task` с ordinal `1..5` и configured task text. В P03
+one-off проверяется только на синтаксис и completeness; принадлежность месяцу и
+calendar eligibility определяет P04. Weekly planned task использует boolean
+measurement для week-level `done/not_done`: его configured task text является
+описанием плана, а не ежедневным text fact; personal и shared scope разрешены,
+daily checkpoint запрещён.
+
+Exact measurements: boolean; targeted/informational quantity с unit, precision
+`0..3`, `add|latest` и canonical nonnegative decimal target; actual-time
+`HH:mm` range с overnight и различными endpoints; safe-integer rating с
+`minimum < maximum`; text; ordered checklist; ordered OR variants с собственным
+label/unit/precision/positive target. Informational quantity имеет null target;
+targeted и quantity child/variant complete только с positive target; quantity
+checkpoint использует precision parent quantity measurement. Checklist,
+OR и checkpoint arrays содержат не более 100 элементов; один draft и reorder
+payload — не более 200 active goals. Required text/unit/name/label до 500
+Unicode code points, non-whitespace.
+
+Checkpoints разрешены только для daily, имеют `independent|all`, stable UUID,
+name, `HH:mm` deadline и satisfaction discriminator того же measurement kind.
+Quantity и actual-time checkpoint задают собственный target/range; checklist и
+OR используют parent composition. Parent и child arrays не нормализуются;
+server создаёт ID для новых children, update сохраняет существующие и отвергает
+forged/duplicate/cross-component reuse.
+
+Optional provenance имеет exact `{ schemaVersion: 1, sourceDocument,
+sourcePage, rawValue, rawDenominator, resolution }`: required document/
+resolution non-whitespace до 500 code points, positive safe page, nullable raw
+fields до 2,000. Оно сохраняется byte-for-byte, меняет idempotency fingerprint,
+но не series identity, formulas или score.
+
+В draft одновременно существует не более одного active attachment одной
+definition; повторный add отклоняется finite `422` без записи. Удаление только
+tombstones attachment; повторное добавление этой
+definition создаёт новый plan-goal, config revision и child IDs. Draft-copy
+operation в P03 нет: catalog definition копирует P02, затем её добавляет P03;
+перенос месячного черновика остаётся P09.
+
+Порядок active draft goals всегда плотный `0..count-1`, максимум 200 строк.
+History remove/reorder сохраняет полные exact before/after ID arrays: reorder —
+перестановку одного active set, remove — тот же set без удалённого goal. При
+этом typed event обязан ссылаться на current/adjacent config revisions, exact
+parent draft transition и completed receipt того же plan month/revision;
+ложный previous order либо unrelated aggregate не коммитится. При
+смене source catalog version её catalog series заменяет effective series только
+если она отличается от catalog series предыдущей source version. Обычная
+`continue` version не сбрасывает уже созданную typed effective series; hard
+typed-axis change создаёт новую series, compatible update сохраняет текущую.
+
 ## 9. Типы целей
 
 ### 9.1. Выполнено / не выполнено
@@ -304,7 +371,10 @@ metadata-версии и не пытается вывести его автом�
 - ровно `N` раз за календарную неделю;
 - ровно `N` раз за календарный месяц;
 - один раз к конкретной дате.
-- `weekly_planned_task` — текстовая задача, заданная в черновике на календарную неделю без фиксированного дня; она получает `done` или `not_done` только на уровне недели.
+- `weekly_planned_task` — задача с configured text, заданная в черновике на
+  календарную неделю без фиксированного дня; её measurement — boolean, и она
+  получает `done` или `not_done` только на уровне недели. Configured text не
+  является ежедневным text fact.
 
 Для гибких недельных и месячных целей `N` — целое число `>= 1`. Диапазоны вроде «2–3 раза» не являются допустимой опубликованной нормой: пользователь должен выбрать одно точное значение `N` в черновике.
 

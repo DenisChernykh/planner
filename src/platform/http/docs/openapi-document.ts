@@ -24,12 +24,25 @@ interface ReferencedProblemSchema {
   readonly oneOf?: readonly ReferencedProblemSchema[]
 }
 
+export type OpenApiDocumentContribution = {
+  readonly tags?: readonly {
+    readonly name: string
+    readonly description: string
+  }[]
+  readonly problemCodeComponents?: readonly {
+    readonly componentName: string
+    readonly codes: readonly string[]
+  }[]
+  readonly install: (document: OpenAPIObject) => void
+}
+
 export function createOpenApiDocument(
   app: INestApplication,
   config: ApplicationRuntimeConfig,
   problems: readonly RegisteredProblemDefinition[],
+  contributions: readonly OpenApiDocumentContribution[] = [],
 ): OpenAPIObject {
-  const documentConfig = new DocumentBuilder()
+  const builder = new DocumentBuilder()
     .setTitle('Planner API')
     .setDescription('Closed monthly planner backend contract.')
     .setVersion('0.1.0-alpha.0')
@@ -38,7 +51,6 @@ export function createOpenApiDocument(
     .addServer('/', 'Current API origin.')
     .addTag('health', 'Process lifecycle and dependency health probes.')
     .addTag('auth', 'Opaque browser session operations.')
-    .addTag('planning', 'Versioned goal catalog and monthly planning.')
     .addCookieAuth(
       config.auth.sessionCookieName,
       {
@@ -58,15 +70,31 @@ export function createOpenApiDocument(
       },
       'csrfToken',
     )
-    .build()
+  for (const contribution of contributions) {
+    for (const tag of contribution.tags ?? []) {
+      builder.addTag(tag.name, tag.description)
+    }
+  }
+  const documentConfig = builder.build()
   const document = SwaggerModule.createDocument(app, documentConfig, {
     autoTagControllers: true,
     deepScanRoutes: true,
   })
   const problemCodes = problems.map(({ code }) => code).sort()
   const componentNames = findProblemComponentNames(document)
-  const conflictCodes = new Set(
-    problemCodeEnum(document, 'GoalDefinitionConflictProblemResponseDto'),
+  const componentCodes = new Map<string, ReadonlySet<string>>()
+  for (const contribution of contributions) {
+    for (const partition of contribution.problemCodeComponents ?? []) {
+      if (componentCodes.has(partition.componentName)) {
+        throw new Error(
+          `OpenAPI problem component is registered twice: ${partition.componentName}`,
+        )
+      }
+      componentCodes.set(partition.componentName, new Set(partition.codes))
+    }
+  }
+  const specializedCodes = new Set(
+    [...componentCodes.values()].flatMap((codes) => [...codes]),
   )
   for (const componentName of componentNames) {
     const problemSchema = document.components?.schemas?.[componentName]
@@ -77,25 +105,15 @@ export function createOpenApiDocument(
     if (codeSchema === undefined || '$ref' in codeSchema) {
       throw new Error(`OpenAPI ${componentName}.code schema is unavailable`)
     }
-    codeSchema.enum =
-      componentName === 'GoalDefinitionConflictProblemResponseDto'
-        ? problemCodes.filter((code) => conflictCodes.has(code))
-        : problemCodes.filter((code) => !conflictCodes.has(code))
+    const selectedCodes = componentCodes.get(componentName)
+    codeSchema.enum = problemCodes.filter((code) =>
+      selectedCodes === undefined
+        ? !specializedCodes.has(code)
+        : selectedCodes.has(code),
+    )
   }
+  for (const contribution of contributions) contribution.install(document)
   return document
-}
-
-function problemCodeEnum(
-  document: OpenAPIObject,
-  componentName: string,
-): readonly string[] {
-  const schema = document.components?.schemas?.[componentName]
-  if (schema === undefined || '$ref' in schema) return []
-  const code = schema.properties?.['code']
-  if (code === undefined || '$ref' in code || !Array.isArray(code.enum)) {
-    return []
-  }
-  return code.enum.filter((value): value is string => typeof value === 'string')
 }
 
 function findProblemComponentNames(document: OpenAPIObject): readonly string[] {

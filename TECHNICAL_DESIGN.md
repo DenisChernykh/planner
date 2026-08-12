@@ -670,6 +670,103 @@ source document/page, raw denominator/value и принятое resolution. Prov
 копируется в preview/report metadata, но не участвует в formulas или решении о
 continuity analytical series.
 
+#### 7.3.1. P03 typed draft-goal contract
+
+P03 разводит две границы: exact-shape `DraftGoalConfigV1`, который можно
+сохранить с null/empty required leaves, и narrowed `GoalConfigV1`, прошедший
+publish validation. Structurally malformed type/discriminator/format, extra
+field, prototype/accessor/boxed value или forged child ID отклоняется до записи;
+semantic incompleteness сохраняется и возвращается как blocker data. Snapshot
+всего input выполняется до первого `await`; output является recursively frozen
+plain-data clone. Строки, Unicode bytes и array order не нормализуются.
+
+Pure validator возвращает discriminated result: `{ publishable: true, config:
+GoalConfigV1, blockers: [] }` либо `{ publishable: false, config: null,
+blockers: nonEmptyTuple }`. `GoalConfigV1` дополнительно имеет private
+unique-symbol compile-time brand, который не существует в runtime JSON; только
+validator может создать refined value. Поэтому P04/P05 не принимают unchecked
+structural draft с, например, non-daily checkpoints.
+Public refinement boundary повторно снимает exact stored-form snapshot: она не
+брендирует caller-owned object, отклоняет accessor/extra/null child ID и
+возвращает recursively frozen clone, не зависящий от последующей мутации input.
+
+`DraftGoalConfigV1` имеет ровно `schemaVersion: 1`, `scope`, `repetition`,
+`measurement`, `checkpoints`. Scope — `personal` с nullable
+`ownerMemberId` либо `shared` без owner. Repetition — `daily`, `weekdays` с
+unique weekday literals в уже canonical Monday order, `weekly|monthly` с
+nullable canonical positive integer string `n`, `one_off` с nullable canonical
+date или `weekly_planned_task` с nullable ordinal string `1..5` и nullable task
+text. Weekly planned task требует boolean measurement, разрешён для personal и
+shared и не имеет daily checkpoints.
+
+Measurement — discriminated union:
+
+- `boolean` и `text` без дополнительных полей;
+- `quantity` с nullable `targeted|informational` mode, unit, precision `0..3`,
+  `add|latest` aggregation и target;
+- `actual_time` с nullable canonical `HH:mm` start/end; overnight разрешён,
+  равные endpoints publish-blocking;
+- `rating` с nullable safe-integer minimum/maximum;
+- `checklist` с ordered `{ itemId, label }`;
+- `any_of` с ordered `{ variantId, label, unit, precision, target }`.
+
+Canonical decimal — `0` или unsigned integer without leading zeroes с optional
+fraction, без sign/exponent/whitespace; scale не превышает precision. Complete
+targeted/OR/checkpoint quantity target положительный; scale quantity checkpoint
+также не превышает precision его parent quantity measurement; informational quantity
+имеет null target. Complete rating требует `minimum < maximum`. Required
+text/unit/name/label bounded to 500 Unicode code points and non-whitespace.
+Null/empty required leaves являются blockers; malformed non-null values —
+structural error. Checklist items, OR variants and checkpoints bounded to 100;
+active goals in one draft and reorder IDs bounded to 200. Bound overflow —
+structural `422`. P03 проверяет у one-off только canonical date syntax и
+completeness; принадлежность target month и calendar eligibility начинает P04.
+
+Checkpoints nullable и разрешены только при `daily`. Non-null value имеет
+nullable `independent|all` aggregation и ordered items `{ checkpointId, name,
+deadline, satisfaction }`. Deadline — nullable `HH:mm`. Satisfaction
+discriminator обязан совпадать с parent measurement: boolean/rating/text без
+leaf values, quantity со своим target, actual-time со своим range, checklist/
+any-of используют parent composition. Nested checkpoints запрещены. Stable
+UUID child IDs живут внутри immutable config JSON: add принимает только absent/
+null IDs и назначает server UUID; update сохраняет известные IDs и назначает
+UUID только новым absent/null children, запрещая forged, duplicate и
+cross-component reuse.
+
+Optional `SourceProvenanceV1` имеет exact shape `{ schemaVersion: 1,
+sourceDocument, sourcePage, rawValue, rawDenominator, resolution }`. Document и
+resolution — exact non-whitespace strings до 500 code points; page — positive
+safe integer; raw fields — nullable exact strings до 2,000 code points.
+Provenance display-only: оно меняет command fingerprint, но исключено из
+semantic series signature, formulas и future expectations.
+
+Physical P03 seam создаётся одной migration
+`20260811150000_typed_draft_goals`: mutable root `plan_draft_goals`, immutable
+`plan_draft_goal_revisions` и immutable typed detail
+`planning_draft_goal_changes`. Root хранит plan/space/definition identity,
+display order, current revision и nullable detached time; revision хранит source
+catalog version отдельно от effective series, exact config/provenance и
+timestamp. Stable children не имеют отдельных tables. Cross-space composite
+FKs, deferrable current-revision FK, immutable revision/history triggers,
+no-DELETE root guard и finite action/detail shape не позволяют обходить
+application invariants. P02 series не считается orphan, если на неё ссылается
+catalog version или draft-goal revision.
+Partial unique active `(plan_month_id, goal_definition_id)` запрещает два
+одновременных attachments одной definition; application проверяет тот же
+инвариант под draft lock и возвращает finite structural `422`, а unique index
+остаётся DB backstop. Remove tombstones существующий
+root; последующий add создаёт новый plan-goal, revision и stable child IDs, не
+восстанавливая старую identity. Deferred root invariant ограничивает active set
+200 строками и требует dense display order `0..count-1` после add/remove/
+reorder. Typed history хранит exact `before_order`/`after_order`: reorder
+фиксирует полную перестановку active set, remove — полный previous set и ровно
+этот set без tombstoned goal; произвольные, duplicate, subset и foreign-month
+UUID запрещены.
+Typed detail дополнительно связывает exact current/adjacent config revisions,
+parent draft `before/+1/after`, completed receipt aggregate/result и финальный
+effect. Поэтому старая, обратная или несмежная revision pair, ложный previous
+order и receipt другого plan month/revision не могут закоммититься.
+
 ### 7.4. Goal scope
 
 - `personal` требует `owner_member_id`;
@@ -1125,6 +1222,81 @@ currentState }` и `GoalDefinitionStateConflictError { requestedState,
 currentState, currentRevision }`; остальные — `CommandValidationError`,
 `CommandFingerprintConflictError`, `PlanningAuthorizationDeniedError` и
 `PlanningDependencyUnavailableError`.
+
+P03 commands имеют exact contracts:
+
+```text
+planning.add-draft-goal.v1
+  positive expectedRevision required
+  payload { planMonthId, goalDefinitionId, config, sourceProvenance }
+planning.update-draft-goal.v1
+  positive expectedRevision required
+  payload { planMonthId, planGoalId, goalDefinitionVersionId, config,
+            sourceProvenance }
+planning.remove-draft-goal.v1
+  positive expectedRevision required
+  payload { planMonthId, planGoalId }
+planning.reorder-draft-goals.v1
+  positive expectedRevision required
+  payload { planMonthId, orderedPlanGoalIds }
+```
+
+Все четыре command возвращают только
+`DurableCommandResultRef<'planning.plan-draft.v1'>`; aggregate ID — plan month,
+revision — новая `plan_drafts.revision`. P03 не имеет draft-copy command:
+catalog copy уже принадлежит P02 и затем добавляется обычным add; month copy
+остаётся P09. Remove ставит detach/tombstone, сохраняя root/revisions/history;
+reorder требует полную exact permutation всех active goal IDs и выполняется как
+одна action/revision.
+
+Caller не передаёт actor/member/user/space/series ID или series decision. Add
+атомарно выбирает active current same-space catalog version и её series. Update
+может выбрать только version того же definition. Catalog series выбранной
+source version сравнивается с catalog series предыдущей source version: только
+переход на version из другой catalog series заменяет effective series. Выбор
+той же source version или более новой `continue` version в прежней catalog
+series сохраняет текущую custom effective series; hard signature change при
+этом создаёт новую definition-owned series, а compatible change переиспользует
+текущую. Hard
+signature включает scope/owner, measurement kind, quantity mode/unit/precision/
+aggregation, checkpoint aggregation/composition/satisfaction schema,
+checklist-item set и OR-variant set. Repetition kind/frequency/N, targets,
+dates/times, display order, child labels и provenance линию не разрывают.
+Metadata semantic break выражается P02 version на новой series, не caller flag.
+
+Каждая fresh mutation в одной existing DurableCommandExecutor transaction
+делает: receipt lock/replay or fingerprint conflict; member authorization;
+same-space draft/month/status lock and draft CAS; catalog/config/series effect;
+ровно один finite action `draft_goal_added|draft_goal_updated|
+draft_goal_removed|draft_goals_reordered` и один typed detail; draft revision
+`+1`; completed receipt. Plan-month lifecycle revision не меняется. Stale,
+unauthorized, malformed или dependency-failed command оставляет zero writes;
+rollback после product effect откатывает root/revision/series/history/receipt.
+
+`GetDraftEditorQuery({ trustedActor, targetMonth })` является отдельной P03
+query и не меняет exact P01 `GetDraftQuery`. Она возвращает draft envelope,
+ordered attached goals, catalog metadata/source version/effective series,
+recursively frozen config/provenance, per-goal blockers и aggregate blockers.
+Validator framework-free, pure, не fail-fast и сортирует safe issues
+`{ planGoalId, pointer, code, detail }` по display order, goal ID, RFC 6901
+pointer и code. Он проверяет только P03 completeness/compatibility; P04 calendar
+targets, P05 score/evaluation, P06 preview/hash и P07 publication/snapshots/
+lifecycle не входят.
+
+HTTP seam P03: authenticated `GET /planning/drafts?targetMonth=YYYY-MM`;
+session+Origin+CSRF mutations `POST /planning/drafts/{planMonthId}/goals`
+(`201`), `POST .../{planGoalId}/update` (`200`), `POST
+.../{planGoalId}/remove` (`200`) и `POST
+/planning/drafts/{planMonthId}/goals/reorder` (`200`). Request schemas exact,
+nested union branches use `oneOf`/discriminator mappings and
+`additionalProperties: false`; add/update/stored config имеют отдельные schemas:
+add child ID только omitted/null, update — omitted/null/existing UUID, stored —
+обязательный UUID. Planning-owned OpenAPI contribution устанавливает эту
+лексику через generic platform composition seam. External bigint strings lossless. Structural
+validation is finite `422`, not-found draft/goal/version is safe `404`,
+not-editable and revision conflict are `409`; only revision conflict carries
+its dedicated exact current/expected extension. Publish blockers remain `200`
+response data, never RFC 9457 Problems.
 
 ## 11. Progress policy
 

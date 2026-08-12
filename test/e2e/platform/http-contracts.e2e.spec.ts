@@ -66,14 +66,25 @@ interface OpenApiSchema {
   readonly $ref?: string
   readonly type?: string
   readonly pattern?: string
+  readonly format?: string
   readonly minLength?: number
   readonly maxLength?: number
-  readonly enum?: readonly string[]
+  readonly minimum?: number
+  readonly maximum?: number
+  readonly maxItems?: number
+  readonly nullable?: boolean
+  readonly enum?: readonly (string | null)[]
   readonly example?: unknown
   readonly additionalProperties?: boolean
   readonly properties?: Record<string, OpenApiSchema>
   readonly required?: readonly string[]
   readonly oneOf?: readonly OpenApiSchema[]
+  readonly allOf?: readonly OpenApiSchema[]
+  readonly items?: OpenApiSchema
+  readonly discriminator?: {
+    readonly propertyName?: string
+    readonly mapping?: Record<string, string>
+  }
 }
 
 interface OpenApiOperation {
@@ -371,6 +382,48 @@ describe('S03 HTTP contracts', () => {
     expect(typeof (body as { requestId?: unknown }).requestId).toBe('string')
   })
 
+  it('keeps platform OpenAPI composition vocabulary-free and installs planning schemas only through its module contribution', async () => {
+    const [platformSource, planningSource] = await Promise.all([
+      readFile('src/platform/http/docs/openapi-document.ts', 'utf8'),
+      readFile(
+        'src/modules/planning/presentation/planning-openapi.contribution.ts',
+        'utf8',
+      ),
+    ])
+    expect(platformSource).not.toMatch(
+      /DraftGoalConfigV1|StoredDraftGoalConfigV1|Versioned goal catalog|GoalDefinitionConflict|DraftConflict/u,
+    )
+    expect(platformSource).toContain('OpenApiDocumentContribution')
+    expect(planningSource).toContain('AddDraftGoalConfigV1')
+    expect(planningSource).toContain('StoredDraftGoalConfigV1')
+
+    const generic = createOpenApiDocument(
+      app,
+      createOpenApiRuntimeConfig(),
+      app.get(HttpProblemRegistry).definitions,
+    )
+    expect(generic.tags?.map((tag) => tag.name)).not.toContain('planning')
+    expect(
+      generic.components?.schemas?.['AddDraftGoalConfigV1'],
+    ).toBeUndefined()
+    expect(
+      generic.components?.schemas?.['StoredDraftGoalConfigV1'],
+    ).toBeUndefined()
+
+    const composed = JSON.parse(await generateOpenApiArtifact()) as {
+      readonly tags?: readonly { readonly name?: string }[]
+      readonly components?: { readonly schemas?: Record<string, unknown> }
+    }
+    expect(composed.tags?.map((tag) => tag.name)).toContain('planning')
+    expect(composed.components?.schemas).toEqual(
+      expect.objectContaining({
+        AddDraftGoalConfigV1: expect.any(Object) as unknown,
+        UpdateDraftGoalConfigV1: expect.any(Object) as unknown,
+        StoredDraftGoalConfigV1: expect.any(Object) as unknown,
+      }),
+    )
+  })
+
   it('publishes the exact committed production HTTP graph, request schemas and finite Problem union', async () => {
     // In-process metadata that is absent from the committed tsx artifact must fail.
     const document = JSON.parse(
@@ -403,6 +456,11 @@ describe('S03 HTTP contracts', () => {
       '/planning/catalog/goal-definitions/{goalDefinitionId}/copy',
       '/planning/catalog/goal-definitions/{goalDefinitionId}/restore',
       '/planning/catalog/goal-definitions/{goalDefinitionId}/versions',
+      '/planning/drafts',
+      '/planning/drafts/{planMonthId}/goals',
+      '/planning/drafts/{planMonthId}/goals/reorder',
+      '/planning/drafts/{planMonthId}/goals/{planGoalId}/remove',
+      '/planning/drafts/{planMonthId}/goals/{planGoalId}/update',
     ])
     expect(document.paths['/auth/issue']).toBeUndefined()
     expect(Object.keys(document.paths['/auth/me'] ?? {})).toEqual(['get'])
@@ -557,7 +615,9 @@ describe('S03 HTTP contracts', () => {
       'COMMAND_FINGERPRINT_CONFLICT',
       'CONFLICT',
       'DEPENDENCY_UNAVAILABLE',
+      'DRAFT_GOAL_NOT_FOUND',
       'GOAL_DEFINITION_NOT_FOUND',
+      'GOAL_DEFINITION_VERSION_NOT_FOUND',
       'INTERNAL_ERROR',
       'MALFORMED_REQUEST',
       'NOT_FOUND',
@@ -565,6 +625,8 @@ describe('S03 HTTP contracts', () => {
       'OIDC_LOGIN_REJECTED',
       'PAYLOAD_TOO_LARGE',
       'PLANNING_AUTHORIZATION_DENIED',
+      'PLAN_DRAFT_NOT_EDITABLE',
+      'PLAN_DRAFT_NOT_FOUND',
       'RATE_LIMIT_EXCEEDED',
       'UNSUPPORTED_MEDIA_TYPE',
       'VALIDATION_FAILED',
@@ -868,6 +930,590 @@ describe('S03 HTTP contracts', () => {
           ?.schema,
       ).toEqual({ oneOf: [baseProblemRef, conflictProblemRef] })
     }
+
+    const drafts = document.paths['/planning/drafts']
+    const draftAdd = document.paths['/planning/drafts/{planMonthId}/goals']
+    const draftUpdate =
+      document.paths['/planning/drafts/{planMonthId}/goals/{planGoalId}/update']
+    const draftRemove =
+      document.paths['/planning/drafts/{planMonthId}/goals/{planGoalId}/remove']
+    const draftReorder =
+      document.paths['/planning/drafts/{planMonthId}/goals/reorder']
+    expect(Object.keys(drafts ?? {})).toEqual(['get'])
+    for (const operation of [
+      draftAdd,
+      draftUpdate,
+      draftRemove,
+      draftReorder,
+    ]) {
+      expect(Object.keys(operation ?? {})).toEqual(['post'])
+    }
+    expect(drafts?.get?.security).toEqual([{ sessionCookie: [] }])
+    for (const operation of [
+      draftAdd?.post,
+      draftUpdate?.post,
+      draftRemove?.post,
+      draftReorder?.post,
+    ]) {
+      expect(operation?.security).toEqual([
+        { sessionCookie: [], csrfToken: [] },
+      ])
+    }
+    expect(Object.keys(drafts?.get?.responses ?? {}).sort()).toEqual([
+      '200',
+      '401',
+      '403',
+      '404',
+      '409',
+      '422',
+      '503',
+    ])
+    for (const [operation, success] of [
+      [draftAdd?.post, '201'],
+      [draftUpdate?.post, '200'],
+      [draftRemove?.post, '200'],
+      [draftReorder?.post, '200'],
+    ] as const) {
+      expect(Object.keys(operation?.responses ?? {}).sort()).toEqual(
+        [
+          success,
+          '400',
+          '401',
+          '403',
+          '404',
+          '409',
+          '413',
+          '415',
+          '422',
+          '503',
+        ].sort(),
+      )
+    }
+    expect(drafts?.get?.parameters).toEqual([
+      {
+        in: 'query',
+        name: 'targetMonth',
+        required: true,
+        schema: {
+          pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+          type: 'string',
+        },
+      },
+    ])
+    const parameter = (
+      operation: OpenApiOperation | undefined,
+      name: string,
+    ): OpenApiParameter | undefined =>
+      operation?.parameters?.find((candidate) => candidate.name === name)
+    for (const operation of [
+      draftAdd?.post,
+      draftUpdate?.post,
+      draftRemove?.post,
+      draftReorder?.post,
+    ]) {
+      expect(parameter(operation, 'planMonthId')).toEqual({
+        in: 'path',
+        name: 'planMonthId',
+        required: true,
+        schema: uuidSchema,
+      })
+    }
+    for (const operation of [draftUpdate?.post, draftRemove?.post]) {
+      expect(parameter(operation, 'planGoalId')).toEqual({
+        in: 'path',
+        name: 'planGoalId',
+        required: true,
+        schema: uuidSchema,
+      })
+    }
+    const addConfigRef = {
+      $ref: '#/components/schemas/AddDraftGoalConfigV1',
+    }
+    const updateConfigRef = {
+      $ref: '#/components/schemas/UpdateDraftGoalConfigV1',
+    }
+    const provenanceRef = {
+      allOf: [{ $ref: '#/components/schemas/SourceProvenanceV1' }],
+      nullable: true,
+      type: 'object',
+    }
+    const commandProperties = {
+      commandId: uuidSchema,
+      expectedRevision: revisionSchema,
+    }
+    const exactRequestBody = (schema: OpenApiSchema): object => ({
+      content: { 'application/json': { schema } },
+      required: true,
+    })
+    expect(draftAdd?.post?.requestBody).toEqual(
+      exactRequestBody({
+        additionalProperties: false,
+        properties: {
+          ...commandProperties,
+          goalDefinitionId: uuidSchema,
+          config: addConfigRef,
+          sourceProvenance: provenanceRef,
+        },
+        required: [
+          'commandId',
+          'expectedRevision',
+          'goalDefinitionId',
+          'config',
+          'sourceProvenance',
+        ],
+        type: 'object',
+      }),
+    )
+    expect(draftUpdate?.post?.requestBody).toEqual(
+      exactRequestBody({
+        additionalProperties: false,
+        properties: {
+          ...commandProperties,
+          goalDefinitionVersionId: uuidSchema,
+          config: updateConfigRef,
+          sourceProvenance: provenanceRef,
+        },
+        required: [
+          'commandId',
+          'expectedRevision',
+          'goalDefinitionVersionId',
+          'config',
+          'sourceProvenance',
+        ],
+        type: 'object',
+      }),
+    )
+    expect(draftRemove?.post?.requestBody).toEqual(
+      exactRequestBody({
+        additionalProperties: false,
+        properties: commandProperties,
+        required: ['commandId', 'expectedRevision'],
+        type: 'object',
+      }),
+    )
+    expect(draftReorder?.post?.requestBody).toEqual(
+      exactRequestBody({
+        additionalProperties: false,
+        properties: {
+          ...commandProperties,
+          orderedPlanGoalIds: {
+            items: uuidSchema,
+            maxItems: 200,
+            type: 'array',
+          },
+        },
+        required: ['commandId', 'expectedRevision', 'orderedPlanGoalIds'],
+        type: 'object',
+      }),
+    )
+    expect(
+      drafts?.get?.responses?.['200']?.content?.['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/DraftEditorResponseV1' })
+    for (const [operation, success] of [
+      [draftAdd?.post, '201'],
+      [draftUpdate?.post, '200'],
+      [draftRemove?.post, '200'],
+      [draftReorder?.post, '200'],
+    ] as const) {
+      expect(
+        operation?.responses?.[success]?.content?.['application/json']?.schema,
+      ).toEqual({ $ref: '#/components/schemas/DraftMutationResponseV1' })
+    }
+    expect(schemas['DraftMutationResponseV1']).toEqual({
+      additionalProperties: false,
+      properties: {
+        kind: { enum: ['planning.plan-draft.v1'], type: 'string' },
+        aggregateId: uuidSchema,
+        aggregateRevision: revisionSchema,
+      },
+      required: ['kind', 'aggregateId', 'aggregateRevision'],
+      type: 'object',
+    })
+    expect(schemas['DraftEditorResponseV1']).toEqual({
+      additionalProperties: false,
+      properties: {
+        planMonthId: uuidSchema,
+        spaceId: uuidSchema,
+        targetMonth: {
+          pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+          type: 'string',
+        },
+        status: { enum: ['draft'], type: 'string' },
+        focus: {
+          maxLength: 500,
+          minLength: 1,
+          pattern: '\\S',
+          type: 'string',
+        },
+        planMonthRevision: revisionSchema,
+        draftRevision: revisionSchema,
+        goals: {
+          items: { $ref: '#/components/schemas/DraftGoalViewV1' },
+          maxItems: 200,
+          type: 'array',
+        },
+        blockers: {
+          items: { $ref: '#/components/schemas/PublishBlockerV1' },
+          type: 'array',
+        },
+      },
+      required: [
+        'planMonthId',
+        'spaceId',
+        'targetMonth',
+        'status',
+        'focus',
+        'planMonthRevision',
+        'draftRevision',
+        'goals',
+        'blockers',
+      ],
+      type: 'object',
+    })
+    expect(schemas['DraftGoalViewV1']).toMatchObject({
+      additionalProperties: false,
+      properties: {
+        planGoalId: uuidSchema,
+        goalDefinitionId: uuidSchema,
+        goalDefinitionVersionId: uuidSchema,
+        goalSeriesId: uuidSchema,
+        displayOrder: { maximum: 199, minimum: 0, type: 'integer' },
+        configRevision: revisionSchema,
+        config: { $ref: '#/components/schemas/StoredDraftGoalConfigV1' },
+        blockers: {
+          items: { $ref: '#/components/schemas/PublishBlockerV1' },
+          type: 'array',
+        },
+      },
+      required: [
+        'planGoalId',
+        'goalDefinitionId',
+        'goalDefinitionVersionId',
+        'goalSeriesId',
+        'title',
+        'why',
+        'category',
+        'displayOrder',
+        'configRevision',
+        'config',
+        'sourceProvenance',
+        'blockers',
+      ],
+      type: 'object',
+    })
+    expect(schemas['PublishBlockerV1']).toEqual({
+      additionalProperties: false,
+      properties: {
+        planGoalId: uuidSchema,
+        pointer: {
+          pattern: '^(?:/(?:[^~/]|~0|~1)*)+$',
+          type: 'string',
+        },
+        code: {
+          enum: ['required', 'empty_collection', 'incompatible'],
+          type: 'string',
+        },
+        detail: {
+          enum: [
+            'Required value is missing.',
+            'At least one item is required.',
+            'Values are incompatible.',
+          ],
+          type: 'string',
+        },
+      },
+      required: ['planGoalId', 'pointer', 'code', 'detail'],
+      type: 'object',
+    })
+
+    const exactDiscriminator = (
+      schemaName: string,
+      branches: readonly string[],
+      mapping: Readonly<Record<string, string>>,
+    ): void => {
+      expect(schemas[schemaName]).toEqual({
+        discriminator: { mapping, propertyName: 'kind' },
+        oneOf: branches.map((name) => ({
+          $ref: `#/components/schemas/${name}`,
+        })),
+      })
+    }
+    exactDiscriminator(
+      'DraftGoalScopeV1',
+      ['PersonalGoalScopeV1', 'SharedGoalScopeV1'],
+      {
+        personal: '#/components/schemas/PersonalGoalScopeV1',
+        shared: '#/components/schemas/SharedGoalScopeV1',
+      },
+    )
+    exactDiscriminator(
+      'DraftGoalRepetitionV1',
+      [
+        'DailyRepetitionV1',
+        'WeekdaysRepetitionV1',
+        'WeeklyRepetitionV1',
+        'MonthlyRepetitionV1',
+        'OneOffRepetitionV1',
+        'WeeklyPlannedTaskRepetitionV1',
+      ],
+      {
+        daily: '#/components/schemas/DailyRepetitionV1',
+        weekdays: '#/components/schemas/WeekdaysRepetitionV1',
+        weekly: '#/components/schemas/WeeklyRepetitionV1',
+        monthly: '#/components/schemas/MonthlyRepetitionV1',
+        one_off: '#/components/schemas/OneOffRepetitionV1',
+        weekly_planned_task:
+          '#/components/schemas/WeeklyPlannedTaskRepetitionV1',
+      },
+    )
+    const baseMeasurementBranches = [
+      'BooleanMeasurementV1',
+      'QuantityMeasurementV1',
+      'ActualTimeMeasurementV1',
+      'RatingMeasurementV1',
+      'TextMeasurementV1',
+    ] as const
+    for (const prefix of ['Add', 'Update', 'Stored'] as const) {
+      exactDiscriminator(
+        `${prefix}DraftGoalMeasurementV1`,
+        [
+          ...baseMeasurementBranches,
+          `${prefix}ChecklistMeasurementV1`,
+          `${prefix}AnyOfMeasurementV1`,
+        ],
+        {
+          boolean: '#/components/schemas/BooleanMeasurementV1',
+          quantity: '#/components/schemas/QuantityMeasurementV1',
+          actual_time: '#/components/schemas/ActualTimeMeasurementV1',
+          rating: '#/components/schemas/RatingMeasurementV1',
+          text: '#/components/schemas/TextMeasurementV1',
+          checklist: `#/components/schemas/${prefix}ChecklistMeasurementV1`,
+          any_of: `#/components/schemas/${prefix}AnyOfMeasurementV1`,
+        },
+      )
+    }
+    const satisfactionBranches = [
+      'BooleanCheckpointSatisfactionV1',
+      'QuantityCheckpointSatisfactionV1',
+      'ActualTimeCheckpointSatisfactionV1',
+      'RatingCheckpointSatisfactionV1',
+      'TextCheckpointSatisfactionV1',
+      'ChecklistCheckpointSatisfactionV1',
+      'AnyOfCheckpointSatisfactionV1',
+    ] as const
+    exactDiscriminator(
+      'DraftGoalCheckpointSatisfactionV1',
+      satisfactionBranches,
+      {
+        boolean: '#/components/schemas/BooleanCheckpointSatisfactionV1',
+        quantity: '#/components/schemas/QuantityCheckpointSatisfactionV1',
+        actual_time: '#/components/schemas/ActualTimeCheckpointSatisfactionV1',
+        rating: '#/components/schemas/RatingCheckpointSatisfactionV1',
+        text: '#/components/schemas/TextCheckpointSatisfactionV1',
+        checklist: '#/components/schemas/ChecklistCheckpointSatisfactionV1',
+        any_of: '#/components/schemas/AnyOfCheckpointSatisfactionV1',
+      },
+    )
+    const exactRequired: Readonly<Record<string, readonly string[]>> = {
+      PersonalGoalScopeV1: ['kind', 'ownerMemberId'],
+      SharedGoalScopeV1: ['kind'],
+      DailyRepetitionV1: ['kind'],
+      WeekdaysRepetitionV1: ['kind', 'weekdays'],
+      WeeklyRepetitionV1: ['kind', 'n'],
+      MonthlyRepetitionV1: ['kind', 'n'],
+      OneOffRepetitionV1: ['kind', 'dueDate'],
+      WeeklyPlannedTaskRepetitionV1: ['kind', 'weekOrdinal', 'taskText'],
+      BooleanMeasurementV1: ['kind'],
+      QuantityMeasurementV1: [
+        'kind',
+        'mode',
+        'unit',
+        'precision',
+        'aggregation',
+        'target',
+      ],
+      ActualTimeMeasurementV1: ['kind', 'start', 'end'],
+      RatingMeasurementV1: ['kind', 'minimum', 'maximum'],
+      TextMeasurementV1: ['kind'],
+      AddChecklistMeasurementV1: ['kind', 'items'],
+      AddAnyOfMeasurementV1: ['kind', 'variants'],
+      UpdateChecklistMeasurementV1: ['kind', 'items'],
+      UpdateAnyOfMeasurementV1: ['kind', 'variants'],
+      BooleanCheckpointSatisfactionV1: ['kind'],
+      QuantityCheckpointSatisfactionV1: ['kind', 'target'],
+      ActualTimeCheckpointSatisfactionV1: ['kind', 'start', 'end'],
+      RatingCheckpointSatisfactionV1: ['kind'],
+      TextCheckpointSatisfactionV1: ['kind'],
+      ChecklistCheckpointSatisfactionV1: ['kind'],
+      AnyOfCheckpointSatisfactionV1: ['kind'],
+      AddChecklistItemV1: ['label'],
+      AddAnyOfVariantV1: ['label', 'unit', 'precision', 'target'],
+      UpdateChecklistItemV1: ['label'],
+      UpdateAnyOfVariantV1: ['label', 'unit', 'precision', 'target'],
+      AddDraftGoalCheckpointV1: ['name', 'deadline', 'satisfaction'],
+      AddDraftGoalCheckpointsV1: ['aggregation', 'items'],
+      AddDraftGoalConfigV1: [
+        'schemaVersion',
+        'scope',
+        'repetition',
+        'measurement',
+        'checkpoints',
+      ],
+      UpdateDraftGoalCheckpointV1: ['name', 'deadline', 'satisfaction'],
+      UpdateDraftGoalCheckpointsV1: ['aggregation', 'items'],
+      UpdateDraftGoalConfigV1: [
+        'schemaVersion',
+        'scope',
+        'repetition',
+        'measurement',
+        'checkpoints',
+      ],
+      StoredChecklistItemV1: ['itemId', 'label'],
+      StoredAnyOfVariantV1: [
+        'variantId',
+        'label',
+        'unit',
+        'precision',
+        'target',
+      ],
+      StoredChecklistMeasurementV1: ['kind', 'items'],
+      StoredAnyOfMeasurementV1: ['kind', 'variants'],
+      StoredDraftGoalCheckpointV1: [
+        'checkpointId',
+        'name',
+        'deadline',
+        'satisfaction',
+      ],
+      StoredDraftGoalCheckpointsV1: ['aggregation', 'items'],
+      StoredDraftGoalConfigV1: [
+        'schemaVersion',
+        'scope',
+        'repetition',
+        'measurement',
+        'checkpoints',
+      ],
+      SourceProvenanceV1: [
+        'schemaVersion',
+        'sourceDocument',
+        'sourcePage',
+        'rawValue',
+        'rawDenominator',
+        'resolution',
+      ],
+    }
+    for (const [name, required] of Object.entries(exactRequired)) {
+      expect(schemas[name]).toMatchObject({
+        additionalProperties: false,
+        required,
+        type: 'object',
+      })
+    }
+    expect(schemas['AddChecklistItemV1']?.properties?.['itemId']).toEqual({
+      enum: [null],
+    })
+    expect(schemas['AddAnyOfVariantV1']?.properties?.['variantId']).toEqual({
+      enum: [null],
+    })
+    expect(
+      schemas['AddDraftGoalCheckpointV1']?.properties?.['checkpointId'],
+    ).toEqual({ enum: [null] })
+    for (const [schemaName, propertyName] of [
+      ['UpdateChecklistItemV1', 'itemId'],
+      ['UpdateAnyOfVariantV1', 'variantId'],
+      ['UpdateDraftGoalCheckpointV1', 'checkpointId'],
+    ] as const) {
+      expect(schemas[schemaName]?.properties?.[propertyName]).toEqual({
+        ...uuidSchema,
+        nullable: true,
+      })
+    }
+    for (const [schemaName, propertyName] of [
+      ['StoredChecklistItemV1', 'itemId'],
+      ['StoredAnyOfVariantV1', 'variantId'],
+      ['StoredDraftGoalCheckpointV1', 'checkpointId'],
+    ] as const) {
+      expect(schemas[schemaName]?.properties?.[propertyName]).toEqual(
+        uuidSchema,
+      )
+      expect(schemas[schemaName]?.required).toContain(propertyName)
+    }
+    for (const [schemaName, propertyName] of [
+      ['AddChecklistItemV1', 'itemId'],
+      ['AddAnyOfVariantV1', 'variantId'],
+      ['AddDraftGoalCheckpointV1', 'checkpointId'],
+      ['UpdateChecklistItemV1', 'itemId'],
+      ['UpdateAnyOfVariantV1', 'variantId'],
+      ['UpdateDraftGoalCheckpointV1', 'checkpointId'],
+    ] as const) {
+      expect(schemas[schemaName]?.required).not.toContain(propertyName)
+    }
+
+    const baseDraftProblemRef = {
+      $ref: '#/components/schemas/ProblemResponseDto',
+    }
+    const draftConflictRef = {
+      $ref: '#/components/schemas/DraftConflictProblemResponseDto',
+    }
+    for (const operation of [
+      draftAdd?.post,
+      draftUpdate?.post,
+      draftRemove?.post,
+      draftReorder?.post,
+    ]) {
+      expect(
+        operation?.responses?.['409']?.content?.['application/problem+json']
+          ?.schema,
+      ).toEqual({ oneOf: [baseDraftProblemRef, draftConflictRef] })
+      expect(
+        Object.keys(
+          operation?.responses?.['409']?.content?.['application/problem+json']
+            ?.examples ?? {},
+        ).sort(),
+      ).toEqual([
+        'COMMAND_FINGERPRINT_CONFLICT',
+        'DRAFT_REVISION_CONFLICT',
+        'PLAN_DRAFT_NOT_EDITABLE',
+      ])
+    }
+    const exact404 = (
+      operation: OpenApiOperation | undefined,
+      codes: readonly string[],
+    ): void => {
+      expect(
+        Object.keys(
+          operation?.responses?.['404']?.content?.['application/problem+json']
+            ?.examples ?? {},
+        ).sort(),
+      ).toEqual([...codes].sort())
+    }
+    exact404(draftAdd?.post, [
+      'PLAN_DRAFT_NOT_FOUND',
+      'GOAL_DEFINITION_VERSION_NOT_FOUND',
+    ])
+    exact404(draftUpdate?.post, [
+      'PLAN_DRAFT_NOT_FOUND',
+      'DRAFT_GOAL_NOT_FOUND',
+      'GOAL_DEFINITION_VERSION_NOT_FOUND',
+    ])
+    exact404(draftRemove?.post, [
+      'PLAN_DRAFT_NOT_FOUND',
+      'DRAFT_GOAL_NOT_FOUND',
+    ])
+    exact404(draftReorder?.post, [
+      'PLAN_DRAFT_NOT_FOUND',
+      'DRAFT_GOAL_NOT_FOUND',
+    ])
+    expect(schemas['DraftConflictProblemResponseDto']).toMatchObject({
+      properties: {
+        code: {
+          enum: ['DRAFT_REVISION_CONFLICT'],
+          example: 'DRAFT_REVISION_CONFLICT',
+        },
+        conflict: {
+          $ref: '#/components/schemas/DraftProblemConflictResponseDto',
+        },
+      },
+    })
   })
 
   it('publishes an RFC 6901 pointer schema for nested escaped segments', async () => {

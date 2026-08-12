@@ -75,3 +75,17 @@ export class GoalDefinitionStateConflictError extends Error {
     this.name = 'GoalDefinitionStateConflictError'
   }
 }
+
+export class DraftGoalNotFoundError extends Error {
+  public constructor() {
+    super('Draft goal was not found')
+    this.name = 'DraftGoalNotFoundError'
+  }
+}
+
+export class GoalDefinitionVersionNotFoundError extends Error {
+  public constructor() {
+    super('Goal definition version was not found')
+    this.name = 'GoalDefinitionVersionNotFoundError'
+  }
+}

@@ -9,6 +9,8 @@ import type { RegisteredProblemDefinition } from '@/platform/http/errors/problem
 
 import {
   GoalDefinitionConflictProblemResponseDto,
+  DraftConflictProblemResponseDto,
+  DraftProblemConflictResponseDto,
   ProblemFieldErrorResponseDto,
   ProblemConflictResponseDto,
   ProblemResponseDto,
@@ -38,6 +40,9 @@ export function ApiProblemResponses(
             code === 'GOAL_DEFINITION_STATE_CONFLICT'
           ) {
             return GoalDefinitionConflictProblemResponseDto
+          }
+          if (code === 'DRAFT_REVISION_CONFLICT') {
+            return DraftConflictProblemResponseDto
           }
           return ProblemResponseDto
         }),
@@ -72,6 +77,8 @@ export function ApiProblemResponses(
       ProblemConflictResponseDto,
       ProblemResponseDto,
       GoalDefinitionConflictProblemResponseDto,
+      DraftProblemConflictResponseDto,
+      DraftConflictProblemResponseDto,
       ValidationProblemResponseDto,
     ),
     ...responses,
@@ -106,6 +113,11 @@ function problemExample(definition: RegisteredProblemDefinition): object {
             currentState: 'active',
             nextAction: 'reload-goal-definition-and-retry',
           },
+        }
+      : {}),
+    ...(definition.code === 'DRAFT_REVISION_CONFLICT'
+      ? {
+          conflict: { expectedRevision: '1', currentRevision: '2' },
         }
       : {}),
   }

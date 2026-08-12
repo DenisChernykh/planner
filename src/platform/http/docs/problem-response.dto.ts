@@ -90,6 +90,25 @@ export class GoalDefinitionConflictProblemResponseDto extends ProblemResponseDto
   public readonly conflict!: ProblemConflictResponseDto
 }
 
+export class DraftProblemConflictResponseDto {
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$', example: '1' })
+  public readonly expectedRevision!: string
+
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$', example: '2' })
+  public readonly currentRevision!: string
+}
+
+export class DraftConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['DRAFT_REVISION_CONFLICT'],
+    example: 'DRAFT_REVISION_CONFLICT',
+  })
+  declare public readonly code: 'DRAFT_REVISION_CONFLICT'
+
+  @ApiProperty({ type: () => DraftProblemConflictResponseDto })
+  public readonly conflict!: DraftProblemConflictResponseDto
+}
+
 export class ValidationProblemResponseDto extends ProblemResponseDto {
   @ApiProperty({ type: () => [ProblemFieldErrorResponseDto] })
   public readonly errors!: readonly ProblemFieldErrorResponseDto[]

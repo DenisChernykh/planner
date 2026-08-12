@@ -32,6 +32,7 @@ import {
   type WorkspaceMemberResolver,
 } from '@/modules/workspace'
 import { ApiProblemResponses } from '@/platform/http/docs/api-problem-responses.decorator'
+import { RequestValidationError } from '@/platform/http/errors/request-validation.error'
 
 import {
   PLANNING_APPLICATION,
@@ -39,6 +40,7 @@ import {
 } from '../application/planning-application'
 import {
   GoalDefinitionNotFoundError,
+  PlanDraftNotFoundError,
   PlanningAuthorizationDeniedError,
   PlanningDependencyUnavailableError,
 } from '../application/planning-errors'
@@ -47,6 +49,11 @@ import {
   GOAL_DEFINITION_NOT_FOUND_PROBLEM,
   GOAL_DEFINITION_REVISION_CONFLICT_PROBLEM,
   GOAL_DEFINITION_STATE_CONFLICT_PROBLEM,
+  DRAFT_GOAL_NOT_FOUND_PROBLEM,
+  DRAFT_REVISION_CONFLICT_PROBLEM,
+  GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM,
+  PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
+  PLAN_DRAFT_NOT_FOUND_PROBLEM,
   PLANNING_AUTHORIZATION_DENIED_PROBLEM,
 } from './planning-problem.definitions'
 import {
@@ -68,6 +75,22 @@ import {
   toGoalDefinitionResultResponse,
   toGoalDefinitionSummaryResponse,
 } from './goal-catalog.response'
+import {
+  AddDraftGoalRequestDto,
+  DraftGoalPathDto,
+  DraftMonthQueryDto,
+  PlanMonthPathDto,
+  RemoveDraftGoalRequestDto,
+  ReorderDraftGoalsRequestDto,
+  type SourceProvenanceDto,
+  UpdateDraftGoalRequestDto,
+} from './draft-goal.dto'
+import {
+  toDraftEditorResponse,
+  toDraftMutationResponse,
+  type DraftEditorResponse,
+  type DraftMutationResponse,
+} from './draft-goal.response'
 
 const uuidSchema = {
   type: 'string' as const,
@@ -77,6 +100,79 @@ const uuidSchema = {
 const revisionSchema = {
   type: 'string' as const,
   pattern: '^[1-9][0-9]*$',
+}
+const addGoalConfigRef = {
+  $ref: '#/components/schemas/AddDraftGoalConfigV1',
+}
+const updateGoalConfigRef = {
+  $ref: '#/components/schemas/UpdateDraftGoalConfigV1',
+}
+const provenanceRef = {
+  type: 'object' as const,
+  allOf: [{ $ref: '#/components/schemas/SourceProvenanceV1' }],
+  nullable: true,
+}
+const addBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    expectedRevision: revisionSchema,
+    goalDefinitionId: uuidSchema,
+    config: addGoalConfigRef,
+    sourceProvenance: provenanceRef,
+  },
+  required: [
+    'commandId',
+    'expectedRevision',
+    'goalDefinitionId',
+    'config',
+    'sourceProvenance',
+  ],
+}
+const updateBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    expectedRevision: revisionSchema,
+    goalDefinitionVersionId: uuidSchema,
+    config: updateGoalConfigRef,
+    sourceProvenance: provenanceRef,
+  },
+  required: [
+    'commandId',
+    'expectedRevision',
+    'goalDefinitionVersionId',
+    'config',
+    'sourceProvenance',
+  ],
+}
+const removeBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: { commandId: uuidSchema, expectedRevision: revisionSchema },
+  required: ['commandId', 'expectedRevision'],
+}
+const reorderBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    expectedRevision: revisionSchema,
+    orderedPlanGoalIds: {
+      type: 'array' as const,
+      maxItems: 200,
+      items: uuidSchema,
+    },
+  },
+  required: ['commandId', 'expectedRevision', 'orderedPlanGoalIds'],
+}
+const draftMutationResponseSchema = {
+  $ref: '#/components/schemas/DraftMutationResponseV1',
+}
+const draftEditorResponseSchema = {
+  $ref: '#/components/schemas/DraftEditorResponseV1',
 }
 const metadataProperties = {
   title: {
@@ -145,6 +241,34 @@ const mutationProblems = [
   'UNSUPPORTED_MEDIA_TYPE' as const,
   'VALIDATION_FAILED' as const,
   'DEPENDENCY_UNAVAILABLE' as const,
+]
+const draftReadProblems = [
+  ...readProblems,
+  PLAN_DRAFT_NOT_FOUND_PROBLEM,
+  PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
+]
+const draftMutationBaseProblems = [
+  ...mutationProblems,
+  PLAN_DRAFT_NOT_FOUND_PROBLEM,
+  PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
+  DRAFT_REVISION_CONFLICT_PROBLEM,
+]
+const draftAddProblems = [
+  ...draftMutationBaseProblems,
+  GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM,
+]
+const draftUpdateProblems = [
+  ...draftMutationBaseProblems,
+  DRAFT_GOAL_NOT_FOUND_PROBLEM,
+  GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM,
+]
+const draftRemoveProblems = [
+  ...draftMutationBaseProblems,
+  DRAFT_GOAL_NOT_FOUND_PROBLEM,
+]
+const draftReorderProblems = [
+  ...draftMutationBaseProblems,
+  DRAFT_GOAL_NOT_FOUND_PROBLEM,
 ]
 
 @ApiTags('planning')
@@ -356,4 +480,223 @@ export class PlanningController {
       throw new PlanningDependencyUnavailableError({ cause: error })
     }
   }
+}
+
+@ApiTags('planning')
+@ApiSecurity('sessionCookie')
+@Controller('planning/drafts')
+export class PlanningDraftController {
+  public constructor(
+    @Inject(PLANNING_APPLICATION)
+    private readonly planning: PlanningApplication,
+    @Inject(WORKSPACE_MEMBER_RESOLVER)
+    private readonly workspaceMembers: WorkspaceMemberResolver,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Read the typed monthly draft editor.' })
+  @ApiQuery({
+    name: 'targetMonth',
+    required: true,
+    schema: { type: 'string', pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$' },
+  })
+  @ApiOkResponse({
+    description: 'Typed draft editor view.',
+    schema: draftEditorResponseSchema,
+  })
+  @ApiProblemResponses(...draftReadProblems)
+  public async editor(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Query() query: DraftMonthQueryDto,
+  ): Promise<DraftEditorResponse> {
+    const value = await this.planning.getDraftEditor.execute({
+      trustedActor: await this.actor(principal),
+      targetMonth: query.targetMonth,
+    })
+    if (value === null) throw new PlanDraftNotFoundError()
+    return toDraftEditorResponse(value)
+  }
+
+  @Post(':planMonthId/goals')
+  @ApiOperation({
+    summary: 'Attach a typed goal to the draft.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiCreatedResponse({
+    description: 'Draft aggregate reference.',
+    schema: draftMutationResponseSchema,
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiBody({ required: true, schema: addBodySchema })
+  @ApiProblemResponses(...draftAddProblems)
+  public async add(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PlanMonthPathDto,
+    @Body() body: AddDraftGoalRequestDto,
+  ): Promise<DraftMutationResponse> {
+    const sourceProvenance = plainProvenance(body.sourceProvenance)
+    return toDraftMutationResponse(
+      await this.planning.addDraftGoal.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: {
+          planMonthId: path.planMonthId,
+          goalDefinitionId: body.goalDefinitionId,
+          config: body.config as never,
+          sourceProvenance,
+        },
+      }),
+    )
+  }
+
+  @Post(':planMonthId/goals/:planGoalId/update')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Append a typed draft-goal revision.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiOkResponse({
+    description: 'Draft aggregate reference.',
+    schema: draftMutationResponseSchema,
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiParam({ name: 'planGoalId', required: true, schema: uuidSchema })
+  @ApiBody({ required: true, schema: updateBodySchema })
+  @ApiProblemResponses(...draftUpdateProblems)
+  public async update(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: DraftGoalPathDto,
+    @Body() body: UpdateDraftGoalRequestDto,
+  ): Promise<DraftMutationResponse> {
+    const sourceProvenance = plainProvenance(body.sourceProvenance)
+    return toDraftMutationResponse(
+      await this.planning.updateDraftGoal.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: {
+          planMonthId: path.planMonthId,
+          planGoalId: path.planGoalId,
+          goalDefinitionVersionId: body.goalDefinitionVersionId,
+          config: body.config as never,
+          sourceProvenance,
+        },
+      }),
+    )
+  }
+
+  @Post(':planMonthId/goals/:planGoalId/remove')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Detach a goal from the draft.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiOkResponse({
+    description: 'Draft aggregate reference.',
+    schema: draftMutationResponseSchema,
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiParam({ name: 'planGoalId', required: true, schema: uuidSchema })
+  @ApiBody({ required: true, schema: removeBodySchema })
+  @ApiProblemResponses(...draftRemoveProblems)
+  public async remove(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: DraftGoalPathDto,
+    @Body() body: RemoveDraftGoalRequestDto,
+  ): Promise<DraftMutationResponse> {
+    return toDraftMutationResponse(
+      await this.planning.removeDraftGoal.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: { planMonthId: path.planMonthId, planGoalId: path.planGoalId },
+      }),
+    )
+  }
+
+  @Post(':planMonthId/goals/reorder')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Replace the complete active draft-goal order.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiOkResponse({
+    description: 'Draft aggregate reference.',
+    schema: draftMutationResponseSchema,
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiBody({ required: true, schema: reorderBodySchema })
+  @ApiProblemResponses(...draftReorderProblems)
+  public async reorder(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PlanMonthPathDto,
+    @Body() body: ReorderDraftGoalsRequestDto,
+  ): Promise<DraftMutationResponse> {
+    return toDraftMutationResponse(
+      await this.planning.reorderDraftGoals.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: {
+          planMonthId: path.planMonthId,
+          orderedPlanGoalIds: body.orderedPlanGoalIds,
+        },
+      }),
+    )
+  }
+
+  private async actor(
+    principal: AuthenticatedPrincipal,
+  ): Promise<{ readonly kind: 'member'; readonly id: string }> {
+    try {
+      const member = await this.workspaceMembers.resolveUser(principal.userId)
+      return { kind: 'member', id: member.memberId }
+    } catch (error: unknown) {
+      if (error instanceof WorkspaceMemberNotFoundError)
+        throw new PlanningAuthorizationDeniedError()
+      throw new PlanningDependencyUnavailableError({ cause: error })
+    }
+  }
+}
+
+function plainProvenance(value: SourceProvenanceDto | null | undefined): {
+  readonly schemaVersion: 1
+  readonly sourceDocument: string
+  readonly sourcePage: number
+  readonly rawValue: string | null
+  readonly rawDenominator: string | null
+  readonly resolution: string
+} | null {
+  if (value === null) return null
+  if (value === undefined) throw missingProvenanceField('/sourceProvenance')
+  if (value.rawValue === undefined) {
+    throw missingProvenanceField('/sourceProvenance/rawValue')
+  }
+  if (value.rawDenominator === undefined) {
+    throw missingProvenanceField('/sourceProvenance/rawDenominator')
+  }
+  return {
+    schemaVersion: value.schemaVersion,
+    sourceDocument: value.sourceDocument,
+    sourcePage: value.sourcePage,
+    rawValue: value.rawValue,
+    rawDenominator: value.rawDenominator,
+    resolution: value.resolution,
+  }
+}
+
+function missingProvenanceField(pointer: string): RequestValidationError {
+  return new RequestValidationError([
+    {
+      pointer,
+      code: 'invalid_type',
+      detail: 'Field has an invalid type.',
+    },
+    {
+      pointer,
+      code: 'required',
+      detail: 'Required field is missing.',
+    },
+  ])
 }

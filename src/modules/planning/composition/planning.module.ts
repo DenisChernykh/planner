@@ -14,12 +14,15 @@ import {
 } from '@/shared/application/database-transaction.port'
 
 import { PLANNING_APPLICATION } from '../application/planning-application'
-import { PlanningController } from '../presentation/planning.controller'
+import {
+  PlanningController,
+  PlanningDraftController,
+} from '../presentation/planning.controller'
 import { createPlanningApplication } from './create-planning-application'
 
 @Module({
   imports: [DatabaseModule, WorkspaceModule],
-  controllers: [PlanningController],
+  controllers: [PlanningController, PlanningDraftController],
   providers: [
     {
       provide: PLANNING_APPLICATION,

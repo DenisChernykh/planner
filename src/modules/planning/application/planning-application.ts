@@ -1,6 +1,13 @@
 import type { CreateEmptyDraftCommand } from './create-empty-draft.command'
 import type { GetDraftQuery } from './get-draft.query'
 import type {
+  AddDraftGoalCommand,
+  RemoveDraftGoalCommand,
+  ReorderDraftGoalsCommand,
+  UpdateDraftGoalCommand,
+} from './draft-goal.commands'
+import type { GetDraftEditorQuery } from './get-draft-editor.query'
+import type {
   ArchiveGoalDefinitionCommand,
   CopyGoalDefinitionCommand,
   CreateGoalDefinitionCommand,
@@ -21,6 +28,11 @@ export type PlanningApplication = {
   readonly createEmptyDraft: CreateEmptyDraftCommand
   readonly updateMonthFocus: UpdateMonthFocusCommand
   readonly getDraft: GetDraftQuery
+  readonly getDraftEditor: GetDraftEditorQuery
+  readonly addDraftGoal: AddDraftGoalCommand
+  readonly updateDraftGoal: UpdateDraftGoalCommand
+  readonly removeDraftGoal: RemoveDraftGoalCommand
+  readonly reorderDraftGoals: ReorderDraftGoalsCommand
   readonly createGoalDefinition: CreateGoalDefinitionCommand
   readonly createGoalDefinitionVersion: CreateGoalDefinitionVersionCommand
   readonly archiveGoalDefinition: ArchiveGoalDefinitionCommand

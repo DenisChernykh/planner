@@ -137,6 +137,224 @@ export type GoalDefinitionDetail = GoalDefinitionSummary & {
   versions: readonly GoalDefinitionVersionView[];
 };
 
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export type DraftGoalScopeV1 =
+  | { readonly kind: "personal"; readonly ownerMemberId: MemberId | null }
+  | { readonly kind: "shared" };
+
+export type DraftGoalRepetitionV1 =
+  | { readonly kind: "daily" }
+  | { readonly kind: "weekdays"; readonly weekdays: readonly Weekday[] }
+  | { readonly kind: "weekly"; readonly n: string | null }
+  | { readonly kind: "monthly"; readonly n: string | null }
+  | { readonly kind: "one_off"; readonly dueDate: string | null }
+  | {
+      readonly kind: "weekly_planned_task";
+      readonly weekOrdinal: "1" | "2" | "3" | "4" | "5" | null;
+      readonly taskText: string | null;
+    };
+
+export type DraftGoalMeasurementV1 =
+  | { readonly kind: "boolean" }
+  | {
+      readonly kind: "quantity";
+      readonly mode: "targeted" | "informational" | null;
+      readonly unit: string | null;
+      readonly precision: 0 | 1 | 2 | 3 | null;
+      readonly aggregation: "add" | "latest" | null;
+      readonly target: string | null;
+    }
+  | {
+      readonly kind: "actual_time";
+      readonly start: string | null;
+      readonly end: string | null;
+    }
+  | {
+      readonly kind: "rating";
+      readonly minimum: number | null;
+      readonly maximum: number | null;
+    }
+  | { readonly kind: "text" }
+  | {
+      readonly kind: "checklist";
+      readonly items: readonly {
+        readonly itemId: string | null;
+        readonly label: string | null;
+      }[];
+    }
+  | {
+      readonly kind: "any_of";
+      readonly variants: readonly {
+        readonly variantId: string | null;
+        readonly label: string | null;
+        readonly unit: string | null;
+        readonly precision: 0 | 1 | 2 | 3 | null;
+        readonly target: string | null;
+      }[];
+    };
+
+export type DraftGoalCheckpointSatisfactionV1 =
+  | { readonly kind: "boolean" }
+  | { readonly kind: "quantity"; readonly target: string | null }
+  | {
+      readonly kind: "actual_time";
+      readonly start: string | null;
+      readonly end: string | null;
+    }
+  | { readonly kind: "rating" }
+  | { readonly kind: "text" }
+  | { readonly kind: "checklist" }
+  | { readonly kind: "any_of" };
+
+export type DraftGoalConfigV1 = {
+  readonly schemaVersion: 1;
+  readonly scope: DraftGoalScopeV1;
+  readonly repetition: DraftGoalRepetitionV1;
+  readonly measurement: DraftGoalMeasurementV1;
+  readonly checkpoints: {
+    readonly aggregation: "independent" | "all" | null;
+    readonly items: readonly {
+      readonly checkpointId: string | null;
+      readonly name: string | null;
+      readonly deadline: string | null;
+      readonly satisfaction: DraftGoalCheckpointSatisfactionV1;
+    }[];
+  } | null;
+};
+
+export type GoalScopeV1 =
+  | { readonly kind: "personal"; readonly ownerMemberId: MemberId }
+  | { readonly kind: "shared" };
+
+export type GoalRepetitionV1 =
+  | { readonly kind: "daily" }
+  | {
+      readonly kind: "weekdays";
+      readonly weekdays: readonly [Weekday, ...Weekday[]];
+    }
+  | { readonly kind: "weekly"; readonly n: string }
+  | { readonly kind: "monthly"; readonly n: string }
+  | { readonly kind: "one_off"; readonly dueDate: string }
+  | {
+      readonly kind: "weekly_planned_task";
+      readonly weekOrdinal: "1" | "2" | "3" | "4" | "5";
+      readonly taskText: string;
+    };
+
+export type GoalMeasurementV1 =
+  | { readonly kind: "boolean" }
+  | {
+      readonly kind: "quantity";
+      readonly mode: "targeted";
+      readonly unit: string;
+      readonly precision: 0 | 1 | 2 | 3;
+      readonly aggregation: "add" | "latest";
+      readonly target: string;
+    }
+  | {
+      readonly kind: "quantity";
+      readonly mode: "informational";
+      readonly unit: string;
+      readonly precision: 0 | 1 | 2 | 3;
+      readonly aggregation: "add" | "latest";
+      readonly target: null;
+    }
+  | { readonly kind: "actual_time"; readonly start: string; readonly end: string }
+  | { readonly kind: "rating"; readonly minimum: number; readonly maximum: number }
+  | { readonly kind: "text" }
+  | {
+      readonly kind: "checklist";
+      readonly items: readonly [
+        { readonly itemId: string; readonly label: string },
+        ...{ readonly itemId: string; readonly label: string }[],
+      ];
+    }
+  | {
+      readonly kind: "any_of";
+      readonly variants: readonly [
+        {
+          readonly variantId: string;
+          readonly label: string;
+          readonly unit: string;
+          readonly precision: 0 | 1 | 2 | 3;
+          readonly target: string;
+        },
+        ...{
+          readonly variantId: string;
+          readonly label: string;
+          readonly unit: string;
+          readonly precision: 0 | 1 | 2 | 3;
+          readonly target: string;
+        }[],
+      ];
+    };
+
+export type GoalCheckpointSatisfactionV1 =
+  | { readonly kind: "boolean" }
+  | { readonly kind: "quantity"; readonly target: string }
+  | { readonly kind: "actual_time"; readonly start: string; readonly end: string }
+  | { readonly kind: "rating" }
+  | { readonly kind: "text" }
+  | { readonly kind: "checklist" }
+  | { readonly kind: "any_of" };
+
+declare const goalConfigV1Brand: unique symbol;
+
+export type GoalConfigV1 = {
+  readonly schemaVersion: 1;
+  readonly scope: GoalScopeV1;
+  readonly repetition: GoalRepetitionV1;
+  readonly measurement: GoalMeasurementV1;
+  readonly checkpoints: {
+    readonly aggregation: "independent" | "all";
+    readonly items: readonly [
+      {
+        readonly checkpointId: string;
+        readonly name: string;
+        readonly deadline: string;
+        readonly satisfaction: GoalCheckpointSatisfactionV1;
+      },
+      ...{
+        readonly checkpointId: string;
+        readonly name: string;
+        readonly deadline: string;
+        readonly satisfaction: GoalCheckpointSatisfactionV1;
+      }[],
+    ];
+  } | null;
+  /** Compile-time only; never serialized or installed as an object property. */
+  readonly [goalConfigV1Brand]: true;
+};
+
+export type SourceProvenanceV1 = {
+  readonly schemaVersion: 1;
+  readonly sourceDocument: string;
+  readonly sourcePage: number;
+  readonly rawValue: string | null;
+  readonly rawDenominator: string | null;
+  readonly resolution: string;
+};
+
+export type PublishBlocker = {
+  readonly planGoalId: PlanGoalId;
+  readonly pointer: string;
+  readonly code: "required" | "empty_collection" | "incompatible";
+  readonly detail: string;
+};
+
+export type GoalConfigValidationResult =
+  | {
+      readonly publishable: true;
+      readonly config: GoalConfigV1;
+      readonly blockers: readonly [];
+    }
+  | {
+      readonly publishable: false;
+      readonly config: null;
+      readonly blockers: readonly [PublishBlocker, ...PublishBlocker[]];
+    };
+
 export type CanonicalJsonValue =
   | null
   | boolean
@@ -858,24 +1076,138 @@ publishable until P03 adds typed config.
 
 - Create: `src/modules/planning/domain/goal-config.ts`
 - Create: `src/modules/planning/domain/goal-validation.ts`
+- Create: P03 application types, commands, query and persistence port
+- Create: Prisma draft-goal persistence, composition wiring, DTO/response and
+  bounded HTTP controller surfaces
+- Modify: `prisma/schema.prisma`, planning exports/application/composition,
+  finite Problem registry and deterministic OpenAPI artifact
+- Create: `prisma/migrations/20260811150000_typed_draft_goals/migration.sql`
 - Create: `src/modules/planning/application/draft-goal.commands.ts`
 - Modify: `src/modules/planning/presentation/planning.controller.ts`
 - Test: `test/unit/planning/goal-validation.spec.ts`
 - Test: `test/integration/planning/draft-goal.integration.spec.ts`
+- Test: `test/e2e/planning/draft-goal.e2e.spec.ts`
+- Modify: exact migration/table, P01/P02 regression and HTTP/OpenAPI inventories
 
-**Produces:** versioned `GoalConfig`, `sourceProvenance` and stable IDs for
-checkpoints/items/OR variants; P04/P05 evaluate these exact types. P03 owns
-typed semantic comparison for scope/owner/type/unit/precision/repetition/
-aggregation and children, forces `SeriesDecision = new` for PRD
-identity-changing axes, and creates the first draft-attachment/publishable seam.
+**Produces:** structurally valid editable `DraftGoalConfigV1`, narrowed
+publishable `GoalConfigV1`, exact optional `SourceProvenanceV1`, stable
+server-owned UUIDs for checkpoints/items/OR variants and immutable config
+revisions. P04/P05 consume these exact types. Semantic comparison is
+server-owned: repetition, `N`, targets, dates, order, labels and provenance
+continue the current series; scope/owner, measurement kind, quantity mode/unit/
+precision/aggregation, checkpoint aggregation/composition/satisfaction schema,
+checklist set and OR set force a new definition-owned series. Caller never
+sends actor/member/user/space/series IDs or a series decision.
 
-- [ ] Написать RED table tests всех types, frequencies, exact N, scope/owner,
-  units, add/latest, checkpoints, checklist and OR.
-- [ ] Реализовать add/copy/update/reorder draft goal commands with explicit
-  series decision from P02.
-- [ ] Добавить RFC 9457 validation errors and OpenAPI discriminators.
-- [ ] Запустить unit/integration/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: add typed monthly goal drafts`.
+P03 draft commands are exactly `planning.add-draft-goal.v1`,
+`planning.update-draft-goal.v1`, `planning.remove-draft-goal.v1` and
+`planning.reorder-draft-goals.v1`; all require positive draft
+`expectedRevision`, use result kind `planning.plan-draft.v1`, aggregate by plan
+month and increase only `plan_drafts.revision`. There is no P03 draft-copy
+command: catalog copy is P02 followed by add; month/template copy remains P09.
+Remove detaches/tombstones the attachment without physical deletion. Reorder
+accepts the full exact permutation of active draft-goal IDs.
+
+Add pins the active current same-space P02 catalog version and its series.
+Update may pin another version of the same definition. Its catalog series wins
+only when it differs from the previous source version's catalog series; a
+newer `continue` version on the same catalog series therefore preserves any
+custom effective series already allocated by P03. Otherwise a hard typed-axis
+change allocates a new series in the same transaction, while compatible change
+reuses the current effective series.
+The immutable draft-goal revision stores source catalog version separately from
+effective series. Stable child IDs are generated for absent/null add IDs;
+update preserves existing IDs and generates only omitted/null new children,
+rejecting forged, duplicate or cross-component reuse.
+Public publish refinement заново валидирует exact stored shape, требует уже
+заполненные server child IDs до brand и возвращает detached recursively frozen
+branded clone; генерация новых ID остаётся только mutation boundary.
+
+Structural/type/format/extra-field failures are zero-write RFC 9457 `422`.
+Null/empty required leaves are structurally storable and become deterministic
+publish blockers, returned as data rather than Problems. Input is exact-shape
+plain data, read once before the first await; output is an exact recursively
+frozen clone. String bytes and declared array order are preserved; weekdays
+must already be unique Monday order. Canonical nonnegative decimals forbid
+sign, exponent and leading zeroes, and scale may not exceed precision. Required
+text/unit/label fields are non-whitespace and bounded to 500 code points;
+provenance document/resolution to 500 and raw fields to 2,000. Targeted and OR/
+checkpoint quantity targets are positive when complete; checkpoint scale не
+превышает precision parent quantity measurement. Time is canonical
+`HH:mm`, allows overnight and rejects equal endpoints; rating bounds are safe
+integers with minimum below maximum.
+
+The pure validator returns a discriminated `GoalConfigValidationResult`:
+publishable branch contains the only normally constructible opaque/branded
+`GoalConfigV1` and an empty blocker tuple; incomplete branch contains null
+config and a non-empty blocker tuple. The private compile-time brand is never a
+serialized field. P04/P05 accept only this refined config, so structural TS
+construction cannot bypass compatibility rules such as daily-only checkpoints.
+
+`weekly_planned_task` is repetition with nullable ordinal `1..5` and nullable
+task text, requires boolean measurement, permits personal/shared scope and never
+has daily checkpoints. Checkpoints are allowed only for daily repetition;
+their satisfaction discriminator must match the parent measurement kind,
+quantity/time keep their own target/range, and checklist/OR use the parent
+composition without nesting.
+
+Checklist items, OR variants and checkpoints are each bounded to 100; one draft
+and reorder payload are bounded to 200 active goals. Exceeding a bound is
+structural `422`. P03 validates a `one_off` date's canonical syntax and
+completeness only; target-month/calendar eligibility remains P04.
+
+Persistence uses mutable `plan_draft_goals`, immutable
+`plan_draft_goal_revisions` with versioned JSON config/provenance and stable
+child IDs inside JSON, and one finite typed `planning_draft_goal_changes`
+history detail per action. Cross-space composite FKs, a deferrable current-
+revision FK, no-DELETE/detach and immutable revision/history guards apply.
+There is a partial unique active `(plan_month_id, goal_definition_id)`; remove
+tombstones the root, and a later add creates a fresh plan-goal/revision/child-ID
+identity rather than reviving it. A deferred invariant owns the 200-row maximum
+and dense active display order `0..count-1`. Typed remove/reorder history stores
+full exact `before_order`/`after_order` arrays tied to the parent month: reorder
+is a full same-set permutation and remove is exactly the previous set without
+the tombstoned goal. Detail связывает current/adjacent config revision IDs,
+exact parent draft transition, completed receipt aggregate/revision и final
+effect. Duplicate active definition prechecked under draft lock maps to `422`,
+while the partial unique index remains a backstop.
+Every mutation remains inside the existing durable-command transaction:
+receipt replay/conflict, member authorization, draft/month same-space/status/
+CAS lock, catalog/config/series effect, finite history, draft `+1`, completed
+receipt. The P02 orphan-series invariant counts series referenced by either a
+catalog version or draft-goal revision.
+
+P03 adds `GetDraftEditorQuery`, without widening P01 `GetDraftQuery`. It returns
+the draft plus ordered active goals, catalog metadata/source version/effective
+series, config/provenance, per-goal blockers and aggregate blockers; external
+bigint values are canonical decimal strings. HTTP is exactly authenticated GET
+`/planning/drafts?targetMonth=YYYY-MM`, add `POST
+/planning/drafts/{planMonthId}/goals` (`201`), update/remove `POST
+/planning/drafts/{planMonthId}/goals/{planGoalId}/update|remove` (`200`) and
+reorder `POST /planning/drafts/{planMonthId}/goals/reorder` (`200`). Mutations
+require conjunctive session, Origin and CSRF. OpenAPI documents exact nested
+`oneOf` discriminators with `additionalProperties: false`; planning-owned
+contribution устанавливается generic platform seam. Add/update/stored schemas
+различают null-only/nullable/required UUID child-ID contracts.
+
+Finite P03 Problems add draft/goal/version not-found `404`, not-editable and
+draft-revision conflict `409` (the latter has its dedicated exact extension),
+plus structural `422`; existing auth/parser/fingerprint/dependency Problems
+remain. Publish validation is a framework-free pure function returning every
+safe issue `{ planGoalId, pointer, code, detail }`, ordered by display order,
+goal ID, pointer and code. Calendar targets (P04), evaluation (P05), preview/hash
+(P06) and publication/snapshots/lifecycle (P07) are excluded.
+
+- [x] Написать live unit/integration/E2E RED oracles всех union branches,
+  blockers, semantic axes, stable IDs, PostgreSQL replay/CAS/races/rollback/
+  constraints/history and exact HTTP/OpenAPI security/status/discriminators.
+- [x] Реализовать exact add/update/remove/reorder mutations and separate draft
+  editor query without P04+ behavior.
+- [x] Доказать accepted P01/P02 regressions, migration/table inventories and
+  P02 orphan-series rule over catalog-or-draft references.
+- [x] После independent review повторить focused/static gates и запустить
+  `pnpm check:quick`; pre-review focused/static gates уже GREEN.
+- [x] Commit: `feat: add typed monthly goal drafts`.
 
 ### P04 — Calendar targets and period pace
 
