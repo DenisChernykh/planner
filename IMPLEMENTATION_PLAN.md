@@ -1770,12 +1770,12 @@ never reverses partner/system action or erases history.
 - Create: `src/modules/tracking/application/undo-last-own-action.command.ts`
 - Test: `test/integration/tracking/undo-own-action.integration.spec.ts`
 
-- [ ] Написать RED cases own add/latest/correction, partner latest action,
+- [x] Написать RED cases own add/latest/correction, partner latest action,
   system action, replay and concurrent new action.
-- [ ] Реализовать compensation as new action group/revision using receipt/CAS.
-- [ ] Проверить factsRevision, result replay and audit chain.
-- [ ] Запустить focused integration and `pnpm check:quick`.
-- [ ] Commit: `feat: undo last own tracking action`.
+- [x] Реализовать compensation as new action group/revision using receipt/CAS.
+- [x] Проверить factsRevision, result replay and audit chain.
+- [x] Запустить focused integration and `pnpm check:quick`.
+- [x] Commit: `feat: undo last own tracking action`.
 
 ### T07 — Today and Month read models
 

@@ -10,6 +10,7 @@ import type { RecordRatingCommand } from './record-rating.command'
 import type { RecordOrVariantCommand } from './record-or-variant.command'
 import type { RecordTimeCommand } from './record-time.command'
 import type { RecordTextCommand } from './record-text.command'
+import type { UndoLastOwnActionCommand } from './undo-last-own-action.command'
 
 export type TrackingApplication = {
   readonly correctRecord: CorrectRecordCommand
@@ -22,6 +23,7 @@ export type TrackingApplication = {
   readonly recordChecklistItem: RecordChecklistItemCommand
   readonly recordOrVariant: RecordOrVariantCommand
   readonly recordCompositeOccurrence: RecordCompositeOccurrenceCommand
+  readonly undoLastOwnAction: UndoLastOwnActionCommand
   readonly getFactState: GetFactStateQuery
   readonly getGoalProgress: GetGoalProgressQuery
 }

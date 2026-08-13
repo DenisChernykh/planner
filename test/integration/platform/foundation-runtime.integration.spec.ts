@@ -90,6 +90,7 @@ describe('Planner foundation database runtime', () => {
       { migration_name: '20260811162000_text_checklist_facts' },
       { migration_name: '20260811163000_or_composite_facts' },
       { migration_name: '20260811164000_fact_corrections_tombstones' },
+      { migration_name: '20260811165000_fact_undo' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name
@@ -126,6 +127,7 @@ describe('Planner foundation database runtime', () => {
       { table_name: 'tracking_fact_changes' },
       { table_name: 'tracking_fact_records' },
       { table_name: 'tracking_fact_revisions' },
+      { table_name: 'tracking_fact_undo_changes' },
       { table_name: 'users' },
     ])
   })

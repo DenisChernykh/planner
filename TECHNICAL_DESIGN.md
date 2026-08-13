@@ -1081,6 +1081,42 @@ Deferred constraints запрещают old record-командам создав
 связывают before/after chain, actor, reason, typed current value/tombstone и
 сохраняют старые T01–T04 actions/revisions неизменными.
 
+#### 7.6.6. T06 Undo last own action
+
+T06 добавляет application-only команду
+`tracking.undo-last-own-action.v1` с exact payload `{ factRecordId }`,
+обязательной positive `expectedRevision` текущего record и result
+`tracking.fact-record.v1`. Actor берётся только из trusted member context;
+system actor запрещён. HTTP, OpenAPI, Telegram и UI остаются H03/G05. Exact
+replay и fingerprint conflict исполняются durable executor до clock,
+membership и чтения target.
+
+Команда закрепляет месяц opaque target record и находит в нём последнее по
+`after_facts_revision` ещё не компенсированное reversible-действие этого
+участника. Undo-actions, действия партнёра и system-actions кандидатами не
+являются. Если кандидат относится к другому record, возвращается finite
+`not_latest`; если current revision уже имеет чужое либо системное
+происхождение — `superseded`. Более старое действие не выбирается. Повторный
+Undo пропускает уже компенсированные actions и идёт назад по этому стеку.
+
+Undo create/add добавляет tombstone. Undo correction и personal delete
+добавляет `recorded` revision с точной копией всех typed value columns из
+before-revision компенсируемого action; actor и timestamp принадлежат Undo,
+первоначальный recorder record остаётся неизменным. Действуют active
+publication, effective `published|grace`, T05 correction deadline и CAS target
+record; `closed` или inactive month не изменяется.
+
+Migration `20260811165000_fact_undo` добавляет immutable one-to-one
+`tracking_fact_undo_changes(action_id, undone_action_id,
+restored_from_revision_id)`. Одна transaction блокирует month, затем record,
+добавляет revision, переводит current pointer, увеличивает `facts_revision`
+ровно на один, создаёт `fact_undone` action/change/detail и completed receipt.
+Deferred constraints повторно связывают own/latest uncompensated action,
+same month/record, current provenance, adjacent revisions, точное restored
+value, receipt и final `facts_revision`; UPDATE/DELETE undo history запрещены.
+Dispatcher сохраняет populated T01–T05 history и применяет T06 checks только к
+новому command discriminator.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:

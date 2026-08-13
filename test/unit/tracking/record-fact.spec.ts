@@ -84,6 +84,8 @@ function facts(
   return {
     record: () => Promise.reject(new Error('unexpected record')),
     mutate: () => Promise.reject(new Error('unexpected mutate')),
+    undoLastOwnAction: () =>
+      Promise.reject(new Error('unexpected undoLastOwnAction')),
     getState: () => Promise.reject(new Error('unexpected state')),
     getGoalProgressInput: () =>
       Promise.reject(new Error('unexpected progress input')),

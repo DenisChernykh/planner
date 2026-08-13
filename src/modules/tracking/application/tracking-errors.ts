@@ -45,6 +45,16 @@ export class FactRevisionConflictError extends Error {
   }
 }
 
+export type FactUndoUnavailableReason =
+  'nothing_to_undo' | 'not_latest' | 'superseded'
+
+export class FactUndoUnavailableError extends Error {
+  public constructor(public readonly reason: FactUndoUnavailableReason) {
+    super(`Fact undo is unavailable: ${reason}`)
+    this.name = 'FactUndoUnavailableError'
+  }
+}
+
 export class TrackingDependencyUnavailableError extends Error {
   public constructor(options?: ErrorOptions) {
     super('Tracking dependency is unavailable', options)

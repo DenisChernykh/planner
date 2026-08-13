@@ -55,6 +55,18 @@ export type MutateFactPersistenceInput = {
   readonly reason: string
 }
 
+export type UndoLastOwnActionPersistenceInput = {
+  readonly actor: ActorRef
+  readonly actorScope: string
+  readonly commandId: string
+  readonly occurredAt: Date
+  readonly currentLocalDate: string
+  readonly spaceId: string
+  readonly memberId: string
+  readonly expectedRevision: bigint
+  readonly factRecordId: string
+}
+
 export type GetFactStatePersistenceInput = {
   readonly spaceId: string
   readonly publicationId: string
@@ -72,6 +84,9 @@ export type GetGoalProgressPersistenceInput = {
 export interface FactPersistencePort {
   record(input: RecordFactPersistenceInput): Promise<FactRecordRef>
   mutate(input: MutateFactPersistenceInput): Promise<FactRecordRef>
+  undoLastOwnAction(
+    input: UndoLastOwnActionPersistenceInput,
+  ): Promise<FactRecordRef>
   getState(input: GetFactStatePersistenceInput): Promise<FactStateV1 | null>
   getGoalProgressInput(
     input: GetGoalProgressPersistenceInput,

@@ -20,11 +20,13 @@ import type {
   GetGoalProgressPersistenceInput,
   MutateFactPersistenceInput,
   RecordFactPersistenceInput,
+  UndoLastOwnActionPersistenceInput,
 } from '../application/fact-persistence.port'
 import {
   FactRevisionConflictError,
   FactTargetNotFoundError,
   FactTargetUnavailableError,
+  FactUndoUnavailableError,
   FactValueInvalidError,
   TrackingAuthorizationDeniedError,
 } from '../application/tracking-errors'
@@ -37,7 +39,12 @@ import type {
 type Client = Parameters<Parameters<PrismaClientProvider['withClient']>[0]>[0]
 
 export type FactWritePhase =
-  'record' | 'revision' | 'pointer' | 'facts_revision' | 'history'
+  | 'record'
+  | 'revision'
+  | 'pointer'
+  | 'facts_revision'
+  | 'history'
+  | 'undo_detail'
 
 export type FactWriteObserver = (phase: FactWritePhase) => void | Promise<void>
 
@@ -84,6 +91,37 @@ type MutationTargetRow = {
   readonly owner_member_id: string | null
   readonly config: unknown
   readonly or_variant_id: string | null
+}
+
+type UndoTargetRow = {
+  readonly id: string
+  readonly current_revision_id: string
+  readonly revision_number: bigint
+  readonly plan_month_id: string
+  readonly facts_revision: bigint
+  readonly status: string
+  readonly active_publication_id: string | null
+  readonly publication_id: string
+  readonly plan_goal_snapshot_id: string
+  readonly active_local_date: string
+  readonly correction_deadline: string
+  readonly space_id: string
+}
+
+type UndoCandidateRow = {
+  readonly action_id: string
+  readonly fact_record_id: string
+  readonly before_revision_id: string | null
+  readonly after_revision_id: string
+  readonly source_revision_kind: 'recorded' | 'tombstoned' | null
+  readonly boolean_result: 'done' | 'not_done' | null
+  readonly quantity_value: string | null
+  readonly actual_time_value: string | null
+  readonly rating_value: bigint | null
+  readonly text_value: string | null
+  readonly text_result: 'done' | 'not_done' | null
+  readonly checklist_item_state: 'done' | 'not_done' | null
+  readonly or_variant_value: string | null
 }
 
 type StateRow = {
@@ -1128,6 +1166,205 @@ export class PrismaFactPersistence implements FactPersistencePort {
            ${target.current_revision_id}::uuid, ${afterRevisionId}::uuid)
       `
       await this.afterWritePhase('history')
+      return { factRecordId: target.id, factRevision }
+    })
+  }
+
+  public undoLastOwnAction(
+    input: UndoLastOwnActionPersistenceInput,
+  ): Promise<FactRecordRef> {
+    return this.database.withClient(async (client) => {
+      const lockedMonth = await client.$queryRaw<{ readonly id: string }[]>`
+        SELECT month.id::text
+          FROM tracking_fact_records record
+          JOIN plan_months month ON month.id = record.plan_month_id
+         WHERE record.id = ${input.factRecordId}::uuid
+           AND record.space_id = ${input.spaceId}::uuid
+         FOR UPDATE OF month
+      `
+      if (lockedMonth.length === 0) throw new FactTargetNotFoundError()
+      await client.$queryRaw<{ readonly id: string }[]>`
+        SELECT id::text FROM tracking_fact_records
+         WHERE id = ${input.factRecordId}::uuid
+           AND space_id = ${input.spaceId}::uuid
+         FOR UPDATE
+      `
+      const targetRows = await client.$queryRaw<UndoTargetRow[]>`
+        SELECT record.id::text, record.current_revision_id::text,
+               revision.revision_number, record.plan_month_id::text,
+               month.facts_revision, month.status,
+               month.active_publication_id::text,
+               record.publication_id::text,
+               record.plan_goal_snapshot_id::text,
+               publication.active_local_date::text,
+               (month.month_start + INTERVAL '1 month + 2 days')::date::text
+                 correction_deadline,
+               record.space_id::text
+          FROM tracking_fact_records record
+          JOIN tracking_fact_revisions revision
+            ON revision.id = record.current_revision_id
+          JOIN plan_months month ON month.id = record.plan_month_id
+          JOIN plan_publications publication
+            ON publication.id = record.publication_id
+         WHERE record.id = ${input.factRecordId}::uuid
+           AND record.space_id = ${input.spaceId}::uuid
+      `
+      const target = targetRows[0]
+      if (target === undefined) throw new FactTargetNotFoundError()
+      if (
+        target.status === 'closed' ||
+        input.currentLocalDate > target.correction_deadline
+      ) {
+        throw new FactTargetUnavailableError('closed')
+      }
+      if (
+        target.active_publication_id !== target.publication_id ||
+        !['published', 'grace'].includes(target.status) ||
+        input.currentLocalDate < target.active_local_date
+      ) {
+        throw new FactTargetUnavailableError('not_active')
+      }
+      if (target.revision_number !== input.expectedRevision) {
+        throw new FactRevisionConflictError(
+          input.expectedRevision,
+          target.revision_number,
+        )
+      }
+
+      const candidates = await client.$queryRaw<UndoCandidateRow[]>`
+        SELECT action.id::text action_id,
+               change.fact_record_id::text,
+               change.before_revision_id::text,
+               change.after_revision_id::text,
+               source.revision_kind source_revision_kind,
+               source.boolean_result, source.quantity_value,
+               to_char(source.actual_time_value, 'HH24:MI') actual_time_value,
+               source.rating_value, source.text_value, source.text_result,
+               source.checklist_item_state, source.or_variant_value
+          FROM tracking_action_groups action
+          JOIN tracking_fact_changes change ON change.action_id = action.id
+          LEFT JOIN tracking_fact_undo_changes compensated
+            ON compensated.undone_action_id = action.id
+          LEFT JOIN tracking_fact_revisions source
+            ON source.id = change.before_revision_id
+         WHERE action.plan_month_id = ${target.plan_month_id}::uuid
+           AND action.actor_kind = 'member'
+           AND action.member_id = ${input.memberId}::uuid
+           AND action.action_kind IN (
+             'fact_recorded', 'fact_corrected', 'fact_tombstoned'
+           )
+           AND compensated.action_id IS NULL
+         ORDER BY action.after_facts_revision DESC
+         LIMIT 1
+      `
+      const candidate = candidates[0]
+      if (candidate === undefined) {
+        throw new FactUndoUnavailableError('nothing_to_undo')
+      }
+      if (candidate.fact_record_id !== target.id) {
+        throw new FactUndoUnavailableError('not_latest')
+      }
+      const provenance = await client.$queryRaw<{ readonly valid: boolean }[]>`
+        WITH RECURSIVE effective_revision(revision_id) AS (
+          SELECT ${target.current_revision_id}::uuid
+          UNION
+          SELECT undo.restored_from_revision_id
+            FROM effective_revision current_state
+            JOIN tracking_fact_changes current_change
+              ON current_change.after_revision_id = current_state.revision_id
+             AND current_change.fact_record_id = ${target.id}::uuid
+            JOIN tracking_action_groups current_action
+              ON current_action.id = current_change.action_id
+            JOIN tracking_fact_undo_changes undo
+              ON undo.action_id = current_action.id
+           WHERE current_action.action_kind = 'fact_undone'
+             AND current_action.actor_kind = 'member'
+             AND current_action.member_id = ${input.memberId}::uuid
+             AND undo.restored_from_revision_id IS NOT NULL
+        )
+        SELECT EXISTS (
+          SELECT 1 FROM effective_revision
+           WHERE revision_id = ${candidate.after_revision_id}::uuid
+        ) valid
+      `
+      if (provenance[0]?.valid !== true) {
+        throw new FactUndoUnavailableError('superseded')
+      }
+
+      const afterRevisionId = randomUUID()
+      const factRevision = target.revision_number + 1n
+      const revisionKind =
+        candidate.before_revision_id === null
+          ? 'tombstoned'
+          : candidate.source_revision_kind
+      if (revisionKind === null) {
+        throw new Error('Undo source revision is missing')
+      }
+      await client.$executeRaw`
+        INSERT INTO tracking_fact_revisions
+          (id, fact_record_id, revision_number, revision_kind,
+           boolean_result, quantity_value, actual_time_value, rating_value,
+           text_value, text_result, checklist_item_state, or_variant_value,
+           recorded_by_member_id, created_at)
+        VALUES
+          (${afterRevisionId}::uuid, ${target.id}::uuid, ${factRevision},
+           ${revisionKind}, ${candidate.boolean_result},
+           ${candidate.quantity_value}, ${candidate.actual_time_value}::time,
+           ${candidate.rating_value}::bigint, ${candidate.text_value},
+           ${candidate.text_result}, ${candidate.checklist_item_state},
+           ${candidate.or_variant_value}, ${input.memberId}::uuid,
+           ${input.occurredAt})
+      `
+      await this.afterWritePhase('revision')
+      await client.$executeRaw`
+        UPDATE tracking_fact_records
+           SET current_revision_id = ${afterRevisionId}::uuid,
+               updated_at = ${input.occurredAt}
+         WHERE id = ${target.id}::uuid
+      `
+      await this.afterWritePhase('pointer')
+
+      const afterFactsRevision = target.facts_revision + 1n
+      await client.$executeRaw`
+        UPDATE plan_months
+           SET facts_revision = ${afterFactsRevision}
+         WHERE id = ${target.plan_month_id}::uuid
+           AND facts_revision = ${target.facts_revision}
+      `
+      await this.afterWritePhase('facts_revision')
+
+      const actionId = randomUUID()
+      await client.$executeRaw`
+        INSERT INTO tracking_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id, space_id,
+           plan_month_id, publication_id, plan_goal_snapshot_id,
+           command_type, command_id, before_facts_revision,
+           after_facts_revision, reason, occurred_at)
+        VALUES
+          (${actionId}::uuid, 'fact_undone', 'member', ${input.actorScope},
+           ${input.memberId}::uuid, ${input.spaceId}::uuid,
+           ${target.plan_month_id}::uuid, ${target.publication_id}::uuid,
+           ${target.plan_goal_snapshot_id}::uuid,
+           'tracking.undo-last-own-action.v1', ${input.commandId}::uuid,
+           ${target.facts_revision}, ${afterFactsRevision}, NULL,
+           ${input.occurredAt})
+      `
+      await client.$executeRaw`
+        INSERT INTO tracking_fact_changes
+          (action_id, fact_record_id, before_revision_id, after_revision_id)
+        VALUES
+          (${actionId}::uuid, ${target.id}::uuid,
+           ${target.current_revision_id}::uuid, ${afterRevisionId}::uuid)
+      `
+      await this.afterWritePhase('history')
+      await client.$executeRaw`
+        INSERT INTO tracking_fact_undo_changes
+          (action_id, undone_action_id, restored_from_revision_id)
+        VALUES
+          (${actionId}::uuid, ${candidate.action_id}::uuid,
+           ${candidate.before_revision_id}::uuid)
+      `
+      await this.afterWritePhase('undo_detail')
       return { factRecordId: target.id, factRevision }
     })
   }

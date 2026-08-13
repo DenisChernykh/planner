@@ -555,11 +555,12 @@ model TrackingFactRevision {
   recordedByMemberId String    @map("recorded_by_member_id") @db.Uuid
   createdAt          DateTime  @map("created_at") @db.Timestamptz(3)
 
-  factRecord    TrackingFactRecord   @relation("FactRecordRevisions", fields: [factRecordId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  currentFor    TrackingFactRecord?  @relation("CurrentFactRevision")
-  recordedBy    Membership           @relation("FactRevisionActor", fields: [recordedByMemberId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  beforeChanges TrackingFactChange[] @relation("FactChangeBeforeRevision")
-  afterChanges  TrackingFactChange[] @relation("FactChangeAfterRevision")
+  factRecord    TrackingFactRecord       @relation("FactRecordRevisions", fields: [factRecordId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentFor    TrackingFactRecord?      @relation("CurrentFactRevision")
+  recordedBy    Membership               @relation("FactRevisionActor", fields: [recordedByMemberId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  beforeChanges TrackingFactChange[]     @relation("FactChangeBeforeRevision")
+  afterChanges  TrackingFactChange[]     @relation("FactChangeAfterRevision")
+  undoRestores  TrackingFactUndoChange[]
 
   @@unique([factRecordId, revisionNumber])
   @@unique([factRecordId, id])
@@ -583,13 +584,15 @@ model TrackingActionGroup {
   reason              String?  @db.Text
   occurredAt          DateTime @map("occurred_at") @db.Timestamptz(3)
 
-  member           Membership          @relation(fields: [spaceId, memberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  space            Space               @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  planMonth        PlanMonth           @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  publication      PlanPublication     @relation(fields: [planMonthId, publicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict)
-  planGoalSnapshot PlanGoalSnapshot    @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict)
-  commandReceipt   CommandReceipt      @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
+  member           Membership              @relation(fields: [spaceId, memberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  space            Space                   @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  planMonth        PlanMonth               @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  publication      PlanPublication         @relation(fields: [planMonthId, publicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict)
+  planGoalSnapshot PlanGoalSnapshot        @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict)
+  commandReceipt   CommandReceipt          @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
   factChange       TrackingFactChange?
+  undoChange       TrackingFactUndoChange? @relation("UndoAction")
+  undoneBy         TrackingFactUndoChange? @relation("UndoneAction")
 
   @@unique([actorScope, commandType, commandId])
   @@unique([planMonthId, afterFactsRevision], map: "tracking_action_groups_month_facts_revision_key")
@@ -608,4 +611,16 @@ model TrackingFactChange {
   afterRevision  TrackingFactRevision  @relation("FactChangeAfterRevision", fields: [factRecordId, afterRevisionId], references: [factRecordId, id], onDelete: Restrict, onUpdate: Restrict)
 
   @@map("tracking_fact_changes")
+}
+
+model TrackingFactUndoChange {
+  actionId               String  @id @map("action_id") @db.Uuid
+  undoneActionId         String  @unique(map: "tracking_fact_undo_changes_undone_action_key") @map("undone_action_id") @db.Uuid
+  restoredFromRevisionId String? @map("restored_from_revision_id") @db.Uuid
+
+  action               TrackingActionGroup   @relation("UndoAction", fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  undoneAction         TrackingActionGroup   @relation("UndoneAction", fields: [undoneActionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  restoredFromRevision TrackingFactRevision? @relation(fields: [restoredFromRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("tracking_fact_undo_changes")
 }

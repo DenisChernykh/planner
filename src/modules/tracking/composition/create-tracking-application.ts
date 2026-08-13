@@ -17,6 +17,7 @@ import { RecordRatingCommand } from '../application/record-rating.command'
 import { RecordOrVariantCommand } from '../application/record-or-variant.command'
 import { RecordTimeCommand } from '../application/record-time.command'
 import { RecordTextCommand } from '../application/record-text.command'
+import { UndoLastOwnActionCommand } from '../application/undo-last-own-action.command'
 import type { TrackingApplication } from '../application/tracking-application'
 import { PrismaFactPersistence } from '../infrastructure/prisma-fact.persistence'
 
@@ -79,6 +80,11 @@ export function createTrackingApplication(dependencies: {
       facts,
     ),
     recordCompositeOccurrence: new RecordCompositeOccurrenceCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
+    undoLastOwnAction: new UndoLastOwnActionCommand(
       executor,
       dependencies.workspaceMembers,
       facts,

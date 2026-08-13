@@ -168,6 +168,13 @@ export type DeleteRecordPayload = {
 export type DeleteRecordApplicationCommand =
   ApplicationCommand<DeleteRecordPayload>
 
+export type UndoLastOwnActionPayload = {
+  readonly factRecordId: string
+}
+
+export type UndoLastOwnActionApplicationCommand =
+  ApplicationCommand<UndoLastOwnActionPayload>
+
 export type GetFactStateInput = {
   readonly trustedActor: ActorRef
   readonly publicationId: string

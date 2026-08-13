@@ -74,6 +74,8 @@ function facts(inputs: unknown[] = []): FactPersistencePort {
       inputs.push(input)
       return Promise.resolve({ factRecordId, factRevision: 2n })
     },
+    undoLastOwnAction: () =>
+      Promise.reject(new Error('unexpected undoLastOwnAction')),
     getState: () => Promise.reject(new Error('unexpected getState')),
     getGoalProgressInput: () =>
       Promise.reject(new Error('unexpected getGoalProgressInput')),

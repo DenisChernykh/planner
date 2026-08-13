@@ -31,6 +31,8 @@ import type {
   RecordTimePayload,
   RecordTextApplicationCommand,
   RecordTextPayload,
+  UndoLastOwnActionApplicationCommand,
+  UndoLastOwnActionPayload,
 } from './tracking.types'
 
 const UUID =
@@ -503,6 +505,14 @@ function deleteRecordPayload(value: unknown): DeleteRecordPayload {
   })
 }
 
+function undoLastOwnActionPayload(value: unknown): UndoLastOwnActionPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, ['factRecordId'])
+  return Object.freeze({
+    factRecordId: uuid(ownData(value, 'factRecordId')),
+  })
+}
+
 function mutationEnvelope<TPayload>(
   value: unknown,
   readPayload: (payloadValue: unknown) => TPayload,
@@ -570,6 +580,12 @@ export function snapshotDeleteRecordCommand(
   return mutationEnvelope(value, deleteRecordPayload)
 }
 
+export function snapshotUndoLastOwnActionCommand(
+  value: unknown,
+): UndoLastOwnActionApplicationCommand & { readonly expectedRevision: bigint } {
+  return mutationEnvelope(value, undoLastOwnActionPayload)
+}
+
 export function canonicalRecordTimePayload(
   value: RecordTimePayload,
 ): RecordTimePayload {
@@ -622,6 +638,12 @@ export function canonicalDeleteRecordPayload(
   value: DeleteRecordPayload,
 ): DeleteRecordPayload {
   return deleteRecordPayload(value)
+}
+
+export function canonicalUndoLastOwnActionPayload(
+  value: UndoLastOwnActionPayload,
+): UndoLastOwnActionPayload {
+  return undoLastOwnActionPayload(value)
 }
 
 export function canonicalRecordFactPayload(value: RecordFactPayload): {
