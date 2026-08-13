@@ -12,6 +12,8 @@ import {
 import type {
   CreateEmptyDraftApplicationCommand,
   CreateEmptyDraftPayload,
+  CreateDraftFromPublicationApplicationCommand,
+  CreateDraftFromPublicationPayload,
   UpdateMonthFocusApplicationCommand,
   UpdateMonthFocusPayload,
 } from './planning.types'
@@ -28,9 +30,16 @@ function exactObject(
     return false
   }
   const ownKeys = Reflect.ownKeys(value)
+  const descriptors = Object.getOwnPropertyDescriptors(value)
   return (
     ownKeys.length === keys.length &&
-    ownKeys.every((key) => typeof key === 'string' && keys.includes(key))
+    ownKeys.every(
+      (key) =>
+        typeof key === 'string' &&
+        keys.includes(key) &&
+        descriptors[key]?.get === undefined &&
+        descriptors[key]?.set === undefined,
+    )
   )
 }
 
@@ -76,6 +85,21 @@ function snapshotUpdatePayload(value: unknown): UpdateMonthFocusPayload {
   return Object.freeze({ planMonthId, focus })
 }
 
+function snapshotCopyPayload(
+  value: unknown,
+): CreateDraftFromPublicationPayload {
+  if (!exactObject(value, ['sourcePublicationId', 'targetMonth'])) {
+    throw new CommandValidationError()
+  }
+  if (!isCanonicalPlanningUuid(value.sourcePublicationId)) {
+    throw new CommandValidationError()
+  }
+  return Object.freeze({
+    sourcePublicationId: value.sourcePublicationId,
+    targetMonth: validateTargetMonth(value.targetMonth),
+  })
+}
+
 export function validateTargetMonth(value: unknown): string {
   if (!isCanonicalCalendarMonth(value)) throw new CommandValidationError()
   return value
@@ -101,6 +125,12 @@ export function canonicalUpdatePayload(
   payload: UpdateMonthFocusPayload,
 ): CanonicalJsonObject {
   return snapshotUpdatePayload(payload)
+}
+
+export function canonicalCreateDraftFromPublicationPayload(
+  payload: CreateDraftFromPublicationPayload,
+): CanonicalJsonObject {
+  return snapshotCopyPayload(payload)
 }
 
 export function snapshotCreateEmptyDraftCommand(
@@ -162,5 +192,18 @@ export function snapshotUpdateMonthFocusCommand(
     trustedActor,
     expectedRevision,
     payload,
+  })
+}
+
+export function snapshotCreateDraftFromPublicationCommand(
+  command: unknown,
+): CreateDraftFromPublicationApplicationCommand {
+  if (!exactObject(command, ['commandId', 'trustedActor', 'payload'])) {
+    throw new CommandValidationError()
+  }
+  return Object.freeze({
+    commandId: snapshotCommandId(command.commandId),
+    trustedActor: snapshotActor(command.trustedActor),
+    payload: snapshotCopyPayload(command.payload),
   })
 }

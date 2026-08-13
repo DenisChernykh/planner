@@ -13,11 +13,19 @@ export type UpdateMonthFocusPayload = {
   readonly focus: string
 }
 
+export type CreateDraftFromPublicationPayload = {
+  readonly sourcePublicationId: string
+  readonly targetMonth: string
+}
+
 export type CreateEmptyDraftApplicationCommand =
   ApplicationCommand<CreateEmptyDraftPayload>
 
 export type UpdateMonthFocusApplicationCommand =
   ApplicationCommand<UpdateMonthFocusPayload>
+
+export type CreateDraftFromPublicationApplicationCommand =
+  ApplicationCommand<CreateDraftFromPublicationPayload>
 
 export type GetDraftInput = {
   readonly trustedActor: ActorRef

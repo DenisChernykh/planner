@@ -659,7 +659,10 @@ catalog actions без metadata duplication или arbitrary JSON.
 - `planning_publication_changes` — immutable typed history detail
   `published|cancelled`; publish хранит confirmed preview и переход
   `NULL -> publication`, cancel — переход `publication -> NULL` без изменения
-  publication row.
+  publication row;
+- `planning_month_copy_changes` — immutable typed detail только для
+  `draft_copied`: source publication ID, bounded количество скопированных целей
+  и exact destination order новых plan-goal IDs.
 
 Одна plan month может иметь несколько publication revisions, но не более одной
 active publication. Cancel до начала месяца помечает revision cancelled; он не
@@ -932,20 +935,45 @@ transaction и один executor timestamp.
 
 ### 9.1. `CreateDraftFromPublication`
 
-Одна idempotent PostgreSQL transaction:
+Application-only команда `planning.create-draft-from-publication.v1` принимает
+exact payload `{ sourcePublicationId, targetMonth }`, запрещает
+`expectedRevision` и возвращает `planning.plan-draft.v1` revision `1`. Source
+может быть любой same-space publication по ID, включая cancelled или
+historical revision. Target — любой canonical свободный `YYYY-MM` в диапазоне
+`0001..9999`; product clock задаёт только единый audit timestamp и не
+ограничивает месяц.
 
-1. Проверяет actor, source publication и отсутствие другого destination month.
-2. Создаёт destination `plan_month` и `plan_draft`.
-3. Копирует focus как editable draft value.
-4. Копирует goal snapshot configuration, analytical-series references, order и
-   `sourceProvenance` в editable draft goals.
-5. Копирует weekly planned task text и week ordinal.
-6. Не копирует facts, record revisions, statuses, notes/results, coverage,
-   progress, notification occurrences или reports.
-7. Сохраняет action history и command receipt.
+Durable executor до clock, membership и source read обрабатывает exact replay
+и fingerprint conflict. Для fresh command одна PostgreSQL transaction:
 
-Source publication и исходный month остаются immutable. Unique
-`(spaceId, year, month)` не позволяет создать второй destination month.
+1. Авторизует member и читает exact same-space source publication; missing и
+   foreign source одинаково дают `PlanPublicationNotFoundError`.
+2. Пытается создать unique destination `plan_month`. Любой уже существующий
+   destination status даёт `PlanMonthAlreadyExistsError(existingRef)` без
+   copy history и completed receipt; competing inserts сериализуются unique
+   constraint и создают ровно один destination.
+3. Создаёт `draft` с lifecycle/draft revision `1`, `facts_revision = 0`,
+   `active_publication_id = NULL` и source focus.
+4. Одним bounded set-based copy до `200` целей создаёт новые plan-goal и config
+   revision IDs. Из snapshot сохраняются definition version, analytical series,
+   order, scope/owner, exact config, provenance и stable component IDs, включая
+   weekly planned task text и ordinal.
+5. Добавляет finite `draft_copied` action,
+   `planning_month_copy_changes(sourcePublicationId, copiedGoalCount,
+   afterOrder)` и completed receipt в той же transaction.
+
+Migration `20260811153000_copy_month` deferred constraints связывают action,
+source publication, destination month/draft/goals и completed receipt; требуют
+same-space, обе destination revisions `1`, exact copied configuration/order и
+отсутствие лишних destination config revisions. Copy detail и участвующая
+publication history immutable; UPDATE/DELETE запрещены.
+
+Source publication и исходный month остаются byte-stable. Destination не
+получает publication metadata, preview/hash, calendars, expectations, periods,
+facts, statuses, notes/results, coverage, progress, notification occurrences
+или reports. Facts/corrections/reports до T01/E01 ещё отсутствуют в schema,
+поэтому P09 доказывает их структурное отсутствие; regression с populated source
+принадлежит T01/E01.
 
 ### 9.2. `PublishMonth`
 

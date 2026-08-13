@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto'
 
 import { Prisma } from '@/generated/prisma/client'
 import type { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
+import { CommandValidationError } from '@/shared/application/application-command'
 
 import type {
+  CreateDraftFromPublicationPersistenceInput,
   CreateDraftPersistenceInput,
   CreateDraftPersistenceResult,
   PlanDraftPersistencePort,
@@ -15,8 +17,23 @@ import {
   DraftRevisionConflictError,
   PlanDraftNotEditableError,
   PlanDraftNotFoundError,
+  PlanPublicationNotFoundError,
 } from '../application/planning-errors'
 import type { DraftView } from '../application/planning.types'
+
+type Client = Parameters<Parameters<PrismaClientProvider['withClient']>[0]>[0]
+
+export type DraftCopyWritePhase =
+  | 'month'
+  | 'draft'
+  | 'goal_roots'
+  | 'goal_revisions'
+  | 'goal_pointers'
+  | 'history'
+
+export type DraftCopyWriteObserver = (
+  phase: DraftCopyWritePhase,
+) => void | Promise<void>
 
 type DraftRow = {
   readonly plan_month_id: string
@@ -26,6 +43,13 @@ type DraftRow = {
   readonly focus: string
   readonly plan_month_revision: bigint
   readonly draft_revision: bigint
+}
+
+type CopySourceRow = {
+  readonly publication_id: string
+  readonly source_plan_month_id: string
+  readonly focus: string
+  readonly goal_count: number
 }
 
 function actorColumns(
@@ -64,7 +88,10 @@ function toDraftView(row: DraftRow): DraftView {
 }
 
 export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
-  public constructor(private readonly database: PrismaClientProvider) {}
+  public constructor(
+    private readonly database: PrismaClientProvider,
+    private readonly afterCopyWritePhase: DraftCopyWriteObserver = () => {},
+  ) {}
 
   public createEmptyDraft(
     input: CreateDraftPersistenceInput,
@@ -114,6 +141,148 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
         beforeFocus: null,
         afterFocus: input.focus,
       })
+      return {
+        status: 'created',
+        draft: { planMonthId, draftRevision: 1n },
+      }
+    })
+  }
+
+  public createFromPublication(
+    input: CreateDraftFromPublicationPersistenceInput,
+  ): Promise<CreateDraftPersistenceResult> {
+    return this.database.withClient(async (client) => {
+      const sourceRows = await client.$queryRaw<CopySourceRow[]>`
+        SELECT publication.id::text publication_id,
+               publication.plan_month_id::text source_plan_month_id,
+               publication.focus,
+               count(snapshot.id)::int goal_count
+          FROM plan_publications publication
+          LEFT JOIN plan_goal_snapshots snapshot
+            ON snapshot.publication_id = publication.id
+         WHERE publication.id = ${input.sourcePublicationId}::uuid
+           AND publication.space_id = ${input.spaceId}::uuid
+         GROUP BY publication.id
+      `
+      const source = sourceRows[0]
+      if (source === undefined) throw new PlanPublicationNotFoundError()
+      if (source.goal_count > 200) throw new CommandValidationError()
+
+      const planMonthId = randomUUID()
+      const inserted = await client.$queryRaw<{ readonly id: string }[]>`
+        INSERT INTO plan_months
+          (id, space_id, month_start, status, revision, facts_revision,
+           active_publication_id, created_at, updated_at)
+        VALUES
+          (${planMonthId}::uuid, ${input.spaceId}::uuid,
+           ${`${input.targetMonth}-01`}::date, 'draft', 1, 0, NULL,
+           ${input.occurredAt}, ${input.occurredAt})
+        ON CONFLICT (space_id, month_start) DO NOTHING
+        RETURNING id::text
+      `
+      if (inserted.length === 0) {
+        const existing = await this.findDraftRow(
+          client,
+          input.spaceId,
+          input.targetMonth,
+        )
+        if (existing === null) throw new PlanDraftNotFoundError()
+        return {
+          status: 'exists',
+          draft: {
+            planMonthId: existing.plan_month_id,
+            draftRevision: existing.draft_revision,
+          },
+        }
+      }
+      await this.afterCopyWritePhase('month')
+
+      await client.planDraft.create({
+        data: {
+          planMonthId,
+          focus: source.focus,
+          revision: 1n,
+          createdAt: input.occurredAt,
+          updatedAt: input.occurredAt,
+        },
+      })
+      await this.afterCopyWritePhase('draft')
+
+      await client.$executeRaw`
+        INSERT INTO plan_draft_goals
+          (id, space_id, plan_month_id, goal_definition_id, display_order,
+           current_revision_id, attached_at, detached_at, created_at, updated_at)
+        SELECT gen_random_uuid(), snapshot.space_id, ${planMonthId}::uuid,
+               snapshot.goal_definition_id, snapshot.display_order,
+               NULL, ${input.occurredAt}, NULL,
+               ${input.occurredAt}, ${input.occurredAt}
+          FROM plan_goal_snapshots snapshot
+         WHERE snapshot.publication_id = ${input.sourcePublicationId}::uuid
+         ORDER BY snapshot.display_order, snapshot.id
+      `
+      await this.afterCopyWritePhase('goal_roots')
+
+      await client.$executeRaw`
+        INSERT INTO plan_draft_goal_revisions
+          (id, plan_goal_id, space_id, goal_definition_id, revision_number,
+           goal_definition_version_id, goal_series_id, scope_kind,
+           owner_member_id, config, source_provenance, created_at)
+        SELECT gen_random_uuid(), root.id, root.space_id,
+               snapshot.goal_definition_id, 1,
+               snapshot.goal_definition_version_id, snapshot.goal_series_id,
+               snapshot.scope_kind, snapshot.owner_member_id,
+               snapshot.config, snapshot.source_provenance,
+               ${input.occurredAt}
+          FROM plan_goal_snapshots snapshot
+          JOIN plan_draft_goals root
+            ON root.plan_month_id = ${planMonthId}::uuid
+           AND root.display_order = snapshot.display_order
+           AND root.goal_definition_id = snapshot.goal_definition_id
+         WHERE snapshot.publication_id = ${input.sourcePublicationId}::uuid
+         ORDER BY snapshot.display_order, snapshot.id
+      `
+      await this.afterCopyWritePhase('goal_revisions')
+
+      await client.$executeRaw`
+        UPDATE plan_draft_goals root
+           SET current_revision_id = revision.id
+          FROM plan_draft_goal_revisions revision
+         WHERE root.plan_month_id = ${planMonthId}::uuid
+           AND revision.plan_goal_id = root.id
+           AND revision.revision_number = 1
+      `
+      await this.afterCopyWritePhase('goal_pointers')
+
+      const orderRows = await client.$queryRaw<{ readonly id: string }[]>`
+        SELECT id::text FROM plan_draft_goals
+         WHERE plan_month_id = ${planMonthId}::uuid AND detached_at IS NULL
+         ORDER BY display_order, id
+      `
+      const afterOrder = orderRows.map((row) => row.id)
+      const actor = actorColumns(input, input.memberId)
+      const actionId = randomUUID()
+      await client.$executeRaw`
+        INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+        VALUES
+          (${actionId}::uuid, 'draft_copied', ${actor.actorKind},
+           ${input.actorScope}, ${actor.memberId}::uuid,
+           ${actor.systemActorId}, ${planMonthId}::uuid, NULL,
+           ${input.commandType}, ${input.commandId}::uuid, NULL, 1,
+           ${input.occurredAt})
+      `
+      await client.$executeRaw`
+        INSERT INTO planning_month_copy_changes
+          (action_id, source_publication_id, copied_goal_count, after_order)
+        VALUES
+          (${actionId}::uuid, ${input.sourcePublicationId}::uuid,
+           ${source.goal_count}, ${afterOrder}::uuid[])
+      `
+      await this.afterCopyWritePhase('history')
+
       return {
         status: 'created',
         draft: { planMonthId, draftRevision: 1n },
@@ -187,7 +356,7 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
   }
 
   private async insertHistory(
-    client: Parameters<Parameters<PrismaClientProvider['withClient']>[0]>[0],
+    client: Client,
     identity: PlanningCommandIdentity & { readonly memberId: string },
     change: {
       readonly actionKind: 'draft_created' | 'month_focus_updated'
@@ -224,7 +393,7 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
   }
 
   private async findDraftRow(
-    client: Parameters<Parameters<PrismaClientProvider['withClient']>[0]>[0],
+    client: Client,
     spaceId: string,
     targetMonth: string,
   ): Promise<DraftRow | null> {
@@ -245,7 +414,7 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
   }
 
   private async findDraftById(
-    client: Parameters<Parameters<PrismaClientProvider['withClient']>[0]>[0],
+    client: Client,
     planMonthId: string,
     lock = false,
   ): Promise<DraftRow | null> {

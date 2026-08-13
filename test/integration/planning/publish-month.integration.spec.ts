@@ -1266,7 +1266,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
     await expectUnpublished(fixture.planMonthId)
   }
 
-  it('retains the exact P07 five-table inventory after the P08 extension', async () => {
+  it('retains the exact P07 five-table inventory after the P09 extension', async () => {
     const migrations = await pool.query<{ migration_name: string }>(
       `SELECT migration_name FROM _prisma_migrations ORDER BY migration_name`,
     )
@@ -1274,7 +1274,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       migration_name: '20260811151000_plan_publication',
     })
     expect(migrations.rows.at(-1)).toEqual({
-      migration_name: '20260811152000_cancel_republish',
+      migration_name: '20260811153000_copy_month',
     })
     const tables = await pool.query<{ table_name: string }>(`
       SELECT table_name FROM information_schema.tables
@@ -1546,6 +1546,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
         columns: ['plan_month_id', 'after_revision'],
         values: [
           'draft_created',
+          'draft_copied',
           'month_focus_updated',
           'draft_goal_added',
           'draft_goal_updated',
@@ -1771,6 +1772,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
        ORDER BY table_class.relname, index_class.relname
     `)
     const p08ChangedIndexes = new Set([
+      'planning_action_groups_draft_after_revision_key',
       'planning_action_groups_lifecycle_after_revision_key',
       'planning_publication_changes_publication_key',
       'planning_publication_changes_publication_kind_key',

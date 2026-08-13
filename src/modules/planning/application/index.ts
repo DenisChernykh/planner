@@ -1,4 +1,5 @@
 export * from './create-empty-draft.command'
+export * from './create-draft-from-publication.command'
 export * from './build-publication-preview.query'
 export * from './cancel-publication.command'
 export * from './draft-goal.commands'

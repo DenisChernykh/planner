@@ -1544,18 +1544,34 @@ notifications or progress.
 **Files:**
 
 - Create: `src/modules/planning/application/create-draft-from-publication.command.ts`
+- Modify: `src/modules/planning/application/planning.types.ts`
+- Modify: `src/modules/planning/application/planning-command.validation.ts`
+- Modify: `src/modules/planning/application/plan-draft-persistence.port.ts`
+- Modify: `src/modules/planning/application/planning-application.ts`
+- Modify: `src/modules/planning/application/index.ts`
+- Modify: `src/modules/planning/composition/create-planning-application.ts`
+- Modify: `src/modules/planning/infrastructure/prisma-plan-draft.persistence.ts`
+- Modify: `prisma/schema.prisma`
+- Create: `prisma/migrations/20260811153000_copy_month/migration.sql`
+- Test: `test/unit/planning/copy-month.spec.ts`
 - Test: `test/integration/planning/copy-month.integration.spec.ts`
-- Test: `test/e2e/planning/copy-month.e2e-spec.ts`
+- Test: `test/e2e/planning/copy-month.e2e.spec.ts`
+- Modify: `test/integration/planning/publish-month.integration.spec.ts`
 
-**Produces:** editable destination draft with unique space/month identity;
-source publication remains byte-for-byte immutable.
+**Produces:** exact `planning.create-draft-from-publication.v1`, editable
+revision-1 destination with unique space/month identity and immutable typed
+`draft_copied` audit. Source publication remains byte-for-byte immutable.
+Facts/corrections/reports ещё отсутствуют в schema; populated-source regression
+начинается в T01/E01, а P09 доказывает отсутствие derived publication children.
 
-- [ ] Написать RED fixture with records, corrections, weekly tasks and report
-  refs.
-- [ ] Реализовать idempotent atomic copy and destination conflict response.
-- [ ] Сравнить source hash before/after and prove copied facts absent.
-- [ ] Запустить focused integration/E2E.
-- [ ] Commit: `feat: copy published month into clean draft`.
+- [x] Написать RED exact-contract/authorization/unit fixture и real-PostgreSQL
+  fixture с archived definition, provenance, stable components и weekly task.
+- [x] Реализовать idempotent atomic bounded copy, safe destination conflict и
+  rollback после каждой write phase.
+- [x] Сравнить source digest/xmin before/after и доказать отсутствие
+  publication children в destination.
+- [x] Запустить focused unit/integration/application-E2E и P07/P08 regressions.
+- [x] Commit: `feat: copy published month into clean draft`.
 
 ### P10 — Versioned April seed
 

@@ -156,6 +156,7 @@ model PlanningActionGroup {
   goalCatalogChange PlanningGoalCatalogChange?
   draftGoalChange   PlanningDraftGoalChange?
   publicationChange PlanningPublicationChange?
+  monthCopyChange   PlanningMonthCopyChange?
 
   @@unique([actorScope, commandType, commandId])
   @@map("planning_action_groups")
@@ -350,6 +351,7 @@ model PlanPublication {
   publishedBy     Membership                  @relation(fields: [spaceId, publishedByMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_publications_publisher_fkey")
   goalSnapshots   PlanGoalSnapshot[]
   changes         PlanningPublicationChange[]
+  copiedDrafts    PlanningMonthCopyChange[]
 
   @@unique([planMonthId, publicationRevision], map: "plan_publications_month_revision_key")
   @@unique([planMonthId, id], map: "plan_publications_month_id_key")
@@ -444,4 +446,16 @@ model PlanningPublicationChange {
 
   @@unique([publicationId, changeKind], map: "planning_publication_changes_publication_kind_key")
   @@map("planning_publication_changes")
+}
+
+model PlanningMonthCopyChange {
+  actionId             String   @id @map("action_id") @db.Uuid
+  sourcePublicationId  String   @map("source_publication_id") @db.Uuid
+  copiedGoalCount      Int      @map("copied_goal_count")
+  afterOrder           String[] @map("after_order") @db.Uuid
+
+  action            PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sourcePublication PlanPublication      @relation(fields: [sourcePublicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("planning_month_copy_changes")
 }

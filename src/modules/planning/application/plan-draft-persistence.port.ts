@@ -25,6 +25,14 @@ export type UpdateFocusPersistenceInput = PlanningCommandIdentity & {
   readonly expectedRevision: bigint
 }
 
+export type CreateDraftFromPublicationPersistenceInput =
+  PlanningCommandIdentity & {
+    readonly spaceId: string
+    readonly memberId: string
+    readonly sourcePublicationId: string
+    readonly targetMonth: string
+  }
+
 export type PlanningDraftRef = {
   readonly planMonthId: string
   readonly draftRevision: bigint
@@ -37,6 +45,9 @@ export type CreateDraftPersistenceResult =
 export interface PlanDraftPersistencePort {
   createEmptyDraft(
     input: CreateDraftPersistenceInput,
+  ): Promise<CreateDraftPersistenceResult>
+  createFromPublication(
+    input: CreateDraftFromPublicationPersistenceInput,
   ): Promise<CreateDraftPersistenceResult>
   updateFocus(input: UpdateFocusPersistenceInput): Promise<PlanningDraftRef>
   findDraft(spaceId: string, targetMonth: string): Promise<DraftView | null>
