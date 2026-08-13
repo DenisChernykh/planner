@@ -538,14 +538,16 @@ model TrackingFactRecord {
 }
 
 model TrackingFactRevision {
-  id                 String   @id @db.Uuid
-  factRecordId       String   @map("fact_record_id") @db.Uuid
-  revisionNumber     BigInt   @map("revision_number") @db.BigInt
-  revisionKind       String   @map("revision_kind") @db.VarChar(16)
-  booleanResult      String?  @map("boolean_result") @db.VarChar(16)
-  quantityValue      String?  @map("quantity_value") @db.Text
-  recordedByMemberId String   @map("recorded_by_member_id") @db.Uuid
-  createdAt          DateTime @map("created_at") @db.Timestamptz(3)
+  id                 String    @id @db.Uuid
+  factRecordId       String    @map("fact_record_id") @db.Uuid
+  revisionNumber     BigInt    @map("revision_number") @db.BigInt
+  revisionKind       String    @map("revision_kind") @db.VarChar(16)
+  booleanResult      String?   @map("boolean_result") @db.VarChar(16)
+  quantityValue      String?   @map("quantity_value") @db.Text
+  actualTimeValue    DateTime? @map("actual_time_value") @db.Time(0)
+  ratingValue        BigInt?   @map("rating_value") @db.BigInt
+  recordedByMemberId String    @map("recorded_by_member_id") @db.Uuid
+  createdAt          DateTime  @map("created_at") @db.Timestamptz(3)
 
   factRecord    TrackingFactRecord   @relation("FactRecordRevisions", fields: [factRecordId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   currentFor    TrackingFactRecord?  @relation("CurrentFactRevision")

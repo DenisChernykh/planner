@@ -6,7 +6,11 @@ import { DurableCommandExecutor } from '@/shared/application/durable-command.exe
 import type { ProductClock } from '@/shared/application/product-clock'
 
 import { GetFactStateQuery } from '../application/get-fact-state.query'
+import { GetGoalProgressQuery } from '../application/get-goal-progress.query'
+import { RecordCheckpointCommand } from '../application/record-checkpoint.command'
 import { RecordFactCommand } from '../application/record-fact.command'
+import { RecordRatingCommand } from '../application/record-rating.command'
+import { RecordTimeCommand } from '../application/record-time.command'
 import type { TrackingApplication } from '../application/tracking-application'
 import { PrismaFactPersistence } from '../infrastructure/prisma-fact.persistence'
 
@@ -28,6 +32,25 @@ export function createTrackingApplication(dependencies: {
       dependencies.workspaceMembers,
       facts,
     ),
+    recordTime: new RecordTimeCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
+    recordRating: new RecordRatingCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
+    recordCheckpoint: new RecordCheckpointCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
     getFactState: new GetFactStateQuery(dependencies.workspaceMembers, facts),
+    getGoalProgress: new GetGoalProgressQuery(
+      dependencies.workspaceMembers,
+      facts,
+    ),
   })
 }

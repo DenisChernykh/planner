@@ -925,6 +925,45 @@ lock отклоняет legacy T01 command/result receipts и необъясни
 discriminator зарезервирован в revision schema для T05, но T01 command создаёт
 только `recorded` revisions.
 
+#### 7.6.2. T02 Time/rating/checkpoint extension
+
+T02 добавляет application-only команды `tracking.record-time.v1`,
+`tracking.record-rating.v1` и `tracking.record-checkpoint.v1`; все три
+возвращают `tracking.fact-record.v1` и используют тот же durable executor,
+membership boundary, owner rule и CAS revision chain, что T01. HTTP, OpenAPI и
+Telegram остаются границей H01/G03. Time и rating payload фиксируют
+`{ publicationId, planGoalSnapshotId, expectationDate, value }`, checkpoint
+добавляет обязательный stable `checkpointId` и discriminated Boolean/time/rating
+value. Create не принимает `expectedRevision`, correction требует текущую
+positive fact revision.
+
+`expectationDate` является частью identity и не выводится из времени ввода:
+overnight значение после полуночи можно связать с ожиданием предыдущего дня.
+Команда всё равно запрещает дату позже durable `occurredAt` в
+`Asia/Yekaterinburg`. Top-level time/rating в T02 требуют physical fixed goal
+expectation без checkpoints; flexible time/rating возвращают finite
+`unsupported` до writes, а composite occurrence остаётся T04. Checkpoint
+command адресует ровно physical
+`fixed_expectations(component_kind='checkpoint', component_id=checkpointId)`;
+поэтому разные checkpoints одной даты имеют независимые logical records,
+revisions и receipts. Rating обязан быть safe integer внутри опубликованного
+parent range, но minimum остаётся заполненным и достигнутым фактом. Для time
+любой canonical `HH:mm` от `00:00` до `23:59` сохраняется, PostgreSQL `24:00`
+отвергается, а попадание в обычный/overnight range вычисляет P05.
+
+Migration `20260811161000_time_rating_checkpoints` добавляет typed
+`actual_time_value TIME(0)` и `rating_value BIGINT`, расширяет finite fact и
+command discriminators и заменяет single-value identity на calendar-component
+keys. Обновлённые deferred checks связывают command kind, component identity,
+published config, typed revision, owner, month `facts_revision`, action и
+receipt; old T01 records остаются валидными и immutable.
+
+Read-only `GetGoalProgressQuery` строит channel-neutral P05 input только из
+immutable publication snapshot/calendar и current fact revisions. Он сохраняет
+отдельные checkpoint values, группирует quantity contributions и вызывает
+чистый `evaluateGoalProgress`; presentation query shapes для Today/Month будут
+добавлены T07/H01, а не T02.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:

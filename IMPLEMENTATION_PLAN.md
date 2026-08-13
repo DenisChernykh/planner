@@ -1688,13 +1688,13 @@ measurement; named checkpoints имеют independent facts and one parent score
 - Create: `src/modules/tracking/application/record-checkpoint.command.ts`
 - Test: `test/integration/tracking/time-rating-checkpoint.integration.spec.ts`
 
-- [ ] Написать RED cases cross-midnight range, prior expectation date, rating
+- [x] Написать RED cases cross-midnight range, prior expectation date, rating
   min/max и incomplete/all checkpoints.
-- [ ] Реализовать typed values/revisions and P05 evaluator wiring.
-- [ ] Доказать, что low rating не failure, а checkpoint completion влияет на
+- [x] Реализовать typed values/revisions and P05 evaluator wiring.
+- [x] Доказать, что low rating не failure, а checkpoint completion влияет на
   coverage/score.
-- [ ] Запустить focused integration и `pnpm check:quick`.
-- [ ] Commit: `feat: record time rating and checkpoints`.
+- [x] Запустить focused integration и `pnpm check:quick`.
+- [x] Commit: `feat: record time rating and checkpoints`.
 
 ### T03 — Text and checklist facts
 

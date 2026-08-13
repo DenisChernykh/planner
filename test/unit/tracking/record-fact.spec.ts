@@ -84,6 +84,8 @@ function facts(
   return {
     record: () => Promise.reject(new Error('unexpected record')),
     getState: () => Promise.reject(new Error('unexpected state')),
+    getGoalProgressInput: () =>
+      Promise.reject(new Error('unexpected progress input')),
     ...overrides,
   }
 }
@@ -137,6 +139,7 @@ describe('T01 record fact application boundary', () => {
         spaceId,
         memberId,
         expectedRevision: null,
+        checkpointId: null,
         publicationId,
         planGoalSnapshotId: snapshotId,
         localDate: '2026-04-10',

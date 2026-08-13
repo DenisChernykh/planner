@@ -106,6 +106,7 @@ export class RecordFactCommand {
             spaceId: member.spaceId,
             memberId: member.memberId,
             expectedRevision: snapshot.expectedRevision ?? null,
+            checkpointId: null,
             ...snapshot.payload,
           })
           return Object.freeze({

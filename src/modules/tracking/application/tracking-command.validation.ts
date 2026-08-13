@@ -1,17 +1,29 @@
-import type { ActorRef } from '@/shared/application/application-command'
+import type {
+  ActorRef,
+  ApplicationCommand,
+} from '@/shared/application/application-command'
 import { CommandValidationError } from '@/shared/application/application-command'
 
 import type {
   GetFactStateInput,
+  GetGoalProgressInput,
+  RecordCheckpointApplicationCommand,
+  RecordCheckpointPayload,
+  RecordCheckpointValueV1,
   RecordFactApplicationCommand,
   RecordFactPayload,
   RecordFactValueV1,
+  RecordRatingApplicationCommand,
+  RecordRatingPayload,
+  RecordTimeApplicationCommand,
+  RecordTimePayload,
 } from './tracking.types'
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const DECIMAL = /^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u
 const LOCAL_DATE = /^([0-9]{4})-(0[1-9]|1[0-2])-([0-9]{2})$/u
+const LOCAL_TIME = /^([01][0-9]|2[0-3]):([0-5][0-9])$/u
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return (
@@ -95,6 +107,18 @@ export function localDateAt(value: Date): string {
   )
 }
 
+export function canonicalLocalTime(value: unknown): string {
+  if (typeof value !== 'string' || !LOCAL_TIME.test(value)) {
+    throw new CommandValidationError()
+  }
+  return value
+}
+
+function safeRating(value: unknown): number {
+  if (!Number.isSafeInteger(value)) throw new CommandValidationError()
+  return value as number
+}
+
 function factValue(value: unknown): RecordFactValueV1 {
   if (!isRecord(value)) throw new CommandValidationError()
   const kind = ownData(value, 'kind')
@@ -130,6 +154,38 @@ function payload(value: unknown): RecordFactPayload {
     planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
     localDate: canonicalLocalDate(ownData(value, 'localDate')),
     value: factValue(ownData(value, 'value')),
+  })
+}
+
+function expectedRevision(value: Record<string, unknown>): bigint | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(value, 'expectedRevision')
+  if (descriptor === undefined) return undefined
+  if (!descriptor.enumerable || !('value' in descriptor)) {
+    throw new CommandValidationError()
+  }
+  const revision: unknown = descriptor.value
+  if (typeof revision !== 'bigint' || revision <= 0n) {
+    throw new CommandValidationError()
+  }
+  return revision
+}
+
+function commandEnvelope<TPayload>(
+  value: unknown,
+  readPayload: (payloadValue: unknown) => TPayload,
+): ApplicationCommand<TPayload> {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(
+    value,
+    ['commandId', 'trustedActor', 'payload'],
+    ['expectedRevision'],
+  )
+  const revision = expectedRevision(value)
+  return Object.freeze({
+    commandId: uuid(ownData(value, 'commandId')),
+    trustedActor: actor(ownData(value, 'trustedActor')),
+    ...(revision === undefined ? {} : { expectedRevision: revision }),
+    payload: readPayload(ownData(value, 'payload')),
   })
 }
 
@@ -169,6 +225,117 @@ export function snapshotRecordFactCommand(
   return Object.freeze(snapshot)
 }
 
+function timePayload(value: unknown): RecordTimePayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'publicationId',
+    'planGoalSnapshotId',
+    'expectationDate',
+    'value',
+  ])
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
+    expectationDate: canonicalLocalDate(ownData(value, 'expectationDate')),
+    value: canonicalLocalTime(ownData(value, 'value')),
+  })
+}
+
+function ratingPayload(value: unknown): RecordRatingPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'publicationId',
+    'planGoalSnapshotId',
+    'expectationDate',
+    'value',
+  ])
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
+    expectationDate: canonicalLocalDate(ownData(value, 'expectationDate')),
+    value: safeRating(ownData(value, 'value')),
+  })
+}
+
+function checkpointValue(value: unknown): RecordCheckpointValueV1 {
+  if (!isRecord(value)) throw new CommandValidationError()
+  const kind = ownData(value, 'kind')
+  if (kind === 'boolean') {
+    exactKeys(value, ['kind', 'result'])
+    const result = ownData(value, 'result')
+    if (result !== 'done' && result !== 'not_done') {
+      throw new CommandValidationError()
+    }
+    return Object.freeze({ kind, result })
+  }
+  if (kind === 'actual_time') {
+    exactKeys(value, ['kind', 'value'])
+    return Object.freeze({
+      kind,
+      value: canonicalLocalTime(ownData(value, 'value')),
+    })
+  }
+  if (kind === 'rating') {
+    exactKeys(value, ['kind', 'value'])
+    return Object.freeze({ kind, value: safeRating(ownData(value, 'value')) })
+  }
+  throw new CommandValidationError()
+}
+
+function checkpointPayload(value: unknown): RecordCheckpointPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'publicationId',
+    'planGoalSnapshotId',
+    'expectationDate',
+    'checkpointId',
+    'value',
+  ])
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
+    expectationDate: canonicalLocalDate(ownData(value, 'expectationDate')),
+    checkpointId: uuid(ownData(value, 'checkpointId')),
+    value: checkpointValue(ownData(value, 'value')),
+  })
+}
+
+export function snapshotRecordTimeCommand(
+  value: unknown,
+): RecordTimeApplicationCommand {
+  return commandEnvelope(value, timePayload)
+}
+
+export function snapshotRecordRatingCommand(
+  value: unknown,
+): RecordRatingApplicationCommand {
+  return commandEnvelope(value, ratingPayload)
+}
+
+export function snapshotRecordCheckpointCommand(
+  value: unknown,
+): RecordCheckpointApplicationCommand {
+  return commandEnvelope(value, checkpointPayload)
+}
+
+export function canonicalRecordTimePayload(
+  value: RecordTimePayload,
+): RecordTimePayload {
+  return timePayload(value)
+}
+
+export function canonicalRecordRatingPayload(
+  value: RecordRatingPayload,
+): RecordRatingPayload {
+  return ratingPayload(value)
+}
+
+export function canonicalRecordCheckpointPayload(
+  value: RecordCheckpointPayload,
+): RecordCheckpointPayload {
+  return checkpointPayload(value)
+}
+
 export function canonicalRecordFactPayload(value: RecordFactPayload): {
   readonly publicationId: string
   readonly planGoalSnapshotId: string
@@ -193,5 +360,23 @@ export function snapshotGetFactStateInput(value: unknown): GetFactStateInput {
     publicationId: uuid(ownData(value, 'publicationId')),
     planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
     localDate: canonicalLocalDate(ownData(value, 'localDate')),
+  })
+}
+
+export function snapshotGetGoalProgressInput(
+  value: unknown,
+): GetGoalProgressInput {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'trustedActor',
+    'publicationId',
+    'planGoalSnapshotId',
+    'asOfLocalDate',
+  ])
+  return Object.freeze({
+    trustedActor: actor(ownData(value, 'trustedActor')),
+    publicationId: uuid(ownData(value, 'publicationId')),
+    planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
+    asOfLocalDate: canonicalLocalDate(ownData(value, 'asOfLocalDate')),
   })
 }
