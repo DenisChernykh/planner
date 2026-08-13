@@ -68,3 +68,49 @@ export class TrackingDependencyUnavailableError extends Error {
     this.name = 'TrackingDependencyUnavailableError'
   }
 }
+
+export class CloseDayTargetNotFoundError extends Error {
+  public constructor() {
+    super('CloseDay target was not found')
+    this.name = 'CloseDayTargetNotFoundError'
+  }
+}
+
+export type CloseDayTargetUnavailableReason =
+  'not_active' | 'future_date' | 'not_applicable' | 'closed'
+
+export class CloseDayTargetUnavailableError extends Error {
+  public constructor(public readonly reason: CloseDayTargetUnavailableReason) {
+    super(`CloseDay target is unavailable: ${reason}`)
+    this.name = 'CloseDayTargetUnavailableError'
+  }
+}
+
+export class CloseDayRevisionConflictError extends Error {
+  public constructor(
+    public readonly expectedRevision: bigint,
+    public readonly currentRevision: bigint,
+  ) {
+    super('CloseDay facts revision is stale')
+    this.name = 'CloseDayRevisionConflictError'
+  }
+}
+
+export class CloseDayPreviewConflictError extends Error {
+  public constructor() {
+    super('CloseDay preview no longer matches the unresolved set')
+    this.name = 'CloseDayPreviewConflictError'
+  }
+}
+
+export type ExistingDayCloseRef = {
+  readonly dayCloseId: string
+  readonly revision: bigint
+}
+
+export class CloseDayAlreadyClosedError extends Error {
+  public constructor(public readonly existingRef: ExistingDayCloseRef) {
+    super('Day was already closed by this member')
+    this.name = 'CloseDayAlreadyClosedError'
+  }
+}

@@ -95,6 +95,7 @@ type MutationTargetRow = {
 
 type UndoTargetRow = {
   readonly id: string
+  readonly fact_kind: StateRow['fact_kind']
   readonly current_revision_id: string
   readonly revision_number: bigint
   readonly plan_month_id: string
@@ -135,6 +136,7 @@ type StateRow = {
     | 'text'
     | 'checklist_item'
     | 'or_variant'
+    | 'fixed_not_done'
   readonly contribution_id: string | null
   readonly checklist_item_id: string | null
   readonly or_variant_id: string | null
@@ -148,6 +150,7 @@ type StateRow = {
   readonly text_result: 'done' | 'not_done' | null
   readonly checklist_item_state: 'done' | 'not_done' | null
   readonly or_variant_value: string | null
+  readonly fixed_outcome: 'not_done' | null
   readonly recorded_by_member_id: string
 }
 
@@ -285,6 +288,8 @@ function assertMutationValue(
       }
       return
     }
+    case 'fixed_not_done':
+      throw new FactTargetUnavailableError('unsupported')
   }
 }
 
@@ -556,6 +561,22 @@ export function projectFactValue(
 ): GoalFactValueV1 {
   const first = rows[0]
   if (first === undefined) throw new Error('Stored fact group is empty')
+  if (first.component_kind === 'checklist_item') {
+    const items = rows.map((row) => {
+      const itemId = row.checklist_item_id ?? row.component_id
+      const state =
+        row.fact_kind === 'fixed_not_done'
+          ? row.fixed_outcome
+          : row.fact_kind === 'checklist_item'
+            ? row.checklist_item_state
+            : null
+      if (itemId === null || (state !== 'done' && state !== 'not_done')) {
+        throw new Error('Stored checklist fact group is invalid')
+      }
+      return { itemId, state }
+    })
+    return { kind: 'checklist', items }
+  }
   if (first.fact_kind === 'quantity_add') {
     const contributions = rows.map((row) => {
       if (
@@ -641,6 +662,11 @@ export function projectFactValue(
         text: first.text_value,
         result: first.text_result,
       }
+    case 'fixed_not_done':
+      if (first.fixed_outcome !== 'not_done') {
+        throw new Error('Stored fixed outcome is invalid')
+      }
+      return { kind: 'not_done' }
     default:
       throw new Error('Stored fact kind is invalid')
   }
@@ -1045,6 +1071,9 @@ export class PrismaFactPersistence implements FactPersistencePort {
       `
       const target = rows[0]
       if (target === undefined) throw new FactTargetNotFoundError()
+      if (target.fact_kind === 'fixed_not_done') {
+        throw new FactTargetUnavailableError('unsupported')
+      }
       if (
         target.status === 'closed' ||
         input.currentLocalDate > target.correction_deadline
@@ -1192,7 +1221,8 @@ export class PrismaFactPersistence implements FactPersistencePort {
          FOR UPDATE
       `
       const targetRows = await client.$queryRaw<UndoTargetRow[]>`
-        SELECT record.id::text, record.current_revision_id::text,
+        SELECT record.id::text, record.fact_kind,
+               record.current_revision_id::text,
                revision.revision_number, record.plan_month_id::text,
                month.facts_revision, month.status,
                month.active_publication_id::text,
@@ -1213,6 +1243,9 @@ export class PrismaFactPersistence implements FactPersistencePort {
       `
       const target = targetRows[0]
       if (target === undefined) throw new FactTargetNotFoundError()
+      if (target.fact_kind === 'fixed_not_done') {
+        throw new FactTargetUnavailableError('unsupported')
+      }
       if (
         target.status === 'closed' ||
         input.currentLocalDate > target.correction_deadline
@@ -1401,6 +1434,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
                revision.text_value, revision.text_result,
                revision.checklist_item_state,
                revision.or_variant_value,
+               revision.fixed_outcome,
                revision.recorded_by_member_id::text
           FROM tracking_fact_records record
           JOIN tracking_fact_revisions revision
@@ -1413,6 +1447,19 @@ export class PrismaFactPersistence implements FactPersistencePort {
            AND record.plan_goal_snapshot_id = ${input.planGoalSnapshotId}::uuid
            AND record.local_date = ${input.localDate}::date
            AND revision.revision_kind = 'recorded'
+           AND (
+             record.fact_kind <> 'fixed_not_done'
+             OR NOT EXISTS (
+               SELECT 1
+                 FROM tracking_fact_records typed_record
+                 JOIN tracking_fact_revisions typed_revision
+                   ON typed_revision.id = typed_record.current_revision_id
+                WHERE typed_record.fixed_expectation_id =
+                      record.fixed_expectation_id
+                  AND typed_record.fact_kind <> 'fixed_not_done'
+                  AND typed_revision.revision_kind = 'recorded'
+             )
+           )
            AND (
              record.fixed_expectation_id IS NULL
              OR EXISTS (
@@ -1504,6 +1551,17 @@ export class PrismaFactPersistence implements FactPersistencePort {
           result: first.text_result,
           recordedByMemberId: first.recorded_by_member_id,
         }
+      } else if (first?.fact_kind === 'fixed_not_done') {
+        if (first.fixed_outcome !== 'not_done' || rows.length !== 1) {
+          throw new Error('Stored fixed not_done state is invalid')
+        }
+        fact = {
+          kind: 'fixed_not_done',
+          factRecordId: first.fact_record_id,
+          revision: first.revision_number,
+          result: 'not_done',
+          recordedByMemberId: first.recorded_by_member_id,
+        }
       }
       return freeze({
         publicationId: input.publicationId,
@@ -1556,6 +1614,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
                revision.text_value, revision.text_result,
                revision.checklist_item_state,
                revision.or_variant_value,
+               revision.fixed_outcome,
                revision.recorded_by_member_id::text,
                expectation.component_kind,
                expectation.component_id::text
@@ -1568,6 +1627,19 @@ export class PrismaFactPersistence implements FactPersistencePort {
            AND record.plan_goal_snapshot_id = ${input.planGoalSnapshotId}::uuid
            AND record.local_date <= ${input.asOfLocalDate}::date
            AND revision.revision_kind = 'recorded'
+           AND (
+             record.fact_kind <> 'fixed_not_done'
+             OR NOT EXISTS (
+               SELECT 1
+                 FROM tracking_fact_records typed_record
+                 JOIN tracking_fact_revisions typed_revision
+                   ON typed_revision.id = typed_record.current_revision_id
+                WHERE typed_record.fixed_expectation_id =
+                      record.fixed_expectation_id
+                  AND typed_record.fact_kind <> 'fixed_not_done'
+                  AND typed_revision.revision_kind = 'recorded'
+             )
+           )
          ORDER BY record.local_date, expectation.component_kind,
                   expectation.component_id, record.created_at, record.id
       `
@@ -1575,7 +1647,6 @@ export class PrismaFactPersistence implements FactPersistencePort {
       const groups = new Map<string, ProgressFactRow[]>()
       for (const row of rows) {
         const key =
-          row.fact_kind === 'checklist_item' &&
           row.component_kind === 'checklist_item'
             ? [row.local_date, 'top-level-checklist'].join(':')
             : [
@@ -1597,13 +1668,14 @@ export class PrismaFactPersistence implements FactPersistencePort {
       >()
       for (const group of groups.values()) {
         const first = group[0]!
-        if (first.fact_kind === 'checklist_item') {
+        if (first.component_kind === 'checklist_item') {
           group.sort(
             (left, right) =>
-              (projected.checklistItemOrder.get(left.checklist_item_id ?? '') ??
-                -1) -
               (projected.checklistItemOrder.get(
-                right.checklist_item_id ?? '',
+                left.checklist_item_id ?? left.component_id ?? '',
+              ) ?? -1) -
+              (projected.checklistItemOrder.get(
+                right.checklist_item_id ?? right.component_id ?? '',
               ) ?? -1),
           )
         } else if (first.fact_kind === 'or_variant') {

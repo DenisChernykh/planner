@@ -85,7 +85,7 @@ export function commandFingerprintPreimage<TPayload, K extends string>(
     (hasExpectedRevision && typeof command.expectedRevision !== 'bigint') ||
     (!hasExpectedRevision && command.expectedRevision !== undefined) ||
     (typeof command.expectedRevision === 'bigint' &&
-      command.expectedRevision <= 0n)
+      command.expectedRevision < 0n)
   ) {
     throw new CommandValidationError()
   }

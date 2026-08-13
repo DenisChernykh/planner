@@ -29,7 +29,7 @@ import type {
   TrackingPublishedReadV1,
   TrackingViewerAccessV1,
 } from '../application/tracking-read.types'
-import type { RecordSingleFactValueV1 } from '../application/tracking.types'
+import type { TrackingStoredFactValueV1 } from '../application/tracking.types'
 import {
   projectEvaluationSnapshot,
   projectFactValue,
@@ -124,6 +124,14 @@ type FactRow = ProgressFactRow & {
   readonly after_facts_revision: bigint
 }
 
+type ClosureRow = {
+  readonly local_date: string
+  readonly action_id: string
+  readonly after_facts_revision: bigint
+  readonly occurred_at: Date
+  readonly closed_count: number
+}
+
 type ProjectedGoal = {
   readonly row: GoalRow
   readonly config: GoalConfigV1
@@ -210,7 +218,6 @@ function groupEvaluationFacts(
   const groups = new Map<string, FactRow[]>()
   for (const row of recorded) {
     const key =
-      row.fact_kind === 'checklist_item' &&
       row.component_kind === 'checklist_item'
         ? [row.local_date, 'top-level-checklist'].join(':')
         : [
@@ -232,13 +239,15 @@ function groupEvaluationFacts(
   >()
   for (const group of groups.values()) {
     const first = group[0]!
-    if (first.fact_kind === 'checklist_item') {
+    if (first.component_kind === 'checklist_item') {
       group.sort(
         (left, right) =>
-          (projected.checklistItemOrder.get(left.checklist_item_id ?? '') ??
-            -1) -
-          (projected.checklistItemOrder.get(right.checklist_item_id ?? '') ??
-            -1),
+          (projected.checklistItemOrder.get(
+            left.checklist_item_id ?? left.component_id ?? '',
+          ) ?? -1) -
+          (projected.checklistItemOrder.get(
+            right.checklist_item_id ?? right.component_id ?? '',
+          ) ?? -1),
       )
     } else if (first.fact_kind === 'or_variant') {
       group.sort(
@@ -301,6 +310,25 @@ function groupEvaluationFacts(
   return Object.freeze(facts)
 }
 
+function effectiveFacts(rows: readonly FactRow[]): readonly FactRow[] {
+  const typedRecordedExpectations = new Set(
+    rows
+      .filter(
+        (row) =>
+          row.fixed_expectation_id !== null &&
+          row.fact_kind !== 'fixed_not_done' &&
+          row.revision_kind === 'recorded',
+      )
+      .map((row) => row.fixed_expectation_id!),
+  )
+  return rows.filter(
+    (row) =>
+      row.fact_kind !== 'fixed_not_done' ||
+      row.fixed_expectation_id === null ||
+      !typedRecordedExpectations.has(row.fixed_expectation_id),
+  )
+}
+
 function storedRating(value: string): number {
   const result = Number(value)
   if (!Number.isSafeInteger(result)) {
@@ -309,7 +337,7 @@ function storedRating(value: string): number {
   return result
 }
 
-function factValue(row: FactRow): RecordSingleFactValueV1 | null {
+function factValue(row: FactRow): TrackingStoredFactValueV1 | null {
   if (row.revision_kind === 'tombstoned') return null
   switch (row.fact_kind) {
     case 'boolean':
@@ -342,6 +370,11 @@ function factValue(row: FactRow): RecordSingleFactValueV1 | null {
     case 'or_variant':
       if (row.or_variant_value === null) throw new Error('Invalid OR fact')
       return { kind: 'or_variant', value: row.or_variant_value }
+    case 'fixed_not_done':
+      if (row.fixed_outcome !== 'not_done') {
+        throw new Error('Invalid fixed not_done fact')
+      }
+      return { kind: 'fixed_not_done', result: 'not_done' }
   }
 }
 
@@ -389,6 +422,9 @@ function expectationState(
 ): TrackingExpectationStateV1 {
   const recorded = rows.filter((row) => row.revision_kind === 'recorded')
   if (recorded.length === 0) return 'no_data'
+  if (recorded.some((row) => row.fact_kind === 'fixed_not_done')) {
+    return 'not_done'
+  }
   if (componentKind === 'checklist_item') {
     const row = recorded.find((item) => item.checklist_item_id === componentId)
     return row?.checklist_item_state ?? 'no_data'
@@ -684,8 +720,9 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
       readonly late_publication: boolean
     },
   ): Promise<TrackingPublishedReadV1> {
-    const [goalRows, expectations, periods, facts] = await Promise.all([
-      client.$queryRaw<GoalRow[]>`
+    const [goalRows, expectations, periods, storedFacts, closures] =
+      await Promise.all([
+        client.$queryRaw<GoalRow[]>`
         SELECT id::text plan_goal_snapshot_id,
                goal_series_id::text source_goal_series_id,
                title, why, category, display_order,
@@ -695,7 +732,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
          ORDER BY display_order, id
          LIMIT ${MAX_GOALS + 1}
       `,
-      client.$queryRaw<ExpectationRow[]>`
+        client.$queryRaw<ExpectationRow[]>`
         SELECT id::text fixed_expectation_id,
                plan_goal_snapshot_id::text,
                expectation_date::text, component_kind,
@@ -706,7 +743,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
                   component_kind, component_id, id
          LIMIT ${MAX_MATERIALIZED_UNITS + 1}
       `,
-      client.$queryRaw<PeriodRow[]>`
+        client.$queryRaw<PeriodRow[]>`
         SELECT id::text flexible_period_id,
                plan_goal_snapshot_id::text, period_kind, ordinal,
                period_start::text, period_end::text, period_days,
@@ -716,7 +753,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
          ORDER BY plan_goal_snapshot_id, ordinal, id
          LIMIT ${MAX_MATERIALIZED_UNITS + 1}
       `,
-      client.$queryRaw<FactRow[]>`
+        client.$queryRaw<FactRow[]>`
         SELECT record.id::text fact_record_id,
                record.plan_goal_snapshot_id::text,
                record.fact_kind,
@@ -732,6 +769,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
                revision.text_value, revision.text_result,
                revision.checklist_item_state,
                revision.or_variant_value,
+               revision.fixed_outcome,
                revision.recorded_by_member_id::text,
                expectation.component_kind,
                expectation.component_id::text,
@@ -748,12 +786,23 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
          ORDER BY action.after_facts_revision, record.id
          LIMIT ${MAX_CURRENT_RECORDS + 1}
       `,
-    ])
+        client.$queryRaw<ClosureRow[]>`
+        SELECT detail.local_date::text, detail.action_id::text,
+               action.after_facts_revision, action.occurred_at,
+               detail.closed_count
+          FROM tracking_day_closures detail
+          JOIN tracking_action_groups action ON action.id = detail.action_id
+         WHERE detail.publication_id = ${header.publication_id}::uuid
+           AND detail.member_id = ${input.memberId}::uuid
+         ORDER BY detail.local_date
+      `,
+      ])
+    const facts = effectiveFacts(storedFacts)
     assertTrackingReadBounds({
       goals: goalRows.length,
       fixedExpectations: expectations.length,
       flexiblePeriods: periods.length,
-      currentRecords: facts.length,
+      currentRecords: storedFacts.length,
     })
 
     const factsByGoal = new Map<string, FactRow[]>()
@@ -814,6 +863,9 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
         else values.push(row)
       }
     }
+    const closuresByDate = new Map(
+      closures.map((row) => [row.local_date, row] as const),
+    )
 
     const allDates = monthDates(input.targetMonth)
     const dates =
@@ -994,6 +1046,24 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
       }
       return {
         localDate: date,
+        closure: (() => {
+          const closure = closuresByDate.get(date)
+          return closure === undefined
+            ? {
+                state: 'open' as const,
+                dayCloseId: null,
+                revision: null,
+                closedAt: null,
+                closedCount: null,
+              }
+            : {
+                state: 'closed' as const,
+                dayCloseId: closure.action_id,
+                revision: closure.after_facts_revision,
+                closedAt: new Date(closure.occurred_at.getTime()),
+                closedCount: closure.closed_count,
+              }
+        })(),
         state: aggregateDayState(
           date,
           input.queryLocalDate,

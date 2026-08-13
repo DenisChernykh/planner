@@ -200,6 +200,13 @@ function installTrackingSchemas(document: OpenAPIObject): void {
       },
       ['kind', 'value'],
     ),
+    TrackingFixedNotDoneFactValueV1: object(
+      {
+        kind: { type: 'string', enum: ['fixed_not_done'] },
+        result: { type: 'string', enum: ['not_done'] },
+      },
+      ['kind', 'result'],
+    ),
   }
   Object.assign(schemas, factValues)
   schemas['TrackingFactValueV1'] = oneOf(Object.keys(factValues), 'kind')
@@ -218,6 +225,7 @@ function installTrackingSchemas(document: OpenAPIObject): void {
           'text',
           'checklist_item',
           'or_variant',
+          'fixed_not_done',
         ],
       },
       contributionId: nullableUuid,
@@ -333,6 +341,23 @@ function installTrackingSchemas(document: OpenAPIObject): void {
   schemas['TrackingDayReadV1'] = object(
     {
       localDate: date,
+      closure: object(
+        {
+          state: { type: 'string', enum: ['open', 'closed'] },
+          dayCloseId: nullableUuid,
+          revision: { oneOf: [positive, { enum: [null] }] },
+          closedAt: {
+            oneOf: [{ type: 'string', format: 'date-time' }, { enum: [null] }],
+          },
+          closedCount: {
+            oneOf: [
+              { type: 'integer', minimum: 0, maximum: 10000 },
+              { enum: [null] },
+            ],
+          },
+        },
+        ['state', 'dayCloseId', 'revision', 'closedAt', 'closedCount'],
+      ),
       state: dayState,
       coverage: ref('TrackingCoverageV1'),
       goals: {
@@ -341,7 +366,7 @@ function installTrackingSchemas(document: OpenAPIObject): void {
         items: ref('TrackingDayGoalV1'),
       },
     },
-    ['localDate', 'state', 'coverage', 'goals'],
+    ['localDate', 'closure', 'state', 'coverage', 'goals'],
   )
   schemas['TrackingGoalReadV1'] = object(
     {

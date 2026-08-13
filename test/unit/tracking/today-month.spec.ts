@@ -194,6 +194,13 @@ describe('T07 Today and Month application queries', () => {
   it('maps the selected published day into Today without changing facts', async () => {
     const day = {
       localDate: '2026-04-10',
+      closure: {
+        state: 'open' as const,
+        dayCloseId: null,
+        revision: null,
+        closedAt: null,
+        closedCount: null,
+      },
       state: 'not_applicable' as const,
       coverage: { filled: '0', applicable: '0' },
       goals: [],

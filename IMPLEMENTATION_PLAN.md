@@ -1810,14 +1810,14 @@ unresolved fixed expectations в `not_done`; flexible and weekly planned tasks
 - Create: `src/modules/tracking/application/preview-close-day.query.ts`
 - Create: `src/modules/tracking/application/close-day.command.ts`
 - Test: `test/integration/tracking/close-day.integration.spec.ts`
-- Test: `test/e2e/tracking/close-day.e2e-spec.ts`
+- Test: `test/e2e/tracking/close-day.e2e.spec.ts`
 
-- [ ] Написать RED cases cancel, replay, preview race, already closed,
+- [x] Написать RED cases cancel, replay, preview race, already closed,
   `no_data` versus `not_done` and flexible exclusion.
-- [ ] Реализовать preview set hash/revision и one-transaction confirmation.
-- [ ] Проверить idempotent result replay before CAS.
-- [ ] Запустить focused integration/E2E.
-- [ ] Commit: `feat: close unresolved daily expectations`.
+- [x] Реализовать preview set hash/revision и one-transaction confirmation.
+- [x] Проверить idempotent result replay before CAS.
+- [x] Запустить focused integration/E2E.
+- [x] Commit: `feat: close unresolved daily expectations`.
 
 ### T09 — Weekly planned task user result
 

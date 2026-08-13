@@ -4,7 +4,7 @@ import type { GoalProgressResult } from '@/modules/progress'
 import type { CanonicalExactRatio } from '@/modules/progress'
 import type { ActorRef } from '@/shared/application/application-command'
 
-import type { RecordSingleFactValueV1 } from './tracking.types'
+import type { TrackingStoredFactValueV1 } from './tracking.types'
 
 export type GetTodayInput = {
   readonly trustedActor: ActorRef
@@ -35,11 +35,12 @@ export type TrackingFactReadV1 = {
     | 'text'
     | 'checklist_item'
     | 'or_variant'
+    | 'fixed_not_done'
   readonly contributionId: string | null
   readonly checklistItemId: string | null
   readonly orVariantId: string | null
   readonly revisionKind: 'recorded' | 'tombstoned'
-  readonly value: RecordSingleFactValueV1 | null
+  readonly value: TrackingStoredFactValueV1 | null
   readonly recordedByMemberId: string
 }
 
@@ -91,6 +92,13 @@ export type TrackingGoalReadV1 = {
 
 export type TrackingDayReadV1 = {
   readonly localDate: string
+  readonly closure: {
+    readonly state: 'open' | 'closed'
+    readonly dayCloseId: string | null
+    readonly revision: bigint | null
+    readonly closedAt: Date | null
+    readonly closedCount: number | null
+  }
   readonly state: TrackingDayStateV1
   readonly coverage: { readonly filled: string; readonly applicable: string }
   readonly goals: readonly TrackingDayGoalV1[]

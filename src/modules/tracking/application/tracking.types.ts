@@ -50,6 +50,14 @@ export type RecordSingleFactValueV1 =
   | ChecklistItemFactValueV1
   | OrVariantFactValueV1
 
+export type FixedNotDoneFactValueV1 = {
+  readonly kind: 'fixed_not_done'
+  readonly result: 'not_done'
+}
+
+export type TrackingStoredFactValueV1 =
+  RecordSingleFactValueV1 | FixedNotDoneFactValueV1
+
 export type RecordCheckpointValueV1 =
   BooleanFactValueV1 | ActualTimeFactValueV1 | RatingFactValueV1
 
@@ -263,6 +271,14 @@ export type OrVariantFactStateV1 = {
   readonly recordedByMemberId: string
 }
 
+export type FixedNotDoneFactStateV1 = {
+  readonly kind: 'fixed_not_done'
+  readonly factRecordId: string
+  readonly revision: bigint
+  readonly result: 'not_done'
+  readonly recordedByMemberId: string
+}
+
 export type FactValueStateV1 =
   | BooleanFactStateV1
   | QuantityAddFactStateV1
@@ -272,6 +288,7 @@ export type FactValueStateV1 =
   | TextFactStateV1
   | ChecklistItemFactStateV1
   | OrVariantFactStateV1
+  | FixedNotDoneFactStateV1
 
 export type FactStateV1 = {
   readonly publicationId: string

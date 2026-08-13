@@ -3476,6 +3476,71 @@
       "TrackingDayReadV1": {
         "additionalProperties": false,
         "properties": {
+          "closure": {
+            "additionalProperties": false,
+            "properties": {
+              "closedAt": {
+                "oneOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "enum": [
+                      null
+                    ]
+                  }
+                ]
+              },
+              "closedCount": {
+                "oneOf": [
+                  {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "enum": [
+                      null
+                    ]
+                  }
+                ]
+              },
+              "dayCloseId": {
+                "nullable": true,
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "revision": {
+                "oneOf": [
+                  {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  {
+                    "enum": [
+                      null
+                    ]
+                  }
+                ]
+              },
+              "state": {
+                "enum": [
+                  "open",
+                  "closed"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "state",
+              "dayCloseId",
+              "revision",
+              "closedAt",
+              "closedCount"
+            ],
+            "type": "object"
+          },
           "coverage": {
             "$ref": "#/components/schemas/TrackingCoverageV1"
           },
@@ -3504,6 +3569,7 @@
         },
         "required": [
           "localDate",
+          "closure",
           "state",
           "coverage",
           "goals"
@@ -3560,7 +3626,8 @@
               "rating",
               "text",
               "checklist_item",
-              "or_variant"
+              "or_variant",
+              "fixed_not_done"
             ],
             "type": "string"
           },
@@ -3639,6 +3706,9 @@
           },
           {
             "$ref": "#/components/schemas/TrackingOrFactValueV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingFixedNotDoneFactValueV1"
           }
         ]
       },
@@ -3685,6 +3755,28 @@
           "componentId",
           "state",
           "facts"
+        ],
+        "type": "object"
+      },
+      "TrackingFixedNotDoneFactValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "fixed_not_done"
+            ],
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "not_done"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "result"
         ],
         "type": "object"
       },

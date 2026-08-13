@@ -18,12 +18,15 @@ import { RecordOrVariantCommand } from '../application/record-or-variant.command
 import { RecordTimeCommand } from '../application/record-time.command'
 import { RecordTextCommand } from '../application/record-text.command'
 import { UndoLastOwnActionCommand } from '../application/undo-last-own-action.command'
+import { CloseDayCommand } from '../application/close-day.command'
+import { PreviewCloseDayQuery } from '../application/preview-close-day.query'
 import {
   GetMonthQuery,
   GetTodayQuery,
 } from '../application/tracking-read.query'
 import type { TrackingApplication } from '../application/tracking-application'
 import { PrismaFactPersistence } from '../infrastructure/prisma-fact.persistence'
+import { PrismaCloseDayPersistence } from '../infrastructure/prisma-close-day.persistence'
 import { PrismaTrackingReadPersistence } from '../infrastructure/prisma-tracking-read.persistence'
 
 export function createTrackingApplication(dependencies: {
@@ -33,6 +36,7 @@ export function createTrackingApplication(dependencies: {
   readonly clock: ProductClock
 }): TrackingApplication {
   const facts = new PrismaFactPersistence(dependencies.database)
+  const closeDays = new PrismaCloseDayPersistence(dependencies.database)
   const reads = new PrismaTrackingReadPersistence(dependencies.database)
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
@@ -40,6 +44,17 @@ export function createTrackingApplication(dependencies: {
     dependencies.clock,
   )
   return Object.freeze({
+    closeDay: new CloseDayCommand(
+      executor,
+      dependencies.workspaceMembers,
+      closeDays,
+    ),
+    previewCloseDay: new PreviewCloseDayQuery(
+      dependencies.workspaceMembers,
+      closeDays,
+      dependencies.transaction,
+      dependencies.clock,
+    ),
     correctRecord: new CorrectRecordCommand(
       executor,
       dependencies.workspaceMembers,

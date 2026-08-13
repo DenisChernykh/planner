@@ -34,12 +34,20 @@ import type {
   UndoLastOwnActionApplicationCommand,
   UndoLastOwnActionPayload,
 } from './tracking.types'
+import {
+  CLOSE_DAY_PREVIEW_HASH_VERSION,
+  CLOSE_DAY_PREVIEW_SCHEMA_VERSION,
+  type CloseDayApplicationCommand,
+  type CloseDayPayload,
+  type PreviewCloseDayInput,
+} from './close-day.types'
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const DECIMAL = /^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u
 const LOCAL_DATE = /^([0-9]{4})-(0[1-9]|1[0-2])-([0-9]{2})$/u
 const LOCAL_TIME = /^([01][0-9]|2[0-3]):([0-5][0-9])$/u
+const SHA256 = /^[0-9a-f]{64}$/u
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return (
@@ -125,6 +133,13 @@ export function localDateAt(value: Date): string {
 
 export function canonicalLocalTime(value: unknown): string {
   if (typeof value !== 'string' || !LOCAL_TIME.test(value)) {
+    throw new CommandValidationError()
+  }
+  return value
+}
+
+function sha256(value: unknown): string {
+  if (typeof value !== 'string' || !SHA256.test(value)) {
     throw new CommandValidationError()
   }
   return value
@@ -586,6 +601,61 @@ export function snapshotUndoLastOwnActionCommand(
   return mutationEnvelope(value, undoLastOwnActionPayload)
 }
 
+function closeDayPayload(value: unknown): CloseDayPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'publicationId',
+    'localDate',
+    'previewSchemaVersion',
+    'previewHashVersion',
+    'previewHash',
+  ])
+  const previewSchemaVersion = ownData(value, 'previewSchemaVersion')
+  const previewHashVersion = ownData(value, 'previewHashVersion')
+  if (
+    previewSchemaVersion !== CLOSE_DAY_PREVIEW_SCHEMA_VERSION ||
+    previewHashVersion !== CLOSE_DAY_PREVIEW_HASH_VERSION
+  ) {
+    throw new CommandValidationError()
+  }
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    localDate: canonicalLocalDate(ownData(value, 'localDate')),
+    previewSchemaVersion,
+    previewHashVersion,
+    previewHash: sha256(ownData(value, 'previewHash')),
+  })
+}
+
+export function snapshotCloseDayCommand(
+  value: unknown,
+): CloseDayApplicationCommand & { readonly expectedRevision: bigint } {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, ['commandId', 'trustedActor', 'expectedRevision', 'payload'])
+  const revision = ownData(value, 'expectedRevision')
+  if (typeof revision !== 'bigint' || revision < 0n) {
+    throw new CommandValidationError()
+  }
+  return Object.freeze({
+    commandId: uuid(ownData(value, 'commandId')),
+    trustedActor: actor(ownData(value, 'trustedActor')),
+    expectedRevision: revision,
+    payload: closeDayPayload(ownData(value, 'payload')),
+  })
+}
+
+export function snapshotPreviewCloseDayInput(
+  value: unknown,
+): PreviewCloseDayInput {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, ['trustedActor', 'publicationId', 'localDate'])
+  return Object.freeze({
+    trustedActor: actor(ownData(value, 'trustedActor')),
+    publicationId: uuid(ownData(value, 'publicationId')),
+    localDate: canonicalLocalDate(ownData(value, 'localDate')),
+  })
+}
+
 export function canonicalRecordTimePayload(
   value: RecordTimePayload,
 ): RecordTimePayload {
@@ -644,6 +714,12 @@ export function canonicalUndoLastOwnActionPayload(
   value: UndoLastOwnActionPayload,
 ): UndoLastOwnActionPayload {
   return undoLastOwnActionPayload(value)
+}
+
+export function canonicalCloseDayPayload(
+  value: CloseDayPayload,
+): CloseDayPayload {
+  return closeDayPayload(value)
 }
 
 export function canonicalRecordFactPayload(value: RecordFactPayload): {

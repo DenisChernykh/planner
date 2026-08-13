@@ -1357,12 +1357,34 @@ republish являются разными durable intents. Records всегда 
 
 ### 9.4. `CloseDay`
 
-Команда сначала возвращает preview unresolved fixed expectations. Подтверждение
-передаёт preview revision/token. Transaction повторно проверяет набор и одним
-action group переводит оставшиеся фиксированные units в `not_done`.
+T08 добавляет channel-neutral `PreviewCloseDayQuery` и durable
+`tracking.close-day.v1`. Участник может явно закрыть текущую или прошедшую
+применимую дату active publication до обычной correction deadline: в месяце
+`published` и в grace-дни 1–3. Пропущенный день автоматически не меняется:
+после deadline он остаётся `no_data` без возможности ручного CloseDay.
 
-Flexible weekly/monthly goals и weekly planned tasks не получают daily
-`not_done`. Повтор команды возвращает сохранённый результат.
+Preview содержит actor-relative ordered set unresolved fixed expectations,
+`factsRevision` и versioned SHA-256 hash. В набор входят personal ожидания
+участника и shared; personal партнёра, flexible weekly/monthly goals и
+`weekly_planned_task` исключаются. Любая current recorded typed revision,
+включая частичное значение, считается заполнением; tombstone снова делает
+expectation unresolved.
+
+Подтверждение одной transaction блокирует month, повторно проверяет active
+publication, membership, local date, effective `published|grace`, correction
+deadline, CAS и exact preview hash. Один `day_closed` action создаёт отдельные
+generic `fixed_not_done` records для оставшегося набора, переводит их pointers,
+увеличивает `facts_revision` ровно один раз и связывает multi-effect history,
+immutable closure detail и completed receipt. Пустой exact set всё равно
+создаёт closure marker и revision step. Unique `(publication_id, local_date,
+member_id)` запрещает второй intent; exact command replay возвращает receipt.
+
+Последующая typed запись перекрывает generic marker в P05 и T07 projections;
+её tombstone или Undo снова проявляет `not_done`. Generic marker нельзя
+адресовать correction/delete/Undo. Month/Today возвращают viewer-relative
+closure metadata, но полная audit history остаётся вне read model. Migration
+`20260811166000_close_day` сохраняет populated T01–T07 rows и deferred-проверяет
+set, ownership, dates, adjacent facts revision, effects и receipt.
 
 ### 9.5. `CloseWeek`
 

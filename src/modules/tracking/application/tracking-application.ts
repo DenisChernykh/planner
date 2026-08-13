@@ -12,12 +12,16 @@ import type { RecordTimeCommand } from './record-time.command'
 import type { RecordTextCommand } from './record-text.command'
 import type { UndoLastOwnActionCommand } from './undo-last-own-action.command'
 import type { GetMonthQuery, GetTodayQuery } from './tracking-read.query'
+import type { CloseDayCommand } from './close-day.command'
+import type { PreviewCloseDayQuery } from './preview-close-day.query'
 
 export const TRACKING_APPLICATION: unique symbol = Symbol(
   'TRACKING_APPLICATION',
 )
 
 export type TrackingApplication = {
+  readonly closeDay: CloseDayCommand
+  readonly previewCloseDay: PreviewCloseDayQuery
   readonly correctRecord: CorrectRecordCommand
   readonly deleteRecord: DeleteRecordCommand
   readonly recordFact: RecordFactCommand

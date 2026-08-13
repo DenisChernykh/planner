@@ -5,17 +5,20 @@ import type {
 
 type JsonBigInts<T> = T extends bigint
   ? string
-  : T extends readonly (infer Item)[]
-    ? readonly JsonBigInts<Item>[]
-    : T extends object
-      ? { readonly [Key in keyof T]: JsonBigInts<T[Key]> }
-      : T
+  : T extends Date
+    ? string
+    : T extends readonly (infer Item)[]
+      ? readonly JsonBigInts<Item>[]
+      : T extends object
+        ? { readonly [Key in keyof T]: JsonBigInts<T[Key]> }
+        : T
 
 export type TrackingMonthResponseV1 = JsonBigInts<TrackingMonthReadModelV1>
 export type TrackingTodayResponseV1 = JsonBigInts<TrackingTodayReadModelV1>
 
 function jsonValue(value: unknown): unknown {
   if (typeof value === 'bigint') return value.toString(10)
+  if (value instanceof Date) return value.toISOString()
   if (Array.isArray(value)) return Object.freeze(value.map(jsonValue))
   if (value !== null && typeof value === 'object') {
     return Object.freeze(

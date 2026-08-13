@@ -52,6 +52,7 @@ model Membership {
   createdFactRecords      TrackingFactRecord[]      @relation("FactRecordCreator")
   recordedFactRevisions   TrackingFactRevision[]    @relation("FactRevisionActor")
   trackingActions         TrackingActionGroup[]
+  dayClosures             TrackingDayClosure[]
 
   @@unique([spaceId, slot])
   @@unique([spaceId, id])
@@ -367,6 +368,7 @@ model PlanPublication {
   copiedDrafts    PlanningMonthCopyChange[]
   factRecords     TrackingFactRecord[]
   trackingActions TrackingActionGroup[]
+  dayClosures     TrackingDayClosure[]
 
   @@unique([planMonthId, publicationRevision], map: "plan_publications_month_revision_key")
   @@unique([planMonthId, id], map: "plan_publications_month_id_key")
@@ -552,6 +554,7 @@ model TrackingFactRevision {
   textResult         String?   @map("text_result") @db.VarChar(16)
   checklistItemState String?   @map("checklist_item_state") @db.VarChar(16)
   orVariantValue     String?   @map("or_variant_value") @db.Text
+  fixedOutcome       String?   @map("fixed_outcome") @db.VarChar(16)
   recordedByMemberId String    @map("recorded_by_member_id") @db.Uuid
   createdAt          DateTime  @map("created_at") @db.Timestamptz(3)
 
@@ -576,7 +579,7 @@ model TrackingActionGroup {
   spaceId             String   @map("space_id") @db.Uuid
   planMonthId         String   @map("plan_month_id") @db.Uuid
   publicationId       String   @map("publication_id") @db.Uuid
-  planGoalSnapshotId  String   @map("plan_goal_snapshot_id") @db.Uuid
+  planGoalSnapshotId  String?  @map("plan_goal_snapshot_id") @db.Uuid
   commandType         String   @map("command_type") @db.VarChar(128)
   commandId           String   @map("command_id") @db.Uuid
   beforeFactsRevision BigInt   @map("before_facts_revision") @db.BigInt
@@ -588,11 +591,12 @@ model TrackingActionGroup {
   space            Space                   @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   planMonth        PlanMonth               @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
   publication      PlanPublication         @relation(fields: [planMonthId, publicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict)
-  planGoalSnapshot PlanGoalSnapshot        @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict)
+  planGoalSnapshot PlanGoalSnapshot?       @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict)
   commandReceipt   CommandReceipt          @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
-  factChange       TrackingFactChange?
+  factChanges      TrackingFactChange[]
   undoChange       TrackingFactUndoChange? @relation("UndoAction")
   undoneBy         TrackingFactUndoChange? @relation("UndoneAction")
+  dayClosure       TrackingDayClosure?
 
   @@unique([actorScope, commandType, commandId])
   @@unique([planMonthId, afterFactsRevision], map: "tracking_action_groups_month_facts_revision_key")
@@ -600,7 +604,7 @@ model TrackingActionGroup {
 }
 
 model TrackingFactChange {
-  actionId         String  @id @map("action_id") @db.Uuid
+  actionId         String  @map("action_id") @db.Uuid
   factRecordId     String  @map("fact_record_id") @db.Uuid
   beforeRevisionId String? @map("before_revision_id") @db.Uuid
   afterRevisionId  String  @unique(map: "tracking_fact_changes_after_revision_key") @map("after_revision_id") @db.Uuid
@@ -610,6 +614,7 @@ model TrackingFactChange {
   beforeRevision TrackingFactRevision? @relation("FactChangeBeforeRevision", fields: [factRecordId, beforeRevisionId], references: [factRecordId, id], onDelete: Restrict, onUpdate: Restrict)
   afterRevision  TrackingFactRevision  @relation("FactChangeAfterRevision", fields: [factRecordId, afterRevisionId], references: [factRecordId, id], onDelete: Restrict, onUpdate: Restrict)
 
+  @@id([actionId, factRecordId])
   @@map("tracking_fact_changes")
 }
 
@@ -623,4 +628,23 @@ model TrackingFactUndoChange {
   restoredFromRevision TrackingFactRevision? @relation(fields: [restoredFromRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@map("tracking_fact_undo_changes")
+}
+
+model TrackingDayClosure {
+  actionId             String   @id @map("action_id") @db.Uuid
+  publicationId        String   @map("publication_id") @db.Uuid
+  localDate            DateTime @map("local_date") @db.Date
+  memberId             String   @map("member_id") @db.Uuid
+  previewSchemaVersion String   @map("preview_schema_version") @db.VarChar(100)
+  previewHashVersion   String   @map("preview_hash_version") @db.VarChar(100)
+  previewHash          String   @map("preview_hash") @db.Char(64)
+  expectationIds       String[] @map("expectation_ids") @db.Uuid
+  closedCount          Int      @map("closed_count")
+
+  action      TrackingActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  publication PlanPublication     @relation(fields: [publicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  member      Membership          @relation(fields: [memberId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([publicationId, localDate, memberId], map: "tracking_day_closures_target_key")
+  @@map("tracking_day_closures")
 }
