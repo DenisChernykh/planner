@@ -6,6 +6,7 @@ import { CommandValidationError } from '@/shared/application/application-command
 
 import type {
   CreateDraftFromPublicationPersistenceInput,
+  CreateDraftFromSeedPersistenceInput,
   CreateDraftPersistenceInput,
   CreateDraftPersistenceResult,
   PlanDraftPersistencePort,
@@ -14,6 +15,7 @@ import type {
   UpdateFocusPersistenceInput,
 } from '../application/plan-draft-persistence.port'
 import {
+  PlanSeedAlreadyConsumedError,
   DraftRevisionConflictError,
   PlanDraftNotEditableError,
   PlanDraftNotFoundError,
@@ -35,6 +37,22 @@ export type DraftCopyWriteObserver = (
   phase: DraftCopyWritePhase,
 ) => void | Promise<void>
 
+export type SeedDraftWritePhase =
+  | 'month'
+  | 'draft'
+  | 'definitions'
+  | 'series'
+  | 'definition_versions'
+  | 'goal_roots'
+  | 'goal_revisions'
+  | 'goal_pointers'
+  | 'action'
+  | 'consumption'
+
+export type SeedDraftWriteObserver = (
+  phase: SeedDraftWritePhase,
+) => void | Promise<void>
+
 type DraftRow = {
   readonly plan_month_id: string
   readonly space_id: string
@@ -50,6 +68,27 @@ type CopySourceRow = {
   readonly source_plan_month_id: string
   readonly focus: string
   readonly goal_count: number
+}
+
+type SeedConsumptionRow = {
+  readonly plan_month_id: string
+  readonly seed_version: number
+}
+
+type SeedMaterializedGoal = {
+  readonly definition_id: string
+  readonly series_id: string
+  readonly version_id: string
+  readonly plan_goal_id: string
+  readonly goal_revision_id: string
+  readonly display_order: number
+  readonly title: string
+  readonly why: string
+  readonly category: string
+  readonly scope_kind: 'personal' | 'shared'
+  readonly owner_member_id: string | null
+  readonly config: unknown
+  readonly source_provenance: unknown
 }
 
 function actorColumns(
@@ -91,6 +130,7 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
   public constructor(
     private readonly database: PrismaClientProvider,
     private readonly afterCopyWritePhase: DraftCopyWriteObserver = () => {},
+    private readonly afterSeedWritePhase: SeedDraftWriteObserver = () => {},
   ) {}
 
   public createEmptyDraft(
@@ -282,6 +322,219 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
            ${source.goal_count}, ${afterOrder}::uuid[])
       `
       await this.afterCopyWritePhase('history')
+
+      return {
+        status: 'created',
+        draft: { planMonthId, draftRevision: 1n },
+      }
+    })
+  }
+
+  public createFromSeed(
+    input: CreateDraftFromSeedPersistenceInput,
+  ): Promise<CreateDraftPersistenceResult> {
+    if (
+      input.seed.seedId !== 'april-plan' ||
+      input.seed.seedVersion !== 1 ||
+      input.seed.schemaVersion !== 'planner.april-plan-seed.v1' ||
+      input.seed.goals.length !== 41 ||
+      input.seed.goals.length > 200
+    ) {
+      throw new CommandValidationError()
+    }
+
+    return this.database.withClient(async (client) => {
+      await client.$queryRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${`planning.seed:${input.spaceId}:${input.seed.seedId}`}, 0)
+        )::text AS locked
+      `
+      const consumed = await client.$queryRaw<SeedConsumptionRow[]>`
+        SELECT plan_month_id::text, seed_version
+          FROM planning_seed_consumptions
+         WHERE space_id = ${input.spaceId}::uuid
+           AND seed_id = ${input.seed.seedId}
+      `
+      const existingConsumption = consumed[0]
+      if (existingConsumption !== undefined) {
+        throw new PlanSeedAlreadyConsumedError(
+          existingConsumption.plan_month_id,
+          input.seed.seedId,
+          1,
+        )
+      }
+
+      const planMonthId = randomUUID()
+      const inserted = await client.$queryRaw<{ readonly id: string }[]>`
+        INSERT INTO plan_months
+          (id, space_id, month_start, status, revision, facts_revision,
+           active_publication_id, created_at, updated_at)
+        VALUES
+          (${planMonthId}::uuid, ${input.spaceId}::uuid,
+           ${`${input.targetMonth}-01`}::date, 'draft', 1, 0, NULL,
+           ${input.occurredAt}, ${input.occurredAt})
+        ON CONFLICT (space_id, month_start) DO NOTHING
+        RETURNING id::text
+      `
+      if (inserted.length === 0) {
+        const existing = await this.findDraftRow(
+          client,
+          input.spaceId,
+          input.targetMonth,
+        )
+        if (existing === null) throw new PlanDraftNotFoundError()
+        return {
+          status: 'exists',
+          draft: {
+            planMonthId: existing.plan_month_id,
+            draftRevision: existing.draft_revision,
+          },
+        }
+      }
+      await this.afterSeedWritePhase('month')
+
+      await client.planDraft.create({
+        data: {
+          planMonthId,
+          focus: input.seed.focus,
+          revision: 1n,
+          createdAt: input.occurredAt,
+          updatedAt: input.occurredAt,
+        },
+      })
+      await this.afterSeedWritePhase('draft')
+
+      const goals: readonly SeedMaterializedGoal[] = input.seed.goals.map(
+        (goal, displayOrder) => {
+          const scope = goal.config.scope
+          return {
+            definition_id: randomUUID(),
+            series_id: randomUUID(),
+            version_id: randomUUID(),
+            plan_goal_id: randomUUID(),
+            goal_revision_id: randomUUID(),
+            display_order: displayOrder,
+            title: goal.title,
+            why: goal.why,
+            category: goal.category,
+            scope_kind: scope.kind,
+            owner_member_id:
+              scope.kind === 'personal' ? scope.ownerMemberId : null,
+            config: goal.config,
+            source_provenance: goal.sourceProvenance,
+          }
+        },
+      )
+      const serializedGoals = JSON.stringify(goals)
+
+      await client.$executeRaw`
+        INSERT INTO goal_definitions
+          (id, space_id, state, revision, created_at, updated_at, archived_at)
+        SELECT goal.definition_id, ${input.spaceId}::uuid,
+               'active', 1, ${input.occurredAt}, ${input.occurredAt}, NULL
+          FROM jsonb_to_recordset(${serializedGoals}::jsonb) AS goal(
+            definition_id uuid
+          )
+      `
+      await this.afterSeedWritePhase('definitions')
+
+      await client.$executeRaw`
+        INSERT INTO goal_series (id, goal_definition_id, created_at)
+        SELECT goal.series_id, goal.definition_id, ${input.occurredAt}
+          FROM jsonb_to_recordset(${serializedGoals}::jsonb) AS goal(
+            definition_id uuid, series_id uuid
+          )
+      `
+      await this.afterSeedWritePhase('series')
+
+      await client.$executeRaw`
+        INSERT INTO goal_definition_versions
+          (id, goal_definition_id, version_number, goal_series_id,
+           series_decision, title, why, category, created_at)
+        SELECT goal.version_id, goal.definition_id, 1, goal.series_id,
+               'new', goal.title, goal.why, goal.category, ${input.occurredAt}
+          FROM jsonb_to_recordset(${serializedGoals}::jsonb) AS goal(
+            definition_id uuid, series_id uuid, version_id uuid,
+            title text, why text, category text
+          )
+      `
+      await this.afterSeedWritePhase('definition_versions')
+
+      await client.$executeRaw`
+        INSERT INTO plan_draft_goals
+          (id, space_id, plan_month_id, goal_definition_id, display_order,
+           current_revision_id, attached_at, detached_at, created_at, updated_at)
+        SELECT goal.plan_goal_id, ${input.spaceId}::uuid, ${planMonthId}::uuid,
+               goal.definition_id, goal.display_order, NULL,
+               ${input.occurredAt}, NULL, ${input.occurredAt}, ${input.occurredAt}
+          FROM jsonb_to_recordset(${serializedGoals}::jsonb) AS goal(
+            definition_id uuid, plan_goal_id uuid, display_order integer
+          )
+         ORDER BY goal.display_order
+      `
+      await this.afterSeedWritePhase('goal_roots')
+
+      await client.$executeRaw`
+        INSERT INTO plan_draft_goal_revisions
+          (id, plan_goal_id, space_id, goal_definition_id, revision_number,
+           goal_definition_version_id, goal_series_id, scope_kind,
+           owner_member_id, config, source_provenance, created_at)
+        SELECT goal.goal_revision_id, goal.plan_goal_id, ${input.spaceId}::uuid,
+               goal.definition_id, 1, goal.version_id, goal.series_id,
+               goal.scope_kind, goal.owner_member_id, goal.config,
+               goal.source_provenance, ${input.occurredAt}
+          FROM jsonb_to_recordset(${serializedGoals}::jsonb) AS goal(
+            definition_id uuid, series_id uuid, version_id uuid,
+            plan_goal_id uuid, goal_revision_id uuid, scope_kind text,
+            owner_member_id uuid, config jsonb, source_provenance jsonb
+          )
+      `
+      await this.afterSeedWritePhase('goal_revisions')
+
+      await client.$executeRaw`
+        UPDATE plan_draft_goals root
+           SET current_revision_id = goal.goal_revision_id
+          FROM jsonb_to_recordset(${serializedGoals}::jsonb) AS goal(
+            plan_goal_id uuid, goal_revision_id uuid
+          )
+         WHERE root.id = goal.plan_goal_id
+           AND root.plan_month_id = ${planMonthId}::uuid
+      `
+      await this.afterSeedWritePhase('goal_pointers')
+
+      const actionId = randomUUID()
+      const actor = actorColumns(input, input.memberId)
+      await client.$executeRaw`
+        INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+        VALUES
+          (${actionId}::uuid, 'draft_created_from_seed', ${actor.actorKind},
+           ${input.actorScope}, ${actor.memberId}::uuid,
+           ${actor.systemActorId}, ${planMonthId}::uuid, NULL,
+           ${input.commandType}, ${input.commandId}::uuid, NULL, 1,
+           ${input.occurredAt})
+      `
+      await this.afterSeedWritePhase('action')
+
+      const goalDefinitionIds = goals.map((goal) => goal.definition_id)
+      const afterOrder = goals.map((goal) => goal.plan_goal_id)
+      await client.$executeRaw`
+        INSERT INTO planning_seed_consumptions
+          (action_id, space_id, plan_month_id, seed_id, seed_version,
+           seed_schema_version, actor_persona, member_a_member_id,
+           member_b_member_id, seeded_goal_count, goal_definition_ids,
+           after_order)
+        VALUES
+          (${actionId}::uuid, ${input.spaceId}::uuid, ${planMonthId}::uuid,
+           ${input.seed.seedId}, ${input.seed.seedVersion},
+           ${input.seed.schemaVersion}, ${input.actorPersona},
+           ${input.denisMemberId}::uuid, ${input.tanyaMemberId}::uuid,
+           ${goals.length}, ${goalDefinitionIds}::uuid[], ${afterOrder}::uuid[])
+      `
+      await this.afterSeedWritePhase('consumption')
 
       return {
         status: 'created',

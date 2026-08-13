@@ -7,6 +7,7 @@ import type { ProductClock } from '@/shared/application/product-clock'
 
 import { CreateEmptyDraftCommand } from '../application/create-empty-draft.command'
 import { CreateDraftFromPublicationCommand } from '../application/create-draft-from-publication.command'
+import { CreateDraftFromSeedCommand } from '../application/create-draft-from-seed.command'
 import { BuildPublicationPreviewQuery } from '../application/build-publication-preview.query'
 import {
   AddDraftGoalCommand,
@@ -38,6 +39,7 @@ import { PrismaPlanDraftPersistence } from '../infrastructure/prisma-plan-draft.
 import { PrismaDraftGoalPersistence } from '../infrastructure/prisma-draft-goal.persistence'
 import { PrismaGoalCatalogPersistence } from '../infrastructure/prisma-goal-catalog.persistence'
 import { PrismaPublicationPersistence } from '../infrastructure/prisma-publication.persistence'
+import { PrismaSeedOwnerBinding } from '../infrastructure/prisma-seed-owner-binding'
 
 export function createPlanningApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -49,6 +51,7 @@ export function createPlanningApplication(dependencies: {
   const draftGoals = new PrismaDraftGoalPersistence(dependencies.database)
   const catalog = new PrismaGoalCatalogPersistence(dependencies.database)
   const publications = new PrismaPublicationPersistence(dependencies.database)
+  const seedOwnerBindings = new PrismaSeedOwnerBinding(dependencies.database)
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -63,6 +66,12 @@ export function createPlanningApplication(dependencies: {
     createDraftFromPublication: new CreateDraftFromPublicationCommand(
       executor,
       dependencies.workspaceMembers,
+      drafts,
+    ),
+    createDraftFromSeed: new CreateDraftFromSeedCommand(
+      executor,
+      dependencies.workspaceMembers,
+      seedOwnerBindings,
       drafts,
     ),
     updateMonthFocus: new UpdateMonthFocusCommand(

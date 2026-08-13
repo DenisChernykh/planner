@@ -1266,7 +1266,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
     await expectUnpublished(fixture.planMonthId)
   }
 
-  it('retains the exact P07 five-table inventory after the P09 extension', async () => {
+  it('retains the exact P07 five-table inventory after the P11 extension', async () => {
     const migrations = await pool.query<{ migration_name: string }>(
       `SELECT migration_name FROM _prisma_migrations ORDER BY migration_name`,
     )
@@ -1274,7 +1274,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       migration_name: '20260811151000_plan_publication',
     })
     expect(migrations.rows.at(-1)).toEqual({
-      migration_name: '20260811153000_copy_month',
+      migration_name: '20260811155000_seed_consumption',
     })
     const tables = await pool.query<{ table_name: string }>(`
       SELECT table_name FROM information_schema.tables
@@ -1547,6 +1547,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
         values: [
           'draft_created',
           'draft_copied',
+          'draft_created_from_seed',
           'month_focus_updated',
           'draft_goal_added',
           'draft_goal_updated',

@@ -18,6 +18,17 @@ export class PlanMonthAlreadyExistsError extends Error {
   }
 }
 
+export class PlanSeedAlreadyConsumedError extends Error {
+  public constructor(
+    public readonly planMonthId: string,
+    public readonly seedId: 'april-plan',
+    public readonly seedVersion: 1,
+  ) {
+    super('The April plan seed has already been consumed in this space')
+    this.name = 'PlanSeedAlreadyConsumedError'
+  }
+}
+
 export class PlanDraftNotFoundError extends Error {
   public constructor() {
     super('Plan draft was not found')

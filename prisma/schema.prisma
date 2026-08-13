@@ -26,6 +26,7 @@ model Space {
   memberships     Membership[]
   planMonths      PlanMonth[]
   goalDefinitions GoalDefinition[]
+  seedConsumptions PlanningSeedConsumption[]
 
   @@map("spaces")
 }
@@ -44,6 +45,8 @@ model Membership {
   ownedDraftGoalRevisions PlanDraftGoalRevision[]
   publishedPlans          PlanPublication[]
   ownedGoalSnapshots      PlanGoalSnapshot[]
+  denisSeedBindings       PlanningSeedConsumption[] @relation("SeedDenisMember")
+  tanyaSeedBindings       PlanningSeedConsumption[] @relation("SeedTanyaMember")
 
   @@unique([spaceId, slot])
   @@unique([spaceId, id])
@@ -98,6 +101,7 @@ model PlanMonth {
   draftGoals        PlanDraftGoal[]
   publications      PlanPublication[]
   activePublication PlanPublication?      @relation("ActivePlanPublication", fields: [id, activePublicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_months_active_publication_fkey")
+  seedConsumption   PlanningSeedConsumption?
 
   @@unique([spaceId, monthStart])
   @@unique([spaceId, id])
@@ -157,6 +161,7 @@ model PlanningActionGroup {
   draftGoalChange   PlanningDraftGoalChange?
   publicationChange PlanningPublicationChange?
   monthCopyChange   PlanningMonthCopyChange?
+  seedConsumption   PlanningSeedConsumption?
 
   @@unique([actorScope, commandType, commandId])
   @@map("planning_action_groups")
@@ -458,4 +463,29 @@ model PlanningMonthCopyChange {
   sourcePublication PlanPublication      @relation(fields: [sourcePublicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@map("planning_month_copy_changes")
+}
+
+model PlanningSeedConsumption {
+  actionId             String   @id @map("action_id") @db.Uuid
+  spaceId              String   @map("space_id") @db.Uuid
+  planMonthId          String   @unique @map("plan_month_id") @db.Uuid
+  seedId               String   @map("seed_id") @db.VarChar(64)
+  seedVersion          Int      @map("seed_version")
+  seedSchemaVersion    String   @map("seed_schema_version") @db.VarChar(128)
+  actorPersona         String   @map("actor_persona") @db.VarChar(16)
+  denisMemberId        String   @map("member_a_member_id") @db.Uuid
+  tanyaMemberId        String   @map("member_b_member_id") @db.Uuid
+  seededGoalCount      Int      @map("seeded_goal_count")
+  goalDefinitionIds    String[] @map("goal_definition_ids") @db.Uuid
+  afterOrder           String[] @map("after_order") @db.Uuid
+
+  action      PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  space       Space               @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  planMonth   PlanMonth           @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  denisMember Membership          @relation("SeedDenisMember", fields: [spaceId, denisMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  tanyaMember Membership          @relation("SeedTanyaMember", fields: [spaceId, tanyaMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([spaceId, seedId])
+  @@unique([spaceId, planMonthId])
+  @@map("planning_seed_consumptions")
 }

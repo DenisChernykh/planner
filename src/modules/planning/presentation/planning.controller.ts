@@ -38,6 +38,7 @@ import {
   PLANNING_APPLICATION,
   type PlanningApplication,
 } from '../application/planning-application'
+import { CANONICAL_CALENDAR_MONTH_PATTERN } from '../domain/planning-values'
 import {
   GoalDefinitionNotFoundError,
   PlanDraftNotFoundError,
@@ -62,6 +63,8 @@ import {
   PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
   PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
   PLANNING_AUTHORIZATION_DENIED_PROBLEM,
+  PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
+  PLAN_SEED_ALREADY_CONSUMED_PROBLEM,
 } from './planning-problem.definitions'
 import {
   CopyGoalDefinitionRequestDto,
@@ -84,6 +87,7 @@ import {
 } from './goal-catalog.response'
 import {
   AddDraftGoalRequestDto,
+  CreateDraftFromSeedRequestDto,
   DraftGoalPathDto,
   DraftMonthQueryDto,
   PlanMonthPathDto,
@@ -189,6 +193,22 @@ const reorderBodySchema = {
 const draftMutationResponseSchema = {
   $ref: '#/components/schemas/DraftMutationResponseV1',
 }
+const createFromSeedBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    targetMonth: {
+      type: 'string' as const,
+      pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
+    },
+    actorPersona: {
+      type: 'string' as const,
+      enum: ['memberA', 'memberB'],
+    },
+  },
+  required: ['commandId', 'targetMonth', 'actorPersona'],
+}
 const draftEditorResponseSchema = {
   $ref: '#/components/schemas/DraftEditorResponseV1',
 }
@@ -291,6 +311,11 @@ const draftReadProblems = [
   ...readProblems,
   PLAN_DRAFT_NOT_FOUND_PROBLEM,
   PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
+]
+const seedDraftProblems = [
+  ...mutationProblems,
+  PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
+  PLAN_SEED_ALREADY_CONSUMED_PROBLEM,
 ]
 const draftMutationBaseProblems = [
   ...mutationProblems,
@@ -551,7 +576,7 @@ export class PlanningDraftController {
   @ApiQuery({
     name: 'targetMonth',
     required: true,
-    schema: { type: 'string', pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$' },
+    schema: { type: 'string', pattern: CANONICAL_CALENDAR_MONTH_PATTERN },
   })
   @ApiOkResponse({
     description: 'Typed draft editor view.',
@@ -575,7 +600,7 @@ export class PlanningDraftController {
   @ApiQuery({
     name: 'targetMonth',
     required: true,
-    schema: { type: 'string', pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$' },
+    schema: { type: 'string', pattern: CANONICAL_CALENDAR_MONTH_PATTERN },
   })
   @ApiOkResponse({
     description: 'Publication preview with blockers as data.',
@@ -592,6 +617,33 @@ export class PlanningDraftController {
     })
     if (value === null) throw new PlanDraftNotFoundError()
     return toPublicationPreviewResponse(value)
+  }
+
+  @Post('from-seed')
+  @ApiOperation({
+    summary: 'Create a complete editable draft from the one-time April seed.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiCreatedResponse({
+    description: 'Draft aggregate reference at revision one.',
+    schema: draftMutationResponseSchema,
+  })
+  @ApiBody({ required: true, schema: createFromSeedBodySchema })
+  @ApiProblemResponses(...seedDraftProblems)
+  public async createFromSeed(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Body() body: CreateDraftFromSeedRequestDto,
+  ): Promise<DraftMutationResponse> {
+    return toDraftMutationResponse(
+      await this.planning.createDraftFromSeed.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        payload: {
+          targetMonth: body.targetMonth,
+          actorPersona: body.actorPersona,
+        },
+      }),
+    )
   }
 
   @Post(':planMonthId/publish')

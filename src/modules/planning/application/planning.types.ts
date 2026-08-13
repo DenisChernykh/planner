@@ -3,6 +3,8 @@ import type {
   ApplicationCommand,
 } from '@/shared/application/application-command'
 
+import type { SeedPersona } from './seed-owner-binding.port'
+
 export type CreateEmptyDraftPayload = {
   readonly targetMonth: string
   readonly focus: string
@@ -18,6 +20,11 @@ export type CreateDraftFromPublicationPayload = {
   readonly targetMonth: string
 }
 
+export type CreateDraftFromSeedPayload = {
+  readonly targetMonth: string
+  readonly actorPersona: SeedPersona
+}
+
 export type CreateEmptyDraftApplicationCommand =
   ApplicationCommand<CreateEmptyDraftPayload>
 
@@ -26,6 +33,9 @@ export type UpdateMonthFocusApplicationCommand =
 
 export type CreateDraftFromPublicationApplicationCommand =
   ApplicationCommand<CreateDraftFromPublicationPayload>
+
+export type CreateDraftFromSeedApplicationCommand =
+  ApplicationCommand<CreateDraftFromSeedPayload>
 
 export type GetDraftInput = {
   readonly trustedActor: ActorRef

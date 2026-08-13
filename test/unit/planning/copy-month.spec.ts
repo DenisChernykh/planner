@@ -51,6 +51,7 @@ function drafts(
   return {
     createEmptyDraft: () => Promise.reject(new Error('unexpected create')),
     createFromPublication: () => Promise.reject(new Error('unexpected copy')),
+    createFromSeed: () => Promise.reject(new Error('unexpected seed')),
     updateFocus: () => Promise.reject(new Error('unexpected update')),
     findDraft: () => Promise.reject(new Error('unexpected find')),
     ...overrides,

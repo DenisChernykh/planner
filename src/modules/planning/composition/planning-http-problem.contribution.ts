@@ -16,6 +16,8 @@ import {
   GoalDefinitionVersionNotFoundError,
   PlanDraftNotEditableError,
   PlanDraftNotFoundError,
+  PlanMonthAlreadyExistsError,
+  PlanSeedAlreadyConsumedError,
   ActivePlanMonthNotFoundError,
   PlanMonthAlreadyPublishedError,
   PlanPublicationBlockedError,
@@ -34,6 +36,8 @@ import {
   GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM,
   PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
   PLAN_DRAFT_NOT_FOUND_PROBLEM,
+  PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
+  PLAN_SEED_ALREADY_CONSUMED_PROBLEM,
   PLANNING_AUTHORIZATION_DENIED_PROBLEM,
   ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM,
   PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
@@ -57,6 +61,8 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       GOAL_DEFINITION_REVISION_CONFLICT_PROBLEM,
       GOAL_DEFINITION_STATE_CONFLICT_PROBLEM,
       PLAN_DRAFT_NOT_FOUND_PROBLEM,
+      PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
+      PLAN_SEED_ALREADY_CONSUMED_PROBLEM,
       DRAFT_GOAL_NOT_FOUND_PROBLEM,
       GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM,
       PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
@@ -74,6 +80,8 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       'GOAL_DEFINITION_REVISION_CONFLICT',
       'GOAL_DEFINITION_STATE_CONFLICT',
       'PLAN_DRAFT_NOT_FOUND',
+      'PLAN_MONTH_ALREADY_EXISTS',
+      'PLAN_SEED_ALREADY_CONSUMED',
       'DRAFT_GOAL_NOT_FOUND',
       'GOAL_DEFINITION_VERSION_NOT_FOUND',
       'PLAN_DRAFT_NOT_EDITABLE',
@@ -121,6 +129,12 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       }
       if (error instanceof PlanDraftNotFoundError) {
         return { code: 'PLAN_DRAFT_NOT_FOUND' }
+      }
+      if (error instanceof PlanMonthAlreadyExistsError) {
+        return { code: 'PLAN_MONTH_ALREADY_EXISTS' }
+      }
+      if (error instanceof PlanSeedAlreadyConsumedError) {
+        return { code: 'PLAN_SEED_ALREADY_CONSUMED' }
       }
       if (error instanceof DraftGoalNotFoundError) {
         return { code: 'DRAFT_GOAL_NOT_FOUND' }

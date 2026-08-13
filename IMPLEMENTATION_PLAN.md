@@ -1606,7 +1606,8 @@ shared important task; MemberB outreach; calendar-derived denominators.
 
 **Outcome:** UF-02 template selection atomically creates a fully populated
 editable draft once; replay is stable and existing draft/consumed seed conflicts
-are explicit.
+are explicit. Actor explicitly binds itself to `memberA|memberB`; membership slots
+remain technical and the immutable consumption stores both persona mappings.
 
 **Files:**
 
@@ -1615,15 +1616,15 @@ are explicit.
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811155000_seed_consumption/migration.sql`
 - Test: `test/integration/planning/create-draft-from-seed.integration.spec.ts`
-- Test: `test/e2e/planning/create-draft-from-seed.e2e-spec.ts`
+- Test: `test/e2e/planning/create-draft-from-seed.e2e.spec.ts`
 
-- [ ] Написать RED cases first selection, exact replay, existing destination
+- [x] Написать RED cases first selection, exact replay, existing destination
   draft, already-consumed seed and same-key/different-payload.
-- [ ] Реализовать seed consumption, draft/focus/goals/order/provenance in one
+- [x] Реализовать seed consumption, draft/focus/goals/order/provenance in one
   transaction using P01/P03 contracts.
-- [ ] Add HTTP/OpenAPI selection route and verify no automatic publish.
-- [ ] Запустить migration integration/E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: create April draft from seed`.
+- [x] Add HTTP/OpenAPI selection route and verify no automatic publish.
+- [x] Запустить migration integration/E2E and `pnpm check:quick`.
+- [x] Commit: `feat: create April draft from seed`.
 
 ---
 

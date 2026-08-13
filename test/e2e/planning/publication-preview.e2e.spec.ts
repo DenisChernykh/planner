@@ -621,7 +621,8 @@ describe('P06 authenticated publication preview HTTP', () => {
         name: 'targetMonth',
         required: true,
         schema: {
-          pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+          pattern:
+            '^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$',
           type: 'string',
         },
       },

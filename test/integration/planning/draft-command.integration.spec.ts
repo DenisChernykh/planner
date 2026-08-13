@@ -486,7 +486,7 @@ describe('P01 draft commands with real PostgreSQL', () => {
     }
   })
 
-  it('snapshots create and update primitives once before a delayed receipt lock', async () => {
+  it('snapshots create and update data properties once before a delayed receipt lock', async () => {
     const createId = '81234567-1234-4234-8234-123456789abc'
     const createLock = await holdReceiptLock(admin, {
       actorScope: `member:${firstMemberId}`,
@@ -498,29 +498,18 @@ describe('P01 draft commands with real PostgreSQL', () => {
       focus: 'Snapshot create focus',
     }
     const createReads = { actor: 0, commandId: 0, payload: 0 }
-    const mutableCreate = Object.defineProperties(
-      {},
+    const mutableCreate = new Proxy(
       {
-        commandId: {
-          enumerable: true,
-          get: () => {
-            createReads.commandId += 1
-            return createId
-          },
-        },
-        trustedActor: {
-          enumerable: true,
-          get: () => {
-            createReads.actor += 1
-            return memberActor()
-          },
-        },
-        payload: {
-          enumerable: true,
-          get: () => {
-            createReads.payload += 1
-            return createPayload
-          },
+        commandId: createId,
+        trustedActor: memberActor(),
+        payload: createPayload,
+      },
+      {
+        get: (target, key, receiver): unknown => {
+          if (key === 'commandId') createReads.commandId += 1
+          if (key === 'trustedActor') createReads.actor += 1
+          if (key === 'payload') createReads.payload += 1
+          return Reflect.get(target, key, receiver) as unknown
         },
       },
     ) as CreateEmptyDraftApplicationCommand
@@ -558,49 +547,30 @@ describe('P01 draft commands with real PostgreSQL', () => {
       planMonthId: created.aggregateId,
       focus: 'Snapshot update focus',
     }
-    let expectedRevision: unknown = 1n
     const updateReads = {
       actor: 0,
       commandId: 0,
       expectedRevision: 0,
       payload: 0,
     }
-    const mutableUpdate = Object.defineProperties(
-      {},
-      {
-        commandId: {
-          enumerable: true,
-          get: () => {
-            updateReads.commandId += 1
-            return updateId
-          },
-        },
-        trustedActor: {
-          enumerable: true,
-          get: () => {
-            updateReads.actor += 1
-            return memberActor()
-          },
-        },
-        expectedRevision: {
-          enumerable: true,
-          get: () => {
-            updateReads.expectedRevision += 1
-            return expectedRevision
-          },
-        },
-        payload: {
-          enumerable: true,
-          get: () => {
-            updateReads.payload += 1
-            return updatePayload
-          },
-        },
+    const updateTarget = {
+      commandId: updateId,
+      trustedActor: memberActor(),
+      expectedRevision: 1n,
+      payload: updatePayload,
+    }
+    const mutableUpdate = new Proxy(updateTarget, {
+      get: (target, key, receiver): unknown => {
+        if (key === 'commandId') updateReads.commandId += 1
+        if (key === 'trustedActor') updateReads.actor += 1
+        if (key === 'expectedRevision') updateReads.expectedRevision += 1
+        if (key === 'payload') updateReads.payload += 1
+        return Reflect.get(target, key, receiver) as unknown
       },
-    ) as Parameters<PlanningApplication['updateMonthFocus']['execute']>[0]
+    }) as Parameters<PlanningApplication['updateMonthFocus']['execute']>[0]
     const pendingUpdate = application.updateMonthFocus.execute(mutableUpdate)
     await new Promise((resolve) => setTimeout(resolve, 25))
-    expectedRevision = 99n
+    updateTarget.expectedRevision = 99n
     updatePayload.focus = 'Mutated update after fingerprint'
     await releaseReceiptLock(updateLock)
 

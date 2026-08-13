@@ -1008,7 +1008,8 @@ describe('S03 HTTP contracts', () => {
         name: 'targetMonth',
         required: true,
         schema: {
-          pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+          pattern:
+            '^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$',
           type: 'string',
         },
       },
@@ -1019,7 +1020,8 @@ describe('S03 HTTP contracts', () => {
         name: 'targetMonth',
         required: true,
         schema: {
-          pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+          pattern:
+            '^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$',
           type: 'string',
         },
       },
@@ -1163,7 +1165,8 @@ describe('S03 HTTP contracts', () => {
         planMonthId: uuidSchema,
         spaceId: uuidSchema,
         targetMonth: {
-          pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+          pattern:
+            '^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$',
           type: 'string',
         },
         status: { enum: ['draft'], type: 'string' },
@@ -1256,7 +1259,8 @@ describe('S03 HTTP contracts', () => {
 
     const dateSchema = { format: 'date', type: 'string' }
     const targetMonthSchema = {
-      pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+      pattern:
+        '^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$',
       type: 'string',
     }
     const calendarContextProperties = {

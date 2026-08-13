@@ -2,6 +2,8 @@ import type { OpenAPIObject } from '@nestjs/swagger'
 
 import type { OpenApiDocumentContribution } from '@/platform/http/docs/openapi-document'
 
+import { CANONICAL_CALENDAR_MONTH_PATTERN } from '../domain/planning-values'
+
 function installPlanningGoalSchemas(document: OpenAPIObject): void {
   const schemas = ((document.components ??= {}).schemas ??=
     {}) as unknown as Record<string, unknown>
@@ -920,7 +922,7 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
       spaceId: uuid,
       targetMonth: {
         type: 'string',
-        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+        pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
       },
       status: { type: 'string', enum: ['draft'] },
       focus: {
@@ -1037,7 +1039,7 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
     {
       targetMonth: {
         type: 'string',
-        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+        pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
       },
       activeLocalDate: { type: 'string', format: 'date' },
       timeZone: { type: 'string', enum: ['Asia/Yekaterinburg'] },
@@ -1096,7 +1098,7 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
   const quotaCalendarContext = {
     targetMonth: {
       type: 'string',
-      pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+      pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
     },
     activeLocalDate: { type: 'string', format: 'date' },
     timeZone: { type: 'string', enum: ['Asia/Yekaterinburg'] },
@@ -1160,7 +1162,7 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
     {
       targetMonth: {
         type: 'string',
-        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+        pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
       },
       activeLocalDate: { type: 'string', format: 'date' },
       timeZone: { type: 'string', enum: ['Asia/Yekaterinburg'] },
@@ -1242,7 +1244,7 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
       spaceId: uuid,
       targetMonth: {
         type: 'string',
-        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+        pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
       },
       status: { type: 'string', enum: ['draft'] },
       planMonthRevision: { type: 'string', pattern: '^[1-9][0-9]*$' },
@@ -1386,7 +1388,7 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
       spaceId: uuid,
       targetMonth: {
         type: 'string',
-        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])$',
+        pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
       },
       sourcePlanMonthRevision: {
         type: 'string',

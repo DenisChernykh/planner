@@ -14,6 +14,8 @@ import type {
   CreateEmptyDraftPayload,
   CreateDraftFromPublicationApplicationCommand,
   CreateDraftFromPublicationPayload,
+  CreateDraftFromSeedApplicationCommand,
+  CreateDraftFromSeedPayload,
   UpdateMonthFocusApplicationCommand,
   UpdateMonthFocusPayload,
 } from './planning.types'
@@ -100,6 +102,19 @@ function snapshotCopyPayload(
   })
 }
 
+function snapshotSeedPayload(value: unknown): CreateDraftFromSeedPayload {
+  if (!exactObject(value, ['targetMonth', 'actorPersona'])) {
+    throw new CommandValidationError()
+  }
+  if (value.actorPersona !== 'memberA' && value.actorPersona !== 'memberB') {
+    throw new CommandValidationError()
+  }
+  return Object.freeze({
+    targetMonth: validateTargetMonth(value.targetMonth),
+    actorPersona: value.actorPersona,
+  })
+}
+
 export function validateTargetMonth(value: unknown): string {
   if (!isCanonicalCalendarMonth(value)) throw new CommandValidationError()
   return value
@@ -131,6 +146,12 @@ export function canonicalCreateDraftFromPublicationPayload(
   payload: CreateDraftFromPublicationPayload,
 ): CanonicalJsonObject {
   return snapshotCopyPayload(payload)
+}
+
+export function canonicalCreateDraftFromSeedPayload(
+  payload: CreateDraftFromSeedPayload,
+): CanonicalJsonObject {
+  return snapshotSeedPayload(payload)
 }
 
 export function snapshotCreateEmptyDraftCommand(
@@ -205,5 +226,18 @@ export function snapshotCreateDraftFromPublicationCommand(
     commandId: snapshotCommandId(command.commandId),
     trustedActor: snapshotActor(command.trustedActor),
     payload: snapshotCopyPayload(command.payload),
+  })
+}
+
+export function snapshotCreateDraftFromSeedCommand(
+  command: unknown,
+): CreateDraftFromSeedApplicationCommand {
+  if (!exactObject(command, ['commandId', 'trustedActor', 'payload'])) {
+    throw new CommandValidationError()
+  }
+  return Object.freeze({
+    commandId: snapshotCommandId(command.commandId),
+    trustedActor: snapshotActor(command.trustedActor),
+    payload: snapshotSeedPayload(command.payload),
   })
 }

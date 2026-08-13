@@ -49,6 +49,22 @@ export const PLAN_DRAFT_NOT_FOUND_PROBLEM = defineProblemDefinition({
   detail: 'The requested plan draft was not found.',
 })
 
+export const PLAN_MONTH_ALREADY_EXISTS_PROBLEM = defineProblemDefinition({
+  slug: 'plan-month-already-exists',
+  code: 'PLAN_MONTH_ALREADY_EXISTS',
+  status: 409,
+  title: 'Plan month already exists',
+  detail: 'A plan already exists for the requested calendar month.',
+})
+
+export const PLAN_SEED_ALREADY_CONSUMED_PROBLEM = defineProblemDefinition({
+  slug: 'plan-seed-already-consumed',
+  code: 'PLAN_SEED_ALREADY_CONSUMED',
+  status: 409,
+  title: 'Plan seed already consumed',
+  detail: 'The one-time April plan seed has already been consumed.',
+})
+
 export const DRAFT_GOAL_NOT_FOUND_PROBLEM = defineProblemDefinition({
   slug: 'draft-goal-not-found',
   code: 'DRAFT_GOAL_NOT_FOUND',

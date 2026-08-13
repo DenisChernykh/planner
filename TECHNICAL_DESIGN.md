@@ -663,6 +663,10 @@ catalog actions без metadata duplication или arbitrary JSON.
 - `planning_month_copy_changes` — immutable typed detail только для
   `draft_copied`: source publication ID, bounded количество скопированных целей
   и exact destination order новых plan-goal IDs.
+- `planning_seed_consumptions` — immutable typed detail одноразового
+  `draft_created_from_seed`: exact seed ID/schema/version, выбранная actor
+  persona, постоянные `memberA|memberB -> member` bindings, 41 новых definition IDs
+  и exact destination order.
 
 Одна plan month может иметь несколько publication revisions, но не более одной
 active publication. Cancel до начала месяца помечает revision cancelled; он не
@@ -974,6 +978,43 @@ facts, statuses, notes/results, coverage, progress, notification occurrences
 или reports. Facts/corrections/reports до T01/E01 ещё отсутствуют в schema,
 поэтому P09 доказывает их структурное отсутствие; regression с populated source
 принадлежит T01/E01.
+
+#### 9.1.1. `CreateDraftFromSeed`
+
+HTTP/application команда `planning.create-draft-from-seed.v1` принимает exact
+payload `{ targetMonth, actorPersona: 'memberA'|'memberB' }`, запрещает
+`expectedRevision` и возвращает `planning.plan-draft.v1` revision `1`.
+`POST /planning/drafts/from-seed` требует session и CSRF. Target — любой
+canonical свободный `YYYY-MM`; clock задаёт только единый audit timestamp.
+
+Membership slots остаются техническими и не определяют persona или права.
+Пользователь явно выбирает свою persona только при использовании ещё не
+израсходованного seed. Planning-local resolver под transaction lock требует
+ровно двух same-space members, связывает actor с выбранной persona и второго
+member с оставшейся persona. Оба участника сохраняют равные права; immutable
+consumption навсегда фиксирует обе привязки.
+
+Durable executor обрабатывает exact replay и fingerprint conflict до clock,
+membership, pair binding и persistence. Fresh transaction сначала сериализует
+`(space, april-plan)` advisory lock и проверяет consumption, затем destination.
+Поэтому уже использованный seed даёт `PlanSeedAlreadyConsumedError`, а любой
+существующий destination при ещё свободном seed —
+`PlanMonthAlreadyExistsError(existingRef)` без consumption или receipt.
+
+Fresh success одним bounded set-based materialization создаёт goal-empty kernel
+и одновременно 41 новые active definitions, по одной new series/version `1`,
+41 draft roots/config revisions `1`, current pointers, dense order, exact
+P10 config/provenance и stable component IDs. Draft и lifecycle остаются
+revision `1`; отдельных P02 catalog actions для initial seed identities нет —
+их происхождение покрывает один `draft_created_from_seed` action. Publication,
+snapshots, expectations, periods и facts не создаются.
+
+Migration `20260811155000_seed_consumption` делает consumption/history
+immutable, unique `(space_id, seed_id)` и deferred связывает exact command,
+member actor/persona, destination header/focus, все новые catalog/draft rows,
+порядок и completed receipt. Commit-time проверка повторяет финальное состояние,
+поэтому mutation после insert detail и любая partial failpoint transaction
+полностью откатываются.
 
 ### 9.2. `PublishMonth`
 

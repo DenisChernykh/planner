@@ -24,6 +24,19 @@ export class DraftMonthQueryDto {
   public readonly targetMonth!: string
 }
 
+export class CreateDraftFromSeedRequestDto {
+  @IsString()
+  @Matches(UUID)
+  public readonly commandId!: string
+
+  @IsString()
+  @Matches(MONTH)
+  public readonly targetMonth!: string
+
+  @IsIn(['memberA', 'memberB'])
+  public readonly actorPersona!: 'memberA' | 'memberB'
+}
+
 export class PlanMonthPathDto {
   @IsString()
   @Matches(UUID)

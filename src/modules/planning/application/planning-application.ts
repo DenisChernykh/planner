@@ -1,5 +1,6 @@
 import type { CreateEmptyDraftCommand } from './create-empty-draft.command'
 import type { CreateDraftFromPublicationCommand } from './create-draft-from-publication.command'
+import type { CreateDraftFromSeedCommand } from './create-draft-from-seed.command'
 import type { BuildPublicationPreviewQuery } from './build-publication-preview.query'
 import type { GetDraftQuery } from './get-draft.query'
 import type {
@@ -34,6 +35,7 @@ export const PLANNING_APPLICATION: unique symbol = Symbol(
 export type PlanningApplication = {
   readonly createEmptyDraft: CreateEmptyDraftCommand
   readonly createDraftFromPublication: CreateDraftFromPublicationCommand
+  readonly createDraftFromSeed: CreateDraftFromSeedCommand
   readonly updateMonthFocus: UpdateMonthFocusCommand
   readonly getDraft: GetDraftQuery
   readonly getDraftEditor: GetDraftEditorQuery

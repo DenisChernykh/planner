@@ -1,6 +1,8 @@
 import type { ActorRef } from '@/shared/application/application-command'
 
 import type { DraftView } from './planning.types'
+import type { SeedPersona } from './seed-owner-binding.port'
+import type { ResolvedAprilPlanSeedV1 } from '../seed/april-plan.seed'
 
 export type PlanningCommandIdentity = {
   readonly actor: ActorRef
@@ -33,6 +35,16 @@ export type CreateDraftFromPublicationPersistenceInput =
     readonly targetMonth: string
   }
 
+export type CreateDraftFromSeedPersistenceInput = PlanningCommandIdentity & {
+  readonly spaceId: string
+  readonly memberId: string
+  readonly targetMonth: string
+  readonly actorPersona: SeedPersona
+  readonly denisMemberId: string
+  readonly tanyaMemberId: string
+  readonly seed: ResolvedAprilPlanSeedV1
+}
+
 export type PlanningDraftRef = {
   readonly planMonthId: string
   readonly draftRevision: bigint
@@ -48,6 +60,9 @@ export interface PlanDraftPersistencePort {
   ): Promise<CreateDraftPersistenceResult>
   createFromPublication(
     input: CreateDraftFromPublicationPersistenceInput,
+  ): Promise<CreateDraftPersistenceResult>
+  createFromSeed(
+    input: CreateDraftFromSeedPersistenceInput,
   ): Promise<CreateDraftPersistenceResult>
   updateFocus(input: UpdateFocusPersistenceInput): Promise<PlanningDraftRef>
   findDraft(spaceId: string, targetMonth: string): Promise<DraftView | null>
