@@ -1388,6 +1388,8 @@
               "PLAN_PUBLICATION_NOT_FOUND",
               "PLAN_SEED_ALREADY_CONSUMED",
               "RATE_LIMIT_EXCEEDED",
+              "TRACKING_AUTHORIZATION_DENIED",
+              "TRACKING_QUERY_INVALID",
               "UNSUPPORTED_MEDIA_TYPE",
               "VALIDATION_FAILED"
             ],
@@ -3327,6 +3329,1209 @@
         ],
         "type": "object"
       },
+      "TrackingAvailableMetricV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "basisPoints": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "exact": {
+            "$ref": "#/components/schemas/TrackingExactRatioV1"
+          }
+        },
+        "required": [
+          "available",
+          "exact",
+          "basisPoints"
+        ],
+        "type": "object"
+      },
+      "TrackingBooleanFactValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "boolean"
+            ],
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "done",
+              "not_done"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "result"
+        ],
+        "type": "object"
+      },
+      "TrackingChecklistFactValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "checklist_item"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "done",
+              "not_done"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "state"
+        ],
+        "type": "object"
+      },
+      "TrackingCoverageV1": {
+        "additionalProperties": false,
+        "properties": {
+          "applicable": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "filled": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filled",
+          "applicable"
+        ],
+        "type": "object"
+      },
+      "TrackingDayGoalV1": {
+        "additionalProperties": false,
+        "properties": {
+          "applicable": {
+            "type": "boolean"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/TrackingCoverageV1"
+          },
+          "fixedExpectations": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingFixedExpectationV1"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "flexiblePeriods": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingFlexiblePeriodV1"
+            },
+            "maxItems": 6,
+            "type": "array"
+          },
+          "planGoalSnapshotId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/TrackingGoalProgressV1"
+          },
+          "state": {
+            "enum": [
+              "future",
+              "not_applicable",
+              "no_data",
+              "partial",
+              "filled"
+            ],
+            "type": "string"
+          },
+          "writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "planGoalSnapshotId",
+          "applicable",
+          "writable",
+          "state",
+          "coverage",
+          "progress",
+          "fixedExpectations",
+          "flexiblePeriods"
+        ],
+        "type": "object"
+      },
+      "TrackingDayReadV1": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/TrackingCoverageV1"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingDayGoalV1"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "localDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "future",
+              "not_applicable",
+              "no_data",
+              "partial",
+              "filled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "localDate",
+          "state",
+          "coverage",
+          "goals"
+        ],
+        "type": "object"
+      },
+      "TrackingEvaluationMetricV1": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrackingAvailableMetricV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingUnavailableMetricV1"
+          }
+        ]
+      },
+      "TrackingExactRatioV1": {
+        "additionalProperties": false,
+        "properties": {
+          "denominator": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "numerator": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "numerator",
+          "denominator"
+        ],
+        "type": "object"
+      },
+      "TrackingFactReadV1": {
+        "additionalProperties": false,
+        "properties": {
+          "checklistItemId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "contributionId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "factKind": {
+            "enum": [
+              "boolean",
+              "quantity_add",
+              "quantity_latest",
+              "actual_time",
+              "rating",
+              "text",
+              "checklist_item",
+              "or_variant"
+            ],
+            "type": "string"
+          },
+          "factRecordId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "orVariantId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "recordedByMemberId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "revisionKind": {
+            "enum": [
+              "recorded",
+              "tombstoned"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrackingFactValueV1"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "factRecordId",
+          "revision",
+          "factKind",
+          "contributionId",
+          "checklistItemId",
+          "orVariantId",
+          "revisionKind",
+          "value",
+          "recordedByMemberId"
+        ],
+        "type": "object"
+      },
+      "TrackingFactValueV1": {
+        "discriminator": {
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrackingBooleanFactValueV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingQuantityFactValueV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingTimeFactValueV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingRatingFactValueV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingTextFactValueV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingChecklistFactValueV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingOrFactValueV1"
+          }
+        ]
+      },
+      "TrackingFixedExpectationV1": {
+        "additionalProperties": false,
+        "properties": {
+          "componentId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "componentKind": {
+            "enum": [
+              "goal",
+              "checkpoint",
+              "checklist_item"
+            ],
+            "type": "string"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingFactReadV1"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "fixedExpectationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "no_data",
+              "partial",
+              "done",
+              "not_done"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "fixedExpectationId",
+          "componentKind",
+          "componentId",
+          "state",
+          "facts"
+        ],
+        "type": "object"
+      },
+      "TrackingFlexiblePeriodProgressV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actualEquivalentOccurrences": {
+            "$ref": "#/components/schemas/TrackingExactRatioV1"
+          },
+          "creditedOccurrences": {
+            "$ref": "#/components/schemas/TrackingExactRatioV1"
+          },
+          "overperformanceOccurrences": {
+            "$ref": "#/components/schemas/TrackingExactRatioV1"
+          },
+          "periodEnd": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "periodStart": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "periodTarget": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "periodStart",
+          "periodEnd",
+          "periodTarget",
+          "actualEquivalentOccurrences",
+          "creditedOccurrences",
+          "overperformanceOccurrences"
+        ],
+        "type": "object"
+      },
+      "TrackingFlexiblePeriodV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actualProgress": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrackingExactRatioV1"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "eligibleOnDate": {
+            "type": "boolean"
+          },
+          "expectedProgress": {
+            "oneOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingFactReadV1"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "flexiblePeriodId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "ordinal": {
+            "maximum": 6,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "periodEnd": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "periodKind": {
+            "enum": [
+              "weekly",
+              "monthly",
+              "weekly_planned_task"
+            ],
+            "type": "string"
+          },
+          "periodStart": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "periodTarget": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "no_data",
+              "partial",
+              "done",
+              "not_done"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "flexiblePeriodId",
+          "periodKind",
+          "ordinal",
+          "periodStart",
+          "periodEnd",
+          "periodTarget",
+          "eligibleOnDate",
+          "expectedProgress",
+          "actualProgress",
+          "state",
+          "facts"
+        ],
+        "type": "object"
+      },
+      "TrackingGoalProgressV1": {
+        "additionalProperties": false,
+        "properties": {
+          "contribution": {
+            "$ref": "#/components/schemas/TrackingScoreContributionV1"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/TrackingCoverageV1"
+          },
+          "formulaVersions": {
+            "additionalProperties": false,
+            "properties": {
+              "calendar": {
+                "enum": [
+                  "planner.calendar-targets.v1"
+                ],
+                "type": "string"
+              },
+              "evaluation": {
+                "enum": [
+                  "planner.goal-evaluation.v1"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "calendar",
+              "evaluation"
+            ],
+            "type": "object"
+          },
+          "overperformance": {
+            "$ref": "#/components/schemas/TrackingEvaluationMetricV1"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingFlexiblePeriodProgressV1"
+            },
+            "maxItems": 6,
+            "type": "array"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/TrackingEvaluationMetricV1"
+          },
+          "score": {
+            "$ref": "#/components/schemas/TrackingEvaluationMetricV1"
+          }
+        },
+        "required": [
+          "formulaVersions",
+          "progress",
+          "score",
+          "overperformance",
+          "coverage",
+          "contribution",
+          "periods"
+        ],
+        "type": "object"
+      },
+      "TrackingGoalReadV1": {
+        "additionalProperties": false,
+        "properties": {
+          "calendar": {
+            "$ref": "#/components/schemas/EligibleCalendarV1"
+          },
+          "category": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/PublishedGoalConfigV1"
+          },
+          "displayOrder": {
+            "maximum": 199,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "planGoalSnapshotId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/TrackingGoalProgressV1"
+          },
+          "sourceGoalSeriesId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "viewerAccess": {
+            "enum": [
+              "personal_owner",
+              "shared",
+              "partner_read_only"
+            ],
+            "type": "string"
+          },
+          "why": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "planGoalSnapshotId",
+          "sourceGoalSeriesId",
+          "title",
+          "why",
+          "category",
+          "displayOrder",
+          "config",
+          "calendar",
+          "viewerAccess",
+          "progress"
+        ],
+        "type": "object"
+      },
+      "TrackingMonthDraftV1": {
+        "additionalProperties": false,
+        "properties": {
+          "draftRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "focus": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "lifecycleRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "planMonthId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "queryLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.month.v1"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "draft"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "queryLocalDate",
+          "targetMonth",
+          "state",
+          "planMonthId",
+          "lifecycleRevision",
+          "draftRevision",
+          "focus"
+        ],
+        "type": "object"
+      },
+      "TrackingMonthNoPlanV1": {
+        "additionalProperties": false,
+        "properties": {
+          "queryLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.month.v1"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "no_plan"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "queryLocalDate",
+          "targetMonth",
+          "state"
+        ],
+        "type": "object"
+      },
+      "TrackingMonthPublishedV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingDayReadV1"
+            },
+            "maxItems": 31,
+            "minItems": 28,
+            "type": "array"
+          },
+          "factsRevision": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "focus": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingGoalReadV1"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "latePublication": {
+            "type": "boolean"
+          },
+          "lifecycleRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "monthStatus": {
+            "enum": [
+              "published",
+              "grace",
+              "closed"
+            ],
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "future",
+              "active",
+              "grace",
+              "closed"
+            ],
+            "type": "string"
+          },
+          "planMonthId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "publicationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "publicationRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "queryLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.month.v1"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "published"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "queryLocalDate",
+          "targetMonth",
+          "state",
+          "planMonthId",
+          "lifecycleRevision",
+          "factsRevision",
+          "monthStatus",
+          "phase",
+          "publicationId",
+          "publicationRevision",
+          "activeLocalDate",
+          "latePublication",
+          "focus",
+          "goals",
+          "days"
+        ],
+        "type": "object"
+      },
+      "TrackingMonthResponseV1": {
+        "discriminator": {
+          "propertyName": "state"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrackingMonthNoPlanV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingMonthDraftV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingMonthPublishedV1"
+          }
+        ]
+      },
+      "TrackingOrFactValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "or_variant"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "type": "object"
+      },
+      "TrackingQuantityFactValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "quantity"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "type": "object"
+      },
+      "TrackingRatingFactValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "rating"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "type": "object"
+      },
+      "TrackingScoreContributionV1": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/TrackingCoverageV1"
+          },
+          "score": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrackingExactRatioV1"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "score",
+          "coverage"
+        ],
+        "type": "object"
+      },
+      "TrackingTextFactValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "text"
+            ],
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "done",
+              "not_done"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text",
+          "result"
+        ],
+        "type": "object"
+      },
+      "TrackingTimeFactValueV1": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "actual_time"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "type": "object"
+      },
+      "TrackingTodayDraftV1": {
+        "additionalProperties": false,
+        "properties": {
+          "draftRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "focus": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "lifecycleRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "planMonthId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "queryLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.today.v1"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "draft"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "queryLocalDate",
+          "targetMonth",
+          "state",
+          "planMonthId",
+          "lifecycleRevision",
+          "draftRevision",
+          "focus"
+        ],
+        "type": "object"
+      },
+      "TrackingTodayNoPlanV1": {
+        "additionalProperties": false,
+        "properties": {
+          "queryLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.today.v1"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "no_plan"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "queryLocalDate",
+          "targetMonth",
+          "state"
+        ],
+        "type": "object"
+      },
+      "TrackingTodayPublishedV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "day": {
+            "$ref": "#/components/schemas/TrackingDayReadV1"
+          },
+          "factsRevision": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "focus": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingGoalReadV1"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "latePublication": {
+            "type": "boolean"
+          },
+          "lifecycleRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "monthStatus": {
+            "enum": [
+              "published",
+              "grace",
+              "closed"
+            ],
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "future",
+              "active",
+              "grace",
+              "closed"
+            ],
+            "type": "string"
+          },
+          "planMonthId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "publicationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "publicationRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "queryLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.today.v1"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "published"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "queryLocalDate",
+          "targetMonth",
+          "state",
+          "planMonthId",
+          "lifecycleRevision",
+          "factsRevision",
+          "monthStatus",
+          "phase",
+          "publicationId",
+          "publicationRevision",
+          "activeLocalDate",
+          "latePublication",
+          "focus",
+          "goals",
+          "day"
+        ],
+        "type": "object"
+      },
+      "TrackingTodayResponseV1": {
+        "discriminator": {
+          "propertyName": "state"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrackingTodayNoPlanV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingTodayDraftV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingTodayPublishedV1"
+          }
+        ]
+      },
+      "TrackingUnavailableMetricV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              false
+            ],
+            "type": "boolean"
+          },
+          "basisPoints": {
+            "enum": [
+              null
+            ]
+          },
+          "exact": {
+            "enum": [
+              null
+            ]
+          },
+          "reason": {
+            "enum": [
+              "informational",
+              "no_applicable_units"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "exact",
+          "basisPoints",
+          "reason"
+        ],
+        "type": "object"
+      },
       "UpdateAnyOfMeasurementV1": {
         "additionalProperties": false,
         "properties": {
@@ -3592,6 +4797,8 @@
               "PLAN_PUBLICATION_NOT_FOUND",
               "PLAN_SEED_ALREADY_CONSUMED",
               "RATE_LIMIT_EXCEEDED",
+              "TRACKING_AUTHORIZATION_DENIED",
+              "TRACKING_QUERY_INVALID",
               "UNSUPPORTED_MEDIA_TYPE",
               "VALIDATION_FAILED"
             ],
@@ -9678,6 +10885,238 @@
           "planning"
         ]
       }
+    },
+    "/tracking/months/{targetMonth}": {
+      "get": {
+        "operationId": "TrackingQueryController_month",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "targetMonth",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingMonthResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_QUERY_INVALID": {
+                    "summary": "Tracking query invalid",
+                    "value": {
+                      "code": "TRACKING_QUERY_INVALID",
+                      "detail": "The requested tracking query is invalid.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Tracking query invalid",
+                      "type": "https://planner.invalid/problems/tracking-query-invalid"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking query invalid"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking authorization denied"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read a complete channel-neutral tracking month.",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/tracking/today": {
+      "get": {
+        "operationId": "TrackingQueryController_today",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingTodayResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking authorization denied"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read the channel-neutral tracking state for today.",
+        "tags": [
+          "tracking"
+        ]
+      }
     }
   },
   "servers": [
@@ -9698,6 +11137,10 @@
     {
       "description": "Versioned goal catalog and monthly planning.",
       "name": "planning"
+    },
+    {
+      "description": "Channel-neutral Today and Month tracking read models.",
+      "name": "tracking"
     }
   ]
 }

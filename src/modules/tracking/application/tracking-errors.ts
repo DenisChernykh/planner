@@ -5,6 +5,13 @@ export class TrackingAuthorizationDeniedError extends Error {
   }
 }
 
+export class TrackingQueryValidationError extends Error {
+  public constructor() {
+    super('Tracking query is invalid')
+    this.name = 'TrackingQueryValidationError'
+  }
+}
+
 export class FactTargetNotFoundError extends Error {
   public constructor() {
     super('Fact target was not found')

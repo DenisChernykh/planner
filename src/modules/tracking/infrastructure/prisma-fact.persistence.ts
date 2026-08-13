@@ -160,7 +160,7 @@ type ProgressHeaderRow = {
   readonly calendar: unknown
 }
 
-type ProgressFactRow = StateRow & {
+export type ProgressFactRow = StateRow & {
   readonly local_date: string
   readonly component_kind: 'goal' | 'checkpoint' | 'checklist_item' | null
   readonly component_id: string | null
@@ -479,7 +479,7 @@ function projectCheckpointSatisfaction(
   }
 }
 
-function projectEvaluationSnapshot(configValue: unknown): {
+export function projectEvaluationSnapshot(configValue: unknown): {
   readonly snapshot: GoalEvaluationSnapshotV1
   readonly repetition: CalendarRepetitionV1
   readonly checkpointOrder: ReadonlyMap<string, number>
@@ -551,7 +551,9 @@ function projectEvaluationSnapshot(configValue: unknown): {
   }
 }
 
-function projectFactValue(rows: readonly ProgressFactRow[]): GoalFactValueV1 {
+export function projectFactValue(
+  rows: readonly ProgressFactRow[],
+): GoalFactValueV1 {
   const first = rows[0]
   if (first === undefined) throw new Error('Stored fact group is empty')
   if (first.fact_kind === 'quantity_add') {

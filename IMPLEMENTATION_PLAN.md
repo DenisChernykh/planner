@@ -1791,11 +1791,11 @@ facts, states and progress without persistence in edge adapters.
 - Create: `src/modules/tracking/presentation/tracking-query.controller.ts`
 - Test: `test/e2e/tracking/today-month.e2e-spec.ts`
 
-- [ ] Написать RED personal/shared/no-plan/late-publish/no-data fixtures.
-- [ ] Реализовать bounded queries from publication+facts+P05.
-- [ ] Add OpenAPI response schemas and server-side member authorization.
-- [ ] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: expose daily and monthly tracking reads`.
+- [x] Написать RED personal/shared/no-plan/late-publish/no-data fixtures.
+- [x] Реализовать bounded queries from publication+facts+P05.
+- [x] Add OpenAPI response schemas and server-side member authorization.
+- [x] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
+- [x] Commit: `feat: expose daily and monthly tracking reads`.
 
 ### T08 — Atomic CloseDay
 

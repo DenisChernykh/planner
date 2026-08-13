@@ -11,6 +11,11 @@ import type { RecordOrVariantCommand } from './record-or-variant.command'
 import type { RecordTimeCommand } from './record-time.command'
 import type { RecordTextCommand } from './record-text.command'
 import type { UndoLastOwnActionCommand } from './undo-last-own-action.command'
+import type { GetMonthQuery, GetTodayQuery } from './tracking-read.query'
+
+export const TRACKING_APPLICATION: unique symbol = Symbol(
+  'TRACKING_APPLICATION',
+)
 
 export type TrackingApplication = {
   readonly correctRecord: CorrectRecordCommand
@@ -26,4 +31,6 @@ export type TrackingApplication = {
   readonly undoLastOwnAction: UndoLastOwnActionCommand
   readonly getFactState: GetFactStateQuery
   readonly getGoalProgress: GetGoalProgressQuery
+  readonly getToday: GetTodayQuery
+  readonly getMonth: GetMonthQuery
 }

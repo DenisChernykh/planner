@@ -4,6 +4,8 @@ import { AUTH_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/auth/composition/auth-
 import { AuthModule } from '@/modules/auth/composition/auth.module'
 import { PlanningModule } from '@/modules/planning/composition/planning.module'
 import { PLANNING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/planning/composition/planning-http-problem.contribution'
+import { TrackingModule } from '@/modules/tracking/composition/tracking.module'
+import { TRACKING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/tracking/composition/tracking-http-problem.contribution'
 import type { ApplicationRuntimeConfig } from '@/platform/config/runtime-config.types'
 import { RuntimeConfigModule } from '@/platform/config/runtime-config.module'
 import { DatabaseModule } from '@/platform/database/database.module'
@@ -27,10 +29,12 @@ export class ApiModule {
           CORE_HTTP_PROBLEM_CONTRIBUTION,
           AUTH_HTTP_PROBLEM_CONTRIBUTION,
           PLANNING_HTTP_PROBLEM_CONTRIBUTION,
+          TRACKING_HTTP_PROBLEM_CONTRIBUTION,
         ]),
         HealthModule,
         AuthModule,
         PlanningModule,
+        TrackingModule,
       ],
     }
   }

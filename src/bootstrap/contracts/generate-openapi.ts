@@ -5,6 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 
 import { ApiModule } from '@/bootstrap/api/api.module'
 import { PLANNING_OPENAPI_CONTRIBUTION } from '@/modules/planning/composition'
+import { TRACKING_OPENAPI_CONTRIBUTION } from '@/modules/tracking/composition'
 import { createOpenApiDocument } from '@/platform/http/docs/openapi-document'
 import { canonicalizeJson } from '@/platform/http/docs/openapi-normalizer'
 import { HttpProblemRegistry } from '@/platform/http/errors/http-problem.registry'
@@ -23,7 +24,7 @@ export async function generateOpenApiArtifact(): Promise<string> {
         app,
         config,
         app.get(HttpProblemRegistry).definitions,
-        [PLANNING_OPENAPI_CONTRIBUTION],
+        [PLANNING_OPENAPI_CONTRIBUTION, TRACKING_OPENAPI_CONTRIBUTION],
       ),
     )
   } finally {

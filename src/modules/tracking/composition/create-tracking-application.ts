@@ -18,8 +18,13 @@ import { RecordOrVariantCommand } from '../application/record-or-variant.command
 import { RecordTimeCommand } from '../application/record-time.command'
 import { RecordTextCommand } from '../application/record-text.command'
 import { UndoLastOwnActionCommand } from '../application/undo-last-own-action.command'
+import {
+  GetMonthQuery,
+  GetTodayQuery,
+} from '../application/tracking-read.query'
 import type { TrackingApplication } from '../application/tracking-application'
 import { PrismaFactPersistence } from '../infrastructure/prisma-fact.persistence'
+import { PrismaTrackingReadPersistence } from '../infrastructure/prisma-tracking-read.persistence'
 
 export function createTrackingApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -28,6 +33,7 @@ export function createTrackingApplication(dependencies: {
   readonly clock: ProductClock
 }): TrackingApplication {
   const facts = new PrismaFactPersistence(dependencies.database)
+  const reads = new PrismaTrackingReadPersistence(dependencies.database)
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -93,6 +99,18 @@ export function createTrackingApplication(dependencies: {
     getGoalProgress: new GetGoalProgressQuery(
       dependencies.workspaceMembers,
       facts,
+    ),
+    getToday: new GetTodayQuery(
+      dependencies.workspaceMembers,
+      reads,
+      dependencies.transaction,
+      dependencies.clock,
+    ),
+    getMonth: new GetMonthQuery(
+      dependencies.workspaceMembers,
+      reads,
+      dependencies.transaction,
+      dependencies.clock,
     ),
   })
 }

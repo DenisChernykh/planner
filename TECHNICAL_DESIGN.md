@@ -1117,6 +1117,46 @@ value, receipt и final `facts_revision`; UPDATE/DELETE undo history запре�
 Dispatcher сохраняет populated T01–T05 history и применяет T06 checks только к
 новому command discriminator.
 
+#### 7.6.7. T07 Today and Month read models
+
+T07 добавляет channel-neutral `GetTodayQuery({ trustedActor })` и
+`GetMonthQuery({ trustedActor, targetMonth })`. Оба принимают только trusted
+member actor и возвращают tagged read model `no_plan|draft|published`;
+отсутствие плана является успешным состоянием, а не `404`. Today один раз
+читает локальную дату `Asia/Yekaterinburg` и возвращает только её день. Month
+принимает любой canonical `YYYY-MM` пространства и возвращает все даты месяца.
+
+Published variant содержит active publication metadata, lifecycle и facts
+revisions, immutable ordered goal config/calendar, viewer-relative access
+`personal_owner|shared|partner_read_only`, current typed fact revisions,
+tombstones, fixed expectations, flexible/weekly periods и чистый P05 progress.
+Даты до `active_local_date` остаются `not_applicable`; отсутствие current
+record не превращается в `not_done`. Full audit revision history не входит в
+read model. Quota period дополнительно содержит вычисленные P04
+`expectedProgress` и P05 `actualProgress` на тот же as-of; weekly planned task
+имеет `expectedProgress = null` и доступна как read-only period до T09.
+Flexible-only цель считается применимой по календарю периода и получает
+`no_data|partial|filled` по current period facts, хотя её P05 coverage остаётся
+намеренно `0/0`; агрегат дня учитывает такую применимость отдельно от coverage.
+
+PostgreSQL adapter выполняет bounded set-based projection в одной read-only
+`REPEATABLE READ` transaction: не более 200 goals, 10 000 materialized units и
+10 000 current records. `facts_revision`, records и derived P05 state относятся
+к одному MVCC snapshot; превышение лимита отклоняет весь ответ без truncation.
+Для дня progress считается на `min(day, queryLocalDate)`, для month summary —
+на `min(queryLocalDate, monthEnd)`. Effective phase не доверяет задержавшемуся
+worker: persisted `published` после month end читается как `grace`, а после
+третьего grace-дня writeability блокируется календарной correction deadline;
+`closed` требует persisted close/report. Edge adapters не читают
+planning/tracking tables напрямую и не создают собственное состояние.
+
+HTTP публикует authenticated GET `/tracking/today` и
+`/tracking/months/{targetMonth}` без CSRF. Malformed month возвращает finite
+`400 TRACKING_QUERY_INVALID`, missing membership —
+`403 TRACKING_AUTHORIZATION_DENIED`, dependency/projector failure — общий
+`503 DEPENDENCY_UNAVAILABLE`. Write endpoints, CloseDay, weekly result,
+Telegram и UI остаются H01–H03, T08–T09 и G01–G05.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:
