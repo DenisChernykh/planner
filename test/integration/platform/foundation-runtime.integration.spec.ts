@@ -66,7 +66,7 @@ describe('Planner foundation database runtime', () => {
     await container?.stop()
   })
 
-  it('deploys the exact accepted migration and production-table inventory through T02', async () => {
+  it('deploys the exact accepted migration and production-table inventory through T03', async () => {
     const migration = deployMigrations(container.getConnectionUri())
 
     expect(migration).toMatchObject({ exitCode: 0 })
@@ -87,6 +87,7 @@ describe('Planner foundation database runtime', () => {
       { migration_name: '20260811155000_seed_consumption' },
       { migration_name: '20260811160000_tracking_record_kernel' },
       { migration_name: '20260811161000_time_rating_checkpoints' },
+      { migration_name: '20260811162000_text_checklist_facts' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name

@@ -67,14 +67,24 @@ type CurrentRecordRow = {
 type StateRow = {
   readonly fact_record_id: string
   readonly fact_kind:
-    'boolean' | 'quantity_add' | 'quantity_latest' | 'actual_time' | 'rating'
+    | 'boolean'
+    | 'quantity_add'
+    | 'quantity_latest'
+    | 'actual_time'
+    | 'rating'
+    | 'text'
+    | 'checklist_item'
   readonly contribution_id: string | null
+  readonly checklist_item_id: string | null
   readonly revision_number: bigint
   readonly revision_kind: 'recorded' | 'tombstoned'
   readonly boolean_result: 'done' | 'not_done' | null
   readonly quantity_value: string | null
   readonly actual_time_value: string | null
   readonly rating_value: string | null
+  readonly text_value: string | null
+  readonly text_result: 'done' | 'not_done' | null
+  readonly checklist_item_state: 'done' | 'not_done' | null
   readonly recorded_by_member_id: string
 }
 
@@ -89,7 +99,7 @@ type ProgressHeaderRow = {
 
 type ProgressFactRow = StateRow & {
   readonly local_date: string
-  readonly component_kind: 'goal' | 'checkpoint' | null
+  readonly component_kind: 'goal' | 'checkpoint' | 'checklist_item' | null
   readonly component_id: string | null
   readonly fixed_expectation_id: string | null
   readonly flexible_period_id: string | null
@@ -332,10 +342,18 @@ function projectEvaluationSnapshot(configValue: unknown): {
   readonly snapshot: GoalEvaluationSnapshotV1
   readonly repetition: CalendarRepetitionV1
   readonly checkpointOrder: ReadonlyMap<string, number>
+  readonly checklistItemOrder: ReadonlyMap<string, number>
 } {
   const config = record(configValue)
   const checkpoints = config['checkpoints']
   const checkpointOrder = new Map<string, number>()
+  const checklistItemOrder = new Map<string, number>()
+  const measurement = projectMeasurement(config['measurement'])
+  if (measurement.kind === 'checklist') {
+    measurement.items.forEach((item, index) => {
+      checklistItemOrder.set(item.itemId, index)
+    })
+  }
   let projectedCheckpoints: GoalEvaluationSnapshotV1['checkpoints'] = null
   if (checkpoints !== null) {
     const checkpointConfig = record(checkpoints)
@@ -375,11 +393,12 @@ function projectEvaluationSnapshot(configValue: unknown): {
   return {
     snapshot: {
       schemaVersion: 'planner.goal-evaluation-snapshot.v1',
-      measurement: projectMeasurement(config['measurement']),
+      measurement,
       checkpoints: projectedCheckpoints,
     },
     repetition: projectRepetition(config['repetition']),
     checkpointOrder,
+    checklistItemOrder,
   }
 }
 
@@ -408,6 +427,22 @@ function projectFactValue(rows: readonly ProgressFactRow[]): GoalFactValueV1 {
       ],
     }
   }
+  if (first.fact_kind === 'checklist_item') {
+    const items = rows.map((row) => {
+      if (
+        row.fact_kind !== 'checklist_item' ||
+        row.checklist_item_id === null ||
+        row.checklist_item_state === null
+      ) {
+        throw new Error('Stored checklist fact group is invalid')
+      }
+      return {
+        itemId: row.checklist_item_id,
+        state: row.checklist_item_state,
+      }
+    })
+    return { kind: 'checklist', items }
+  }
   if (rows.length !== 1) throw new Error('Stored single fact group is invalid')
   switch (first.fact_kind) {
     case 'boolean':
@@ -430,6 +465,15 @@ function projectFactValue(rows: readonly ProgressFactRow[]): GoalFactValueV1 {
         throw new Error('Stored rating fact is invalid')
       }
       return { kind: 'rating', value: storedRating(first.rating_value) }
+    case 'text':
+      if (first.text_value === null || first.text_result === null) {
+        throw new Error('Stored text fact is invalid')
+      }
+      return {
+        kind: 'text',
+        text: first.text_value,
+        result: first.text_result,
+      }
     default:
       throw new Error('Stored fact kind is invalid')
   }
@@ -462,6 +506,13 @@ export class PrismaFactPersistence implements FactPersistencePort {
         throw new FactTargetNotFoundError()
       }
       if (
+        input.checklistItemId !== null &&
+        target.fixed_expectation_id === null &&
+        target.flexible_period_id === null
+      ) {
+        throw new FactTargetNotFoundError()
+      }
+      if (
         input.localDate < target.month_start ||
         input.localDate > target.month_end ||
         (target.fixed_expectation_id === null &&
@@ -486,15 +537,16 @@ export class PrismaFactPersistence implements FactPersistencePort {
       if (
         target.fixed_expectation_id === null &&
         (input.commandType === 'tracking.record-time.v1' ||
-          input.commandType === 'tracking.record-rating.v1')
+          input.commandType === 'tracking.record-rating.v1' ||
+          input.commandType === 'tracking.record-text.v1' ||
+          input.commandType === 'tracking.record-checklist-item.v1')
       ) {
         throw new FactTargetUnavailableError('unsupported')
       }
 
       let valueConfig = measurement
-      if (input.commandType === 'tracking.record-checkpoint.v1') {
+      if (input.checkpointId !== null) {
         if (
-          input.checkpointId === null ||
           target.component_kind !== 'checkpoint' ||
           target.component_id !== input.checkpointId ||
           checkpoints === null ||
@@ -508,11 +560,32 @@ export class PrismaFactPersistence implements FactPersistencePort {
         if (checkpoint === undefined) throw new FactTargetNotFoundError()
         valueConfig = record(record(checkpoint)['satisfaction'])
       } else if (
-        input.checkpointId !== null ||
+        input.commandType === 'tracking.record-checkpoint.v1' ||
         checkpoints !== null ||
         (target.fixed_expectation_id !== null &&
+          input.commandType !== 'tracking.record-checklist-item.v1' &&
           (target.component_kind !== 'goal' || target.component_id !== null))
       ) {
+        throw new FactValueInvalidError()
+      }
+
+      if (input.commandType === 'tracking.record-checklist-item.v1') {
+        const items = measurement['items']
+        if (
+          input.checklistItemId === null ||
+          measurement['kind'] !== 'checklist' ||
+          valueConfig['kind'] !== 'checklist' ||
+          !Array.isArray(items) ||
+          !items.some(
+            (item) => record(item)['itemId'] === input.checklistItemId,
+          ) ||
+          (input.checkpointId === null &&
+            (target.component_kind !== 'checklist_item' ||
+              target.component_id !== input.checklistItemId))
+        ) {
+          throw new FactTargetNotFoundError()
+        }
+      } else if (input.checklistItemId !== null) {
         throw new FactValueInvalidError()
       }
 
@@ -522,6 +595,8 @@ export class PrismaFactPersistence implements FactPersistencePort {
         | 'quantity_latest'
         | 'actual_time'
         | 'rating'
+        | 'text'
+        | 'checklist_item'
       if (valueConfig['kind'] === 'boolean') {
         if (input.value.kind !== 'boolean') throw new FactValueInvalidError()
         factKind = 'boolean'
@@ -560,6 +635,14 @@ export class PrismaFactPersistence implements FactPersistencePort {
           throw new FactValueInvalidError()
         }
         factKind = 'rating'
+      } else if (valueConfig['kind'] === 'text') {
+        if (input.value.kind !== 'text') throw new FactValueInvalidError()
+        factKind = 'text'
+      } else if (valueConfig['kind'] === 'checklist') {
+        if (input.value.kind !== 'checklist_item') {
+          throw new FactValueInvalidError()
+        }
+        factKind = 'checklist_item'
       } else {
         throw new FactValueInvalidError()
       }
@@ -569,6 +652,10 @@ export class PrismaFactPersistence implements FactPersistencePort {
           factKind !== 'actual_time') ||
         (input.commandType === 'tracking.record-rating.v1' &&
           factKind !== 'rating') ||
+        (input.commandType === 'tracking.record-text.v1' &&
+          factKind !== 'text') ||
+        (input.commandType === 'tracking.record-checklist-item.v1' &&
+          factKind !== 'checklist_item') ||
         (input.commandType === 'tracking.record-fact.v1' &&
           !['boolean', 'quantity_add', 'quantity_latest'].includes(factKind))
       ) {
@@ -608,6 +695,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
             (id, space_id, plan_month_id, publication_id,
              plan_goal_snapshot_id, local_date, fact_kind,
              fixed_expectation_id, flexible_period_id, contribution_id,
+             checklist_item_id,
              current_revision_id, created_by_member_id, created_at, updated_at)
           VALUES
             (${factRecordId}::uuid, ${target.space_id}::uuid,
@@ -615,6 +703,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
              ${input.planGoalSnapshotId}::uuid, ${input.localDate}::date,
              ${factKind}, ${target.fixed_expectation_id}::uuid,
              ${target.flexible_period_id}::uuid, ${contributionId}::uuid,
+             ${input.checklistItemId}::uuid,
              NULL, ${input.memberId}::uuid, ${input.occurredAt},
              ${input.occurredAt})
         `
@@ -629,15 +718,21 @@ export class PrismaFactPersistence implements FactPersistencePort {
         input.value.kind === 'actual_time' ? input.value.value : null
       const ratingValue =
         input.value.kind === 'rating' ? input.value.value : null
+      const textValue = input.value.kind === 'text' ? input.value.text : null
+      const textResult = input.value.kind === 'text' ? input.value.result : null
+      const checklistItemState =
+        input.value.kind === 'checklist_item' ? input.value.state : null
       await client.$executeRaw`
         INSERT INTO tracking_fact_revisions
           (id, fact_record_id, revision_number, revision_kind,
            boolean_result, quantity_value, actual_time_value, rating_value,
+           text_value, text_result, checklist_item_state,
            recorded_by_member_id, created_at)
         VALUES
           (${afterRevisionId}::uuid, ${factRecordId}::uuid, ${factRevision},
            'recorded', ${booleanResult}, ${quantityValue},
            ${actualTimeValue}::time, ${ratingValue}::bigint,
+           ${textValue}, ${textResult}, ${checklistItemState},
            ${input.memberId}::uuid, ${input.occurredAt})
       `
       await this.afterWritePhase('revision')
@@ -705,11 +800,15 @@ export class PrismaFactPersistence implements FactPersistencePort {
       if (header.length === 0) return null
       const rows = await client.$queryRaw<StateRow[]>`
         SELECT record.id::text fact_record_id, record.fact_kind,
-               record.contribution_id::text, revision.revision_number,
+               record.contribution_id::text,
+               record.checklist_item_id::text,
+               revision.revision_number,
                revision.revision_kind, revision.boolean_result,
                revision.quantity_value,
                to_char(revision.actual_time_value, 'HH24:MI') actual_time_value,
                revision.rating_value::text rating_value,
+               revision.text_value, revision.text_result,
+               revision.checklist_item_state,
                revision.recorded_by_member_id::text
           FROM tracking_fact_records record
           JOIN tracking_fact_revisions revision
@@ -797,6 +896,22 @@ export class PrismaFactPersistence implements FactPersistencePort {
           value: storedRating(first.rating_value),
           recordedByMemberId: first.recorded_by_member_id,
         }
+      } else if (first?.fact_kind === 'text') {
+        if (
+          first.text_value === null ||
+          first.text_result === null ||
+          rows.length !== 1
+        ) {
+          throw new Error('Stored text fact state is invalid')
+        }
+        fact = {
+          kind: 'text',
+          factRecordId: first.fact_record_id,
+          revision: first.revision_number,
+          text: first.text_value,
+          result: first.text_result,
+          recordedByMemberId: first.recorded_by_member_id,
+        }
       }
       return freeze({
         publicationId: input.publicationId,
@@ -838,12 +953,15 @@ export class PrismaFactPersistence implements FactPersistencePort {
       const rows = await client.$queryRaw<ProgressFactRow[]>`
         SELECT record.id::text fact_record_id, record.fact_kind,
                record.local_date::text, record.contribution_id::text,
+               record.checklist_item_id::text,
                record.fixed_expectation_id::text,
                record.flexible_period_id::text,
                revision.revision_number, revision.revision_kind,
                revision.boolean_result, revision.quantity_value,
                to_char(revision.actual_time_value, 'HH24:MI') actual_time_value,
                revision.rating_value::text rating_value,
+               revision.text_value, revision.text_result,
+               revision.checklist_item_state,
                revision.recorded_by_member_id::text,
                expectation.component_kind,
                expectation.component_id::text
@@ -862,13 +980,17 @@ export class PrismaFactPersistence implements FactPersistencePort {
 
       const groups = new Map<string, ProgressFactRow[]>()
       for (const row of rows) {
-        const key = [
-          row.local_date,
-          row.fixed_expectation_id ?? '',
-          row.flexible_period_id ?? '',
-          row.component_kind ?? '',
-          row.component_id ?? '',
-        ].join(':')
+        const key =
+          row.fact_kind === 'checklist_item' &&
+          row.component_kind === 'checklist_item'
+            ? [row.local_date, 'top-level-checklist'].join(':')
+            : [
+                row.local_date,
+                row.fixed_expectation_id ?? '',
+                row.flexible_period_id ?? '',
+                row.component_kind ?? '',
+                row.component_id ?? '',
+              ].join(':')
         const group = groups.get(key)
         if (group === undefined) groups.set(key, [row])
         else group.push(row)
@@ -881,6 +1003,16 @@ export class PrismaFactPersistence implements FactPersistencePort {
       >()
       for (const group of groups.values()) {
         const first = group[0]!
+        if (first.fact_kind === 'checklist_item') {
+          group.sort(
+            (left, right) =>
+              (projected.checklistItemOrder.get(left.checklist_item_id ?? '') ??
+                -1) -
+              (projected.checklistItemOrder.get(
+                right.checklist_item_id ?? '',
+              ) ?? -1),
+          )
+        }
         const value = projectFactValue(group)
         if (first.component_kind === 'checkpoint') {
           if (first.component_id === null) {
@@ -892,7 +1024,10 @@ export class PrismaFactPersistence implements FactPersistencePort {
             checkpointsByDate.set(first.local_date, [checkpoint])
           } else values.push(checkpoint)
         } else if (first.fixed_expectation_id !== null) {
-          if (first.component_kind !== 'goal' || first.component_id !== null) {
+          if (
+            first.component_kind !== 'checklist_item' &&
+            (first.component_kind !== 'goal' || first.component_id !== null)
+          ) {
             throw new Error('Stored fixed fact identity is invalid')
           }
           facts.push({
@@ -988,10 +1123,17 @@ export class PrismaFactPersistence implements FactPersistencePort {
          AND expectation.plan_goal_snapshot_id = snapshot.id
          AND expectation.expectation_date = ${input.localDate}::date
          AND expectation.component_kind =
-           CASE WHEN ${input.checkpointId}::uuid IS NULL
-                THEN 'goal' ELSE 'checkpoint' END
+           CASE
+             WHEN ${input.checkpointId}::uuid IS NOT NULL THEN 'checkpoint'
+             WHEN ${input.checklistItemId}::uuid IS NOT NULL
+               THEN 'checklist_item'
+             ELSE 'goal'
+           END
          AND expectation.component_id IS NOT DISTINCT FROM
-           ${input.checkpointId}::uuid
+           COALESCE(
+             ${input.checkpointId}::uuid,
+             ${input.checklistItemId}::uuid
+           )
         LEFT JOIN LATERAL (
           SELECT candidate.id
             FROM flexible_periods candidate
@@ -1030,8 +1172,11 @@ export class PrismaFactPersistence implements FactPersistencePort {
            ${target.fixed_expectation_id}::uuid
          AND record.flexible_period_id IS NOT DISTINCT FROM
            ${target.flexible_period_id}::uuid
+         AND record.checklist_item_id IS NOT DISTINCT FROM
+           ${input.checklistItemId}::uuid
          AND record.fact_kind IN (
-           'boolean', 'quantity_latest', 'actual_time', 'rating'
+           'boolean', 'quantity_latest', 'actual_time', 'rating',
+           'text', 'checklist_item'
          )
     `
     return rows[0] ?? null

@@ -49,6 +49,7 @@ export class RecordTimeCommand {
         planGoalSnapshotId: snapshot.payload.planGoalSnapshotId,
         localDate: snapshot.payload.expectationDate,
         checkpointId: null,
+        checklistItemId: null,
         value: { kind: 'actual_time', value: snapshot.payload.value },
       },
     )

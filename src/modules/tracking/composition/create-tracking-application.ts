@@ -8,9 +8,11 @@ import type { ProductClock } from '@/shared/application/product-clock'
 import { GetFactStateQuery } from '../application/get-fact-state.query'
 import { GetGoalProgressQuery } from '../application/get-goal-progress.query'
 import { RecordCheckpointCommand } from '../application/record-checkpoint.command'
+import { RecordChecklistItemCommand } from '../application/record-checklist-item.command'
 import { RecordFactCommand } from '../application/record-fact.command'
 import { RecordRatingCommand } from '../application/record-rating.command'
 import { RecordTimeCommand } from '../application/record-time.command'
+import { RecordTextCommand } from '../application/record-text.command'
 import type { TrackingApplication } from '../application/tracking-application'
 import { PrismaFactPersistence } from '../infrastructure/prisma-fact.persistence'
 
@@ -43,6 +45,16 @@ export function createTrackingApplication(dependencies: {
       facts,
     ),
     recordCheckpoint: new RecordCheckpointCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
+    recordText: new RecordTextCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
+    recordChecklistItem: new RecordChecklistItemCommand(
       executor,
       dependencies.workspaceMembers,
       facts,

@@ -49,6 +49,7 @@ export class RecordRatingCommand {
         planGoalSnapshotId: snapshot.payload.planGoalSnapshotId,
         localDate: snapshot.payload.expectationDate,
         checkpointId: null,
+        checklistItemId: null,
         value: { kind: 'rating', value: snapshot.payload.value },
       },
     )

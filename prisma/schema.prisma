@@ -515,6 +515,7 @@ model TrackingFactRecord {
   fixedExpectationId String?  @map("fixed_expectation_id") @db.Uuid
   flexiblePeriodId   String?  @map("flexible_period_id") @db.Uuid
   contributionId     String?  @unique @map("contribution_id") @db.Uuid
+  checklistItemId    String?  @map("checklist_item_id") @db.Uuid
   currentRevisionId  String?  @map("current_revision_id") @db.Uuid
   createdByMemberId  String   @map("created_by_member_id") @db.Uuid
   createdAt          DateTime @map("created_at") @db.Timestamptz(3)
@@ -546,6 +547,9 @@ model TrackingFactRevision {
   quantityValue      String?   @map("quantity_value") @db.Text
   actualTimeValue    DateTime? @map("actual_time_value") @db.Time(0)
   ratingValue        BigInt?   @map("rating_value") @db.BigInt
+  textValue          String?   @map("text_value") @db.Text
+  textResult         String?   @map("text_result") @db.VarChar(16)
+  checklistItemState String?   @map("checklist_item_state") @db.VarChar(16)
   recordedByMemberId String    @map("recorded_by_member_id") @db.Uuid
   createdAt          DateTime  @map("created_at") @db.Timestamptz(3)
 

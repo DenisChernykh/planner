@@ -10,6 +10,8 @@ import type {
   RecordCheckpointApplicationCommand,
   RecordCheckpointPayload,
   RecordCheckpointValueV1,
+  RecordChecklistItemApplicationCommand,
+  RecordChecklistItemPayload,
   RecordFactApplicationCommand,
   RecordFactPayload,
   RecordFactValueV1,
@@ -17,6 +19,8 @@ import type {
   RecordRatingPayload,
   RecordTimeApplicationCommand,
   RecordTimePayload,
+  RecordTextApplicationCommand,
+  RecordTextPayload,
 } from './tracking.types'
 
 const UUID =
@@ -300,6 +304,64 @@ function checkpointPayload(value: unknown): RecordCheckpointPayload {
   })
 }
 
+function nullableUuid(value: unknown): string | null {
+  return value === null ? null : uuid(value)
+}
+
+function completion(value: unknown): 'done' | 'not_done' {
+  if (value !== 'done' && value !== 'not_done') {
+    throw new CommandValidationError()
+  }
+  return value
+}
+
+function nonEmptyText(value: unknown): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new CommandValidationError()
+  }
+  return value
+}
+
+function textPayload(value: unknown): RecordTextPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'publicationId',
+    'planGoalSnapshotId',
+    'expectationDate',
+    'checkpointId',
+    'text',
+    'result',
+  ])
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
+    expectationDate: canonicalLocalDate(ownData(value, 'expectationDate')),
+    checkpointId: nullableUuid(ownData(value, 'checkpointId')),
+    text: nonEmptyText(ownData(value, 'text')),
+    result: completion(ownData(value, 'result')),
+  })
+}
+
+function checklistItemPayload(value: unknown): RecordChecklistItemPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'publicationId',
+    'planGoalSnapshotId',
+    'expectationDate',
+    'checkpointId',
+    'checklistItemId',
+    'state',
+  ])
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
+    expectationDate: canonicalLocalDate(ownData(value, 'expectationDate')),
+    checkpointId: nullableUuid(ownData(value, 'checkpointId')),
+    checklistItemId: uuid(ownData(value, 'checklistItemId')),
+    state: completion(ownData(value, 'state')),
+  })
+}
+
 export function snapshotRecordTimeCommand(
   value: unknown,
 ): RecordTimeApplicationCommand {
@@ -318,6 +380,18 @@ export function snapshotRecordCheckpointCommand(
   return commandEnvelope(value, checkpointPayload)
 }
 
+export function snapshotRecordTextCommand(
+  value: unknown,
+): RecordTextApplicationCommand {
+  return commandEnvelope(value, textPayload)
+}
+
+export function snapshotRecordChecklistItemCommand(
+  value: unknown,
+): RecordChecklistItemApplicationCommand {
+  return commandEnvelope(value, checklistItemPayload)
+}
+
 export function canonicalRecordTimePayload(
   value: RecordTimePayload,
 ): RecordTimePayload {
@@ -334,6 +408,18 @@ export function canonicalRecordCheckpointPayload(
   value: RecordCheckpointPayload,
 ): RecordCheckpointPayload {
   return checkpointPayload(value)
+}
+
+export function canonicalRecordTextPayload(
+  value: RecordTextPayload,
+): RecordTextPayload {
+  return textPayload(value)
+}
+
+export function canonicalRecordChecklistItemPayload(
+  value: RecordChecklistItemPayload,
+): RecordChecklistItemPayload {
+  return checklistItemPayload(value)
 }
 
 export function canonicalRecordFactPayload(value: RecordFactPayload): {

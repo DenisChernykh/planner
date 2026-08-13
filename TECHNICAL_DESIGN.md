@@ -964,6 +964,42 @@ immutable publication snapshot/calendar и current fact revisions. Он сохр
 чистый `evaluateGoalProgress`; presentation query shapes для Today/Month будут
 добавлены T07/H01, а не T02.
 
+#### 7.6.3. T03 Text/checklist extension
+
+T03 добавляет application-only команды `tracking.record-text.v1` и
+`tracking.record-checklist-item.v1`; обе возвращают
+`tracking.fact-record.v1`, используют общий durable executor, trusted member,
+owner rule, future-date boundary и CAS revision chain T01. HTTP, OpenAPI и
+Telegram остаются последующими H02/G04.
+
+Text payload имеет exact shape
+`{ publicationId, planGoalSnapshotId, expectationDate, checkpointId, text,
+result }`, где `checkpointId` — stable UUID либо `null`, `text` — исходная
+непустая строка, а `result` — `done|not_done`. Checklist-item payload имеет
+exact shape
+`{ publicationId, planGoalSnapshotId, expectationDate, checkpointId,
+checklistItemId, state }`, где `state` — `done|not_done`. Отсутствие
+`expectedRevision` означает create; correction требует текущую positive
+revision. Exact replay предшествует clock, membership и target lookup.
+
+Без checkpoints text адресует physical `goal` expectation, а checklist item —
+ровно свой physical `checklist_item` expectation. При checkpoints обе команды
+адресуют physical `checkpoint` expectation; checklist item дополнительно
+несёт stable item ID из parent measurement. Поэтому каждый checklist item
+имеет отдельный logical record/revision chain, но P05 projector группирует
+актуальные item states обратно в одно checklist value соответствующей даты или
+checkpoint. Отдельный parent fact, parent expectation или parent coverage unit
+не создаётся. Flexible text/checklist occurrence остаётся T04 и в T03
+отклоняется finite `unsupported` до writes.
+
+Migration `20260811162000_text_checklist_facts` добавляет typed
+`text_value`, `text_result`, `checklist_item_state` и nullable stable
+`checklist_item_id`, расширяет finite command/fact discriminators и physical
+identity indexes. Deferred checks связывают command kind, exact published
+goal/checkpoint/item component, typed revision history, owner, month
+`facts_revision`, action и receipt. Старые T01/T02 records остаются валидными и
+immutable.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:

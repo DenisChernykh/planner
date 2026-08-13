@@ -26,8 +26,23 @@ export type RatingFactValueV1 = {
   readonly value: number
 }
 
+export type TextFactValueV1 = {
+  readonly kind: 'text'
+  readonly text: string
+  readonly result: 'done' | 'not_done'
+}
+
+export type ChecklistItemFactValueV1 = {
+  readonly kind: 'checklist_item'
+  readonly state: 'done' | 'not_done'
+}
+
 export type RecordSingleFactValueV1 =
-  RecordFactValueV1 | ActualTimeFactValueV1 | RatingFactValueV1
+  | RecordFactValueV1
+  | ActualTimeFactValueV1
+  | RatingFactValueV1
+  | TextFactValueV1
+  | ChecklistItemFactValueV1
 
 export type RecordCheckpointValueV1 =
   BooleanFactValueV1 | ActualTimeFactValueV1 | RatingFactValueV1
@@ -70,6 +85,29 @@ export type RecordCheckpointPayload = {
 
 export type RecordCheckpointApplicationCommand =
   ApplicationCommand<RecordCheckpointPayload>
+
+export type RecordTextPayload = {
+  readonly publicationId: string
+  readonly planGoalSnapshotId: string
+  readonly expectationDate: string
+  readonly checkpointId: string | null
+  readonly text: string
+  readonly result: 'done' | 'not_done'
+}
+
+export type RecordTextApplicationCommand = ApplicationCommand<RecordTextPayload>
+
+export type RecordChecklistItemPayload = {
+  readonly publicationId: string
+  readonly planGoalSnapshotId: string
+  readonly expectationDate: string
+  readonly checkpointId: string | null
+  readonly checklistItemId: string
+  readonly state: 'done' | 'not_done'
+}
+
+export type RecordChecklistItemApplicationCommand =
+  ApplicationCommand<RecordChecklistItemPayload>
 
 export type GetFactStateInput = {
   readonly trustedActor: ActorRef
@@ -132,12 +170,32 @@ export type RatingFactStateV1 = {
   readonly recordedByMemberId: string
 }
 
+export type TextFactStateV1 = {
+  readonly kind: 'text'
+  readonly factRecordId: string
+  readonly revision: bigint
+  readonly text: string
+  readonly result: 'done' | 'not_done'
+  readonly recordedByMemberId: string
+}
+
+export type ChecklistItemFactStateV1 = {
+  readonly kind: 'checklist_item'
+  readonly factRecordId: string
+  readonly revision: bigint
+  readonly checklistItemId: string
+  readonly state: 'done' | 'not_done'
+  readonly recordedByMemberId: string
+}
+
 export type FactValueStateV1 =
   | BooleanFactStateV1
   | QuantityAddFactStateV1
   | QuantityLatestFactStateV1
   | ActualTimeFactStateV1
   | RatingFactStateV1
+  | TextFactStateV1
+  | ChecklistItemFactStateV1
 
 export type FactStateV1 = {
   readonly publicationId: string

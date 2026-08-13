@@ -1709,12 +1709,12 @@ measurement; named checkpoints имеют independent facts and one parent score
 - Create: `src/modules/tracking/application/record-checklist-item.command.ts`
 - Test: `test/integration/tracking/text-checklist.integration.spec.ts`
 
-- [ ] Написать RED cases non-empty text+result, done/not_done correction,
+- [x] Написать RED cases non-empty text+result, done/not_done correction,
   checklist partial completion and required-item coverage units.
-- [ ] Реализовать stable component references and typed revisions.
-- [ ] Проверить parent without extra expectation/coverage unit.
-- [ ] Запустить focused integration и `pnpm check:quick`.
-- [ ] Commit: `feat: record text and checklist facts`.
+- [x] Реализовать stable component references and typed revisions.
+- [x] Проверить parent without extra expectation/coverage unit.
+- [x] Запустить focused integration и `pnpm check:quick`.
+- [x] Commit: `feat: record text and checklist facts`.
 
 ### T04 — OR, informational and flexible composite facts
 

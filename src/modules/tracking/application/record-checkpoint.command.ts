@@ -49,6 +49,7 @@ export class RecordCheckpointCommand {
         planGoalSnapshotId: snapshot.payload.planGoalSnapshotId,
         localDate: snapshot.payload.expectationDate,
         checkpointId: snapshot.payload.checkpointId,
+        checklistItemId: null,
         value: snapshot.payload.value,
       },
     )

@@ -8,6 +8,8 @@ export type TrackingRecordCommandType =
   | 'tracking.record-time.v1'
   | 'tracking.record-rating.v1'
   | 'tracking.record-checkpoint.v1'
+  | 'tracking.record-text.v1'
+  | 'tracking.record-checklist-item.v1'
 
 export type RecordFactPersistenceInput = {
   readonly actor: ActorRef
@@ -23,6 +25,7 @@ export type RecordFactPersistenceInput = {
   readonly planGoalSnapshotId: string
   readonly localDate: string
   readonly checkpointId: string | null
+  readonly checklistItemId: string | null
   readonly value: RecordSingleFactValueV1
 }
 

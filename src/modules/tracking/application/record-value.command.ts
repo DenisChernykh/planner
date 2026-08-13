@@ -41,6 +41,7 @@ export type RecordValueTarget = {
   readonly planGoalSnapshotId: string
   readonly localDate: string
   readonly checkpointId: string | null
+  readonly checklistItemId: string | null
   readonly value: RecordSingleFactValueV1
 }
 
