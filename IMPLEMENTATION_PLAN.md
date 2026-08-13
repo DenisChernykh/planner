@@ -1729,13 +1729,13 @@ occurrences сохраняют independent components and deterministic per-date
 - Create: `src/modules/tracking/application/record-composite-occurrence.command.ts`
 - Test: `test/integration/tracking/or-composite.integration.spec.ts`
 
-- [ ] Написать RED cases OR max without sum, partial variant, informational no
+- [x] Написать RED cases OR max without sum, partial variant, informational no
   target/score/reminder and per-date composite components.
-- [ ] Реализовать stable variant references, typed revisions and composite
+- [x] Реализовать stable variant references, typed revisions and composite
   occurrence identity bounded by publication/date.
-- [ ] Проверить max normalized fraction and recalculation after correction.
-- [ ] Запустить focused integration and `pnpm check:quick`.
-- [ ] Commit: `feat: record flexible composite facts`.
+- [x] Проверить max normalized fraction and recalculation after correction.
+- [x] Запустить focused integration and `pnpm check:quick`.
+- [x] Commit: `feat: record flexible composite facts`.
 
 ### T05 — Corrections and tombstones
 

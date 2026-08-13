@@ -74,8 +74,10 @@ type StateRow = {
     | 'rating'
     | 'text'
     | 'checklist_item'
+    | 'or_variant'
   readonly contribution_id: string | null
   readonly checklist_item_id: string | null
+  readonly or_variant_id: string | null
   readonly revision_number: bigint
   readonly revision_kind: 'recorded' | 'tombstoned'
   readonly boolean_result: 'done' | 'not_done' | null
@@ -85,6 +87,7 @@ type StateRow = {
   readonly text_value: string | null
   readonly text_result: 'done' | 'not_done' | null
   readonly checklist_item_state: 'done' | 'not_done' | null
+  readonly or_variant_value: string | null
   readonly recorded_by_member_id: string
 }
 
@@ -343,15 +346,22 @@ function projectEvaluationSnapshot(configValue: unknown): {
   readonly repetition: CalendarRepetitionV1
   readonly checkpointOrder: ReadonlyMap<string, number>
   readonly checklistItemOrder: ReadonlyMap<string, number>
+  readonly variantOrder: ReadonlyMap<string, number>
 } {
   const config = record(configValue)
   const checkpoints = config['checkpoints']
   const checkpointOrder = new Map<string, number>()
   const checklistItemOrder = new Map<string, number>()
+  const variantOrder = new Map<string, number>()
   const measurement = projectMeasurement(config['measurement'])
   if (measurement.kind === 'checklist') {
     measurement.items.forEach((item, index) => {
       checklistItemOrder.set(item.itemId, index)
+    })
+  }
+  if (measurement.kind === 'any_of') {
+    measurement.variants.forEach((variant, index) => {
+      variantOrder.set(variant.variantId, index)
     })
   }
   let projectedCheckpoints: GoalEvaluationSnapshotV1['checkpoints'] = null
@@ -399,6 +409,7 @@ function projectEvaluationSnapshot(configValue: unknown): {
     repetition: projectRepetition(config['repetition']),
     checkpointOrder,
     checklistItemOrder,
+    variantOrder,
   }
 }
 
@@ -442,6 +453,22 @@ function projectFactValue(rows: readonly ProgressFactRow[]): GoalFactValueV1 {
       }
     })
     return { kind: 'checklist', items }
+  }
+  if (first.fact_kind === 'or_variant') {
+    const variants = rows.map((row) => {
+      if (
+        row.fact_kind !== 'or_variant' ||
+        row.or_variant_id === null ||
+        row.or_variant_value === null
+      ) {
+        throw new Error('Stored OR-variant fact group is invalid')
+      }
+      return {
+        variantId: row.or_variant_id,
+        value: row.or_variant_value,
+      }
+    })
+    return { kind: 'any_of', variants }
   }
   if (rows.length !== 1) throw new Error('Stored single fact group is invalid')
   switch (first.fact_kind) {
@@ -506,7 +533,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
         throw new FactTargetNotFoundError()
       }
       if (
-        input.checklistItemId !== null &&
+        (input.checklistItemId !== null || input.orVariantId !== null) &&
         target.fixed_expectation_id === null &&
         target.flexible_period_id === null
       ) {
@@ -539,7 +566,16 @@ export class PrismaFactPersistence implements FactPersistencePort {
         (input.commandType === 'tracking.record-time.v1' ||
           input.commandType === 'tracking.record-rating.v1' ||
           input.commandType === 'tracking.record-text.v1' ||
-          input.commandType === 'tracking.record-checklist-item.v1')
+          input.commandType === 'tracking.record-checklist-item.v1' ||
+          input.commandType === 'tracking.record-or-variant.v1')
+      ) {
+        throw new FactTargetUnavailableError('unsupported')
+      }
+      if (
+        input.commandType === 'tracking.record-composite-occurrence.v1' &&
+        (target.fixed_expectation_id !== null ||
+          target.flexible_period_id === null ||
+          checkpoints !== null)
       ) {
         throw new FactTargetUnavailableError('unsupported')
       }
@@ -585,8 +621,46 @@ export class PrismaFactPersistence implements FactPersistencePort {
         ) {
           throw new FactTargetNotFoundError()
         }
+      } else if (
+        input.commandType === 'tracking.record-composite-occurrence.v1' &&
+        input.checklistItemId !== null
+      ) {
+        const items = measurement['items']
+        if (
+          measurement['kind'] !== 'checklist' ||
+          !Array.isArray(items) ||
+          !items.some(
+            (item) => record(item)['itemId'] === input.checklistItemId,
+          )
+        ) {
+          throw new FactTargetNotFoundError()
+        }
       } else if (input.checklistItemId !== null) {
         throw new FactValueInvalidError()
+      }
+
+      let orVariantPrecision: number | null = null
+      if (input.orVariantId !== null) {
+        const variants: unknown = measurement['variants']
+        if (
+          valueConfig['kind'] !== 'any_of' ||
+          measurement['kind'] !== 'any_of' ||
+          !Array.isArray(variants)
+        ) {
+          throw new FactValueInvalidError()
+        }
+        const variant = (variants as unknown[]).find(
+          (item) => record(item)['variantId'] === input.orVariantId,
+        )
+        if (variant === undefined) throw new FactTargetNotFoundError()
+        const precision = record(variant)['precision']
+        if (
+          !Number.isInteger(precision) ||
+          ![0, 1, 2, 3].includes(precision as number)
+        ) {
+          throw new FactValueInvalidError()
+        }
+        orVariantPrecision = precision as number
       }
 
       let factKind:
@@ -597,6 +671,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
         | 'rating'
         | 'text'
         | 'checklist_item'
+        | 'or_variant'
       if (valueConfig['kind'] === 'boolean') {
         if (input.value.kind !== 'boolean') throw new FactValueInvalidError()
         factKind = 'boolean'
@@ -643,6 +718,16 @@ export class PrismaFactPersistence implements FactPersistencePort {
           throw new FactValueInvalidError()
         }
         factKind = 'checklist_item'
+      } else if (valueConfig['kind'] === 'any_of') {
+        if (
+          input.value.kind !== 'or_variant' ||
+          input.orVariantId === null ||
+          orVariantPrecision === null ||
+          quantityScale(input.value.value) > orVariantPrecision
+        ) {
+          throw new FactValueInvalidError()
+        }
+        factKind = 'or_variant'
       } else {
         throw new FactValueInvalidError()
       }
@@ -656,6 +741,10 @@ export class PrismaFactPersistence implements FactPersistencePort {
           factKind !== 'text') ||
         (input.commandType === 'tracking.record-checklist-item.v1' &&
           factKind !== 'checklist_item') ||
+        (input.commandType === 'tracking.record-or-variant.v1' &&
+          factKind !== 'or_variant') ||
+        (input.commandType === 'tracking.record-composite-occurrence.v1' &&
+          !['checklist_item', 'or_variant'].includes(factKind)) ||
         (input.commandType === 'tracking.record-fact.v1' &&
           !['boolean', 'quantity_add', 'quantity_latest'].includes(factKind))
       ) {
@@ -695,7 +784,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
             (id, space_id, plan_month_id, publication_id,
              plan_goal_snapshot_id, local_date, fact_kind,
              fixed_expectation_id, flexible_period_id, contribution_id,
-             checklist_item_id,
+             checklist_item_id, or_variant_id,
              current_revision_id, created_by_member_id, created_at, updated_at)
           VALUES
             (${factRecordId}::uuid, ${target.space_id}::uuid,
@@ -703,7 +792,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
              ${input.planGoalSnapshotId}::uuid, ${input.localDate}::date,
              ${factKind}, ${target.fixed_expectation_id}::uuid,
              ${target.flexible_period_id}::uuid, ${contributionId}::uuid,
-             ${input.checklistItemId}::uuid,
+             ${input.checklistItemId}::uuid, ${input.orVariantId}::uuid,
              NULL, ${input.memberId}::uuid, ${input.occurredAt},
              ${input.occurredAt})
         `
@@ -722,17 +811,21 @@ export class PrismaFactPersistence implements FactPersistencePort {
       const textResult = input.value.kind === 'text' ? input.value.result : null
       const checklistItemState =
         input.value.kind === 'checklist_item' ? input.value.state : null
+      const orVariantValue =
+        input.value.kind === 'or_variant' ? input.value.value : null
       await client.$executeRaw`
         INSERT INTO tracking_fact_revisions
           (id, fact_record_id, revision_number, revision_kind,
            boolean_result, quantity_value, actual_time_value, rating_value,
            text_value, text_result, checklist_item_state,
+           or_variant_value,
            recorded_by_member_id, created_at)
         VALUES
           (${afterRevisionId}::uuid, ${factRecordId}::uuid, ${factRevision},
            'recorded', ${booleanResult}, ${quantityValue},
            ${actualTimeValue}::time, ${ratingValue}::bigint,
            ${textValue}, ${textResult}, ${checklistItemState},
+           ${orVariantValue},
            ${input.memberId}::uuid, ${input.occurredAt})
       `
       await this.afterWritePhase('revision')
@@ -802,6 +895,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
         SELECT record.id::text fact_record_id, record.fact_kind,
                record.contribution_id::text,
                record.checklist_item_id::text,
+               record.or_variant_id::text,
                revision.revision_number,
                revision.revision_kind, revision.boolean_result,
                revision.quantity_value,
@@ -809,6 +903,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
                revision.rating_value::text rating_value,
                revision.text_value, revision.text_result,
                revision.checklist_item_state,
+               revision.or_variant_value,
                revision.recorded_by_member_id::text
           FROM tracking_fact_records record
           JOIN tracking_fact_revisions revision
@@ -954,6 +1049,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
         SELECT record.id::text fact_record_id, record.fact_kind,
                record.local_date::text, record.contribution_id::text,
                record.checklist_item_id::text,
+               record.or_variant_id::text,
                record.fixed_expectation_id::text,
                record.flexible_period_id::text,
                revision.revision_number, revision.revision_kind,
@@ -962,6 +1058,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
                revision.rating_value::text rating_value,
                revision.text_value, revision.text_result,
                revision.checklist_item_state,
+               revision.or_variant_value,
                revision.recorded_by_member_id::text,
                expectation.component_kind,
                expectation.component_id::text
@@ -1011,6 +1108,12 @@ export class PrismaFactPersistence implements FactPersistencePort {
               (projected.checklistItemOrder.get(
                 right.checklist_item_id ?? '',
               ) ?? -1),
+          )
+        } else if (first.fact_kind === 'or_variant') {
+          group.sort(
+            (left, right) =>
+              (projected.variantOrder.get(left.or_variant_id ?? '') ?? -1) -
+              (projected.variantOrder.get(right.or_variant_id ?? '') ?? -1),
           )
         }
         const value = projectFactValue(group)
@@ -1121,6 +1224,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
         LEFT JOIN fixed_expectations expectation
           ON expectation.publication_id = snapshot.publication_id
          AND expectation.plan_goal_snapshot_id = snapshot.id
+         AND ${input.commandType} <> 'tracking.record-composite-occurrence.v1'
          AND expectation.expectation_date = ${input.localDate}::date
          AND expectation.component_kind =
            CASE
@@ -1174,9 +1278,11 @@ export class PrismaFactPersistence implements FactPersistencePort {
            ${target.flexible_period_id}::uuid
          AND record.checklist_item_id IS NOT DISTINCT FROM
            ${input.checklistItemId}::uuid
+         AND record.or_variant_id IS NOT DISTINCT FROM
+           ${input.orVariantId}::uuid
          AND record.fact_kind IN (
            'boolean', 'quantity_latest', 'actual_time', 'rating',
-           'text', 'checklist_item'
+           'text', 'checklist_item', 'or_variant'
          )
     `
     return rows[0] ?? null

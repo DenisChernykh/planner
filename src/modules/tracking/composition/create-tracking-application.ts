@@ -9,8 +9,10 @@ import { GetFactStateQuery } from '../application/get-fact-state.query'
 import { GetGoalProgressQuery } from '../application/get-goal-progress.query'
 import { RecordCheckpointCommand } from '../application/record-checkpoint.command'
 import { RecordChecklistItemCommand } from '../application/record-checklist-item.command'
+import { RecordCompositeOccurrenceCommand } from '../application/record-composite-occurrence.command'
 import { RecordFactCommand } from '../application/record-fact.command'
 import { RecordRatingCommand } from '../application/record-rating.command'
+import { RecordOrVariantCommand } from '../application/record-or-variant.command'
 import { RecordTimeCommand } from '../application/record-time.command'
 import { RecordTextCommand } from '../application/record-text.command'
 import type { TrackingApplication } from '../application/tracking-application'
@@ -55,6 +57,16 @@ export function createTrackingApplication(dependencies: {
       facts,
     ),
     recordChecklistItem: new RecordChecklistItemCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
+    recordOrVariant: new RecordOrVariantCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
+    recordCompositeOccurrence: new RecordCompositeOccurrenceCommand(
       executor,
       dependencies.workspaceMembers,
       facts,

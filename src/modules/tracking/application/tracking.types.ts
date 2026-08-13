@@ -37,12 +37,18 @@ export type ChecklistItemFactValueV1 = {
   readonly state: 'done' | 'not_done'
 }
 
+export type OrVariantFactValueV1 = {
+  readonly kind: 'or_variant'
+  readonly value: string
+}
+
 export type RecordSingleFactValueV1 =
   | RecordFactValueV1
   | ActualTimeFactValueV1
   | RatingFactValueV1
   | TextFactValueV1
   | ChecklistItemFactValueV1
+  | OrVariantFactValueV1
 
 export type RecordCheckpointValueV1 =
   BooleanFactValueV1 | ActualTimeFactValueV1 | RatingFactValueV1
@@ -108,6 +114,40 @@ export type RecordChecklistItemPayload = {
 
 export type RecordChecklistItemApplicationCommand =
   ApplicationCommand<RecordChecklistItemPayload>
+
+export type RecordOrVariantPayload = {
+  readonly publicationId: string
+  readonly planGoalSnapshotId: string
+  readonly expectationDate: string
+  readonly checkpointId: string | null
+  readonly variantId: string
+  readonly value: string
+}
+
+export type RecordOrVariantApplicationCommand =
+  ApplicationCommand<RecordOrVariantPayload>
+
+export type RecordCompositeOccurrenceComponentV1 =
+  | {
+      readonly kind: 'checklist_item'
+      readonly checklistItemId: string
+      readonly state: 'done' | 'not_done'
+    }
+  | {
+      readonly kind: 'or_variant'
+      readonly variantId: string
+      readonly value: string
+    }
+
+export type RecordCompositeOccurrencePayload = {
+  readonly publicationId: string
+  readonly planGoalSnapshotId: string
+  readonly localDate: string
+  readonly component: RecordCompositeOccurrenceComponentV1
+}
+
+export type RecordCompositeOccurrenceApplicationCommand =
+  ApplicationCommand<RecordCompositeOccurrencePayload>
 
 export type GetFactStateInput = {
   readonly trustedActor: ActorRef
@@ -188,6 +228,15 @@ export type ChecklistItemFactStateV1 = {
   readonly recordedByMemberId: string
 }
 
+export type OrVariantFactStateV1 = {
+  readonly kind: 'or_variant'
+  readonly factRecordId: string
+  readonly revision: bigint
+  readonly variantId: string
+  readonly value: string
+  readonly recordedByMemberId: string
+}
+
 export type FactValueStateV1 =
   | BooleanFactStateV1
   | QuantityAddFactStateV1
@@ -196,6 +245,7 @@ export type FactValueStateV1 =
   | RatingFactStateV1
   | TextFactStateV1
   | ChecklistItemFactStateV1
+  | OrVariantFactStateV1
 
 export type FactStateV1 = {
   readonly publicationId: string

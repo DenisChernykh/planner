@@ -42,6 +42,7 @@ export type RecordValueTarget = {
   readonly localDate: string
   readonly checkpointId: string | null
   readonly checklistItemId: string | null
+  readonly orVariantId: string | null
   readonly value: RecordSingleFactValueV1
 }
 

@@ -108,6 +108,7 @@ export class RecordFactCommand {
             expectedRevision: snapshot.expectedRevision ?? null,
             checkpointId: null,
             checklistItemId: null,
+            orVariantId: null,
             ...snapshot.payload,
           })
           return Object.freeze({

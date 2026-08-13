@@ -50,6 +50,7 @@ export class RecordCheckpointCommand {
         localDate: snapshot.payload.expectationDate,
         checkpointId: snapshot.payload.checkpointId,
         checklistItemId: null,
+        orVariantId: null,
         value: snapshot.payload.value,
       },
     )

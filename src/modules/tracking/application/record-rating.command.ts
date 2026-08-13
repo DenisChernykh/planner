@@ -50,6 +50,7 @@ export class RecordRatingCommand {
         localDate: snapshot.payload.expectationDate,
         checkpointId: null,
         checklistItemId: null,
+        orVariantId: null,
         value: { kind: 'rating', value: snapshot.payload.value },
       },
     )

@@ -1000,6 +1000,48 @@ goal/checkpoint/item component, typed revision history, owner, month
 `facts_revision`, action и receipt. Старые T01/T02 records остаются валидными и
 immutable.
 
+#### 7.6.4. T04 OR/informational/flexible composite extension
+
+T04 добавляет application-only команды `tracking.record-or-variant.v1` и
+`tracking.record-composite-occurrence.v1`; обе возвращают
+`tracking.fact-record.v1` и переиспользуют durable replay, trusted-member
+authorization, owner rule, future-date boundary и CAS revision chain tracking
+kernel. HTTP, OpenAPI и Telegram остаются H02/G04, correction reason и
+tombstones — T05.
+
+OR-variant payload имеет exact shape
+`{ publicationId, planGoalSnapshotId, expectationDate, checkpointId,
+variantId, value }`, где `checkpointId` — stable UUID либо `null`, `variantId`
+— stable UUID опубликованного варианта, а `value` — canonical nonnegative
+decimal с precision этого варианта. Команда адресует fixed `goal` либо
+`checkpoint` expectation. Каждый вариант имеет отдельный logical record и CAS
+revision chain, но P05 projector группирует актуальные варианты одного
+expectation и использует maximum normalized fraction, не сумму.
+
+Flexible composite payload имеет exact shape
+`{ publicationId, planGoalSnapshotId, localDate, component }`, где component —
+`{ kind:'checklist_item', checklistItemId, state:'done'|'not_done' }` либо
+`{ kind:'or_variant', variantId, value }`. Команда допускает только eligible
+дату ненулевого weekly/monthly period без checkpoints. Logical identity
+ограничена publication, snapshot, physical period, local date и stable
+component ID. Компоненты одной даты сохраняют независимые revision chains, а
+projector детерминированно собирает их в один `quota_occurrence`. Отдельный
+parent fact не создаётся.
+
+Informational quantity продолжает использовать
+`tracking.record-fact.v1`: fixed measurement остаётся coverage unit, flexible
+occurrence не получает target, progress, score, coverage или вклад в aggregate
+score. Notification/reminder suppression доказывается в последующих
+notification tasks; T04 не создаёт delivery rows.
+
+Migration `20260811163000_or_composite_facts` добавляет typed
+`or_variant_value` и nullable stable `or_variant_id`, расширяет finite
+command/fact discriminators и component-aware fixed/flexible uniqueness.
+Deferred checks связывают exact command mode, published variant/item,
+precision, calendar period/date, typed revision history, owner, month
+`facts_revision`, action и receipt. Populated T01–T03 rows остаются byte-stable,
+valid и immutable после upgrade.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:

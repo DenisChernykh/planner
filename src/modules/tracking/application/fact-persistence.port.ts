@@ -10,6 +10,8 @@ export type TrackingRecordCommandType =
   | 'tracking.record-checkpoint.v1'
   | 'tracking.record-text.v1'
   | 'tracking.record-checklist-item.v1'
+  | 'tracking.record-or-variant.v1'
+  | 'tracking.record-composite-occurrence.v1'
 
 export type RecordFactPersistenceInput = {
   readonly actor: ActorRef
@@ -26,6 +28,7 @@ export type RecordFactPersistenceInput = {
   readonly localDate: string
   readonly checkpointId: string | null
   readonly checklistItemId: string | null
+  readonly orVariantId: string | null
   readonly value: RecordSingleFactValueV1
 }
 

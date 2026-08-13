@@ -468,30 +468,30 @@ model PlanningPublicationChange {
 }
 
 model PlanningMonthCopyChange {
-  actionId             String   @id @map("action_id") @db.Uuid
-  sourcePublicationId  String   @map("source_publication_id") @db.Uuid
-  copiedGoalCount      Int      @map("copied_goal_count")
-  afterOrder           String[] @map("after_order") @db.Uuid
+  actionId            String   @id @map("action_id") @db.Uuid
+  sourcePublicationId String   @map("source_publication_id") @db.Uuid
+  copiedGoalCount     Int      @map("copied_goal_count")
+  afterOrder          String[] @map("after_order") @db.Uuid
 
   action            PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  sourcePublication PlanPublication      @relation(fields: [sourcePublicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sourcePublication PlanPublication     @relation(fields: [sourcePublicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@map("planning_month_copy_changes")
 }
 
 model PlanningSeedConsumption {
-  actionId             String   @id @map("action_id") @db.Uuid
-  spaceId              String   @map("space_id") @db.Uuid
-  planMonthId          String   @unique @map("plan_month_id") @db.Uuid
-  seedId               String   @map("seed_id") @db.VarChar(64)
-  seedVersion          Int      @map("seed_version")
-  seedSchemaVersion    String   @map("seed_schema_version") @db.VarChar(128)
-  actorPersona         String   @map("actor_persona") @db.VarChar(16)
-  denisMemberId        String   @map("member_a_member_id") @db.Uuid
-  tanyaMemberId        String   @map("member_b_member_id") @db.Uuid
-  seededGoalCount      Int      @map("seeded_goal_count")
-  goalDefinitionIds    String[] @map("goal_definition_ids") @db.Uuid
-  afterOrder           String[] @map("after_order") @db.Uuid
+  actionId          String   @id @map("action_id") @db.Uuid
+  spaceId           String   @map("space_id") @db.Uuid
+  planMonthId       String   @unique @map("plan_month_id") @db.Uuid
+  seedId            String   @map("seed_id") @db.VarChar(64)
+  seedVersion       Int      @map("seed_version")
+  seedSchemaVersion String   @map("seed_schema_version") @db.VarChar(128)
+  actorPersona      String   @map("actor_persona") @db.VarChar(16)
+  denisMemberId     String   @map("member_a_member_id") @db.Uuid
+  tanyaMemberId     String   @map("member_b_member_id") @db.Uuid
+  seededGoalCount   Int      @map("seeded_goal_count")
+  goalDefinitionIds String[] @map("goal_definition_ids") @db.Uuid
+  afterOrder        String[] @map("after_order") @db.Uuid
 
   action      PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   space       Space               @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
@@ -516,6 +516,7 @@ model TrackingFactRecord {
   flexiblePeriodId   String?  @map("flexible_period_id") @db.Uuid
   contributionId     String?  @unique @map("contribution_id") @db.Uuid
   checklistItemId    String?  @map("checklist_item_id") @db.Uuid
+  orVariantId        String?  @map("or_variant_id") @db.Uuid
   currentRevisionId  String?  @map("current_revision_id") @db.Uuid
   createdByMemberId  String   @map("created_by_member_id") @db.Uuid
   createdAt          DateTime @map("created_at") @db.Timestamptz(3)
@@ -550,6 +551,7 @@ model TrackingFactRevision {
   textValue          String?   @map("text_value") @db.Text
   textResult         String?   @map("text_result") @db.VarChar(16)
   checklistItemState String?   @map("checklist_item_state") @db.VarChar(16)
+  orVariantValue     String?   @map("or_variant_value") @db.Text
   recordedByMemberId String    @map("recorded_by_member_id") @db.Uuid
   createdAt          DateTime  @map("created_at") @db.Timestamptz(3)
 

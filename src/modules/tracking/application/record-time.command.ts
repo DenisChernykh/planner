@@ -50,6 +50,7 @@ export class RecordTimeCommand {
         localDate: snapshot.payload.expectationDate,
         checkpointId: null,
         checklistItemId: null,
+        orVariantId: null,
         value: { kind: 'actual_time', value: snapshot.payload.value },
       },
     )

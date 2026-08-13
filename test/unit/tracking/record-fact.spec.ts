@@ -141,6 +141,7 @@ describe('T01 record fact application boundary', () => {
         expectedRevision: null,
         checkpointId: null,
         checklistItemId: null,
+        orVariantId: null,
         publicationId,
         planGoalSnapshotId: snapshotId,
         localDate: '2026-04-10',

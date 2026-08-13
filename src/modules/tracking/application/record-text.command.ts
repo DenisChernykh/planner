@@ -50,6 +50,7 @@ export class RecordTextCommand {
         localDate: snapshot.payload.expectationDate,
         checkpointId: snapshot.payload.checkpointId,
         checklistItemId: null,
+        orVariantId: null,
         value: {
           kind: 'text',
           text: snapshot.payload.text,

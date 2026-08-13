@@ -12,11 +12,16 @@ import type {
   RecordCheckpointValueV1,
   RecordChecklistItemApplicationCommand,
   RecordChecklistItemPayload,
+  RecordCompositeOccurrenceApplicationCommand,
+  RecordCompositeOccurrenceComponentV1,
+  RecordCompositeOccurrencePayload,
   RecordFactApplicationCommand,
   RecordFactPayload,
   RecordFactValueV1,
   RecordRatingApplicationCommand,
   RecordRatingPayload,
+  RecordOrVariantApplicationCommand,
+  RecordOrVariantPayload,
   RecordTimeApplicationCommand,
   RecordTimePayload,
   RecordTextApplicationCommand,
@@ -362,6 +367,75 @@ function checklistItemPayload(value: unknown): RecordChecklistItemPayload {
   })
 }
 
+function canonicalDecimal(value: unknown): string {
+  if (typeof value !== 'string' || !DECIMAL.test(value)) {
+    throw new CommandValidationError()
+  }
+  return value
+}
+
+function orVariantPayload(value: unknown): RecordOrVariantPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'publicationId',
+    'planGoalSnapshotId',
+    'expectationDate',
+    'checkpointId',
+    'variantId',
+    'value',
+  ])
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
+    expectationDate: canonicalLocalDate(ownData(value, 'expectationDate')),
+    checkpointId: nullableUuid(ownData(value, 'checkpointId')),
+    variantId: uuid(ownData(value, 'variantId')),
+    value: canonicalDecimal(ownData(value, 'value')),
+  })
+}
+
+function compositeComponent(
+  value: unknown,
+): RecordCompositeOccurrenceComponentV1 {
+  if (!isRecord(value)) throw new CommandValidationError()
+  const kind = ownData(value, 'kind')
+  if (kind === 'checklist_item') {
+    exactKeys(value, ['kind', 'checklistItemId', 'state'])
+    return Object.freeze({
+      kind,
+      checklistItemId: uuid(ownData(value, 'checklistItemId')),
+      state: completion(ownData(value, 'state')),
+    })
+  }
+  if (kind === 'or_variant') {
+    exactKeys(value, ['kind', 'variantId', 'value'])
+    return Object.freeze({
+      kind,
+      variantId: uuid(ownData(value, 'variantId')),
+      value: canonicalDecimal(ownData(value, 'value')),
+    })
+  }
+  throw new CommandValidationError()
+}
+
+function compositeOccurrencePayload(
+  value: unknown,
+): RecordCompositeOccurrencePayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, [
+    'publicationId',
+    'planGoalSnapshotId',
+    'localDate',
+    'component',
+  ])
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    planGoalSnapshotId: uuid(ownData(value, 'planGoalSnapshotId')),
+    localDate: canonicalLocalDate(ownData(value, 'localDate')),
+    component: compositeComponent(ownData(value, 'component')),
+  })
+}
+
 export function snapshotRecordTimeCommand(
   value: unknown,
 ): RecordTimeApplicationCommand {
@@ -392,6 +466,18 @@ export function snapshotRecordChecklistItemCommand(
   return commandEnvelope(value, checklistItemPayload)
 }
 
+export function snapshotRecordOrVariantCommand(
+  value: unknown,
+): RecordOrVariantApplicationCommand {
+  return commandEnvelope(value, orVariantPayload)
+}
+
+export function snapshotRecordCompositeOccurrenceCommand(
+  value: unknown,
+): RecordCompositeOccurrenceApplicationCommand {
+  return commandEnvelope(value, compositeOccurrencePayload)
+}
+
 export function canonicalRecordTimePayload(
   value: RecordTimePayload,
 ): RecordTimePayload {
@@ -420,6 +506,18 @@ export function canonicalRecordChecklistItemPayload(
   value: RecordChecklistItemPayload,
 ): RecordChecklistItemPayload {
   return checklistItemPayload(value)
+}
+
+export function canonicalRecordOrVariantPayload(
+  value: RecordOrVariantPayload,
+): RecordOrVariantPayload {
+  return orVariantPayload(value)
+}
+
+export function canonicalRecordCompositeOccurrencePayload(
+  value: RecordCompositeOccurrencePayload,
+): RecordCompositeOccurrencePayload {
+  return compositeOccurrencePayload(value)
 }
 
 export function canonicalRecordFactPayload(value: RecordFactPayload): {
