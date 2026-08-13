@@ -1829,14 +1829,17 @@ result is revisioned, auditable and protected by receipt/CAS.
 **Files:**
 
 - Create: `src/modules/tracking/application/record-weekly-task-result.command.ts`
+- Create: `src/modules/tracking/infrastructure/prisma-weekly-task-result.persistence.ts`
+- Create: `prisma/migrations/20260811167000_weekly_task_result/migration.sql`
 - Test: `test/integration/tracking/weekly-task-result.integration.spec.ts`
+- Test: `test/e2e/tracking/weekly-task-result.e2e.spec.ts`
 
-- [ ] Написать RED owner/partner, done/not_done correction, replay, stale week
+- [x] Написать RED owner/partner, done/not_done correction, replay, stale week
   and already system-closed cases.
-- [ ] Реализовать result as typed week-level fact/action history.
-- [ ] Проверить one factsRevision increment and no daily expectation creation.
-- [ ] Запустить focused integration and `pnpm check:quick`.
-- [ ] Commit: `feat: record weekly planned task result`.
+- [x] Реализовать result as typed week-level fact/action history.
+- [x] Проверить one factsRevision increment and no daily expectation creation.
+- [x] Запустить focused integration and `pnpm check:quick`.
+- [x] Commit: `feat: record weekly planned task result`.
 
 ### T10 — Planner worker and CloseWeek
 
@@ -1857,6 +1860,10 @@ result is revisioned, auditable and protected by receipt/CAS.
 
 **Produces:** product-owned worker executable and REL-03 adoption evidence;
 runner remains only a non-overlapping process-local trigger.
+
+T10 также владеет physical system-result persistence и реальным PostgreSQL
+сценарием `already-system-closed`; T09 проверяет эту конечную ошибку только на
+application fake boundary.
 
 - [ ] Написать fake-clock RED cases Monday, month edge, restart, duplicate tick
   and two competing runners.

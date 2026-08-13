@@ -31,6 +31,8 @@ import type {
   RecordTimePayload,
   RecordTextApplicationCommand,
   RecordTextPayload,
+  RecordWeeklyTaskResultApplicationCommand,
+  RecordWeeklyTaskResultPayload,
   UndoLastOwnActionApplicationCommand,
   UndoLastOwnActionPayload,
 } from './tracking.types'
@@ -464,6 +466,18 @@ function compositeOccurrencePayload(
   })
 }
 
+function weeklyTaskResultPayload(
+  value: unknown,
+): RecordWeeklyTaskResultPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, ['publicationId', 'flexiblePeriodId', 'result'])
+  return Object.freeze({
+    publicationId: uuid(ownData(value, 'publicationId')),
+    flexiblePeriodId: uuid(ownData(value, 'flexiblePeriodId')),
+    result: completion(ownData(value, 'result')),
+  })
+}
+
 function correctValue(value: unknown): CorrectFactValueV1 {
   if (!isRecord(value)) throw new CommandValidationError()
   const kind = ownData(value, 'kind')
@@ -583,6 +597,18 @@ export function snapshotRecordCompositeOccurrenceCommand(
   return commandEnvelope(value, compositeOccurrencePayload)
 }
 
+export function snapshotRecordWeeklyTaskResultCommand(
+  value: unknown,
+): RecordWeeklyTaskResultApplicationCommand {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, ['commandId', 'trustedActor', 'payload'])
+  return Object.freeze({
+    commandId: uuid(ownData(value, 'commandId')),
+    trustedActor: actor(ownData(value, 'trustedActor')),
+    payload: weeklyTaskResultPayload(ownData(value, 'payload')),
+  })
+}
+
 export function snapshotCorrectRecordCommand(
   value: unknown,
 ): CorrectRecordApplicationCommand & { readonly expectedRevision: bigint } {
@@ -696,6 +722,12 @@ export function canonicalRecordCompositeOccurrencePayload(
   value: RecordCompositeOccurrencePayload,
 ): RecordCompositeOccurrencePayload {
   return compositeOccurrencePayload(value)
+}
+
+export function canonicalRecordWeeklyTaskResultPayload(
+  value: RecordWeeklyTaskResultPayload,
+): RecordWeeklyTaskResultPayload {
+  return weeklyTaskResultPayload(value)
 }
 
 export function canonicalCorrectRecordPayload(

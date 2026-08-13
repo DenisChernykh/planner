@@ -20,6 +20,7 @@ import { RecordTextCommand } from '../application/record-text.command'
 import { UndoLastOwnActionCommand } from '../application/undo-last-own-action.command'
 import { CloseDayCommand } from '../application/close-day.command'
 import { PreviewCloseDayQuery } from '../application/preview-close-day.query'
+import { RecordWeeklyTaskResultCommand } from '../application/record-weekly-task-result.command'
 import {
   GetMonthQuery,
   GetTodayQuery,
@@ -28,6 +29,7 @@ import type { TrackingApplication } from '../application/tracking-application'
 import { PrismaFactPersistence } from '../infrastructure/prisma-fact.persistence'
 import { PrismaCloseDayPersistence } from '../infrastructure/prisma-close-day.persistence'
 import { PrismaTrackingReadPersistence } from '../infrastructure/prisma-tracking-read.persistence'
+import { PrismaWeeklyTaskResultPersistence } from '../infrastructure/prisma-weekly-task-result.persistence'
 
 export function createTrackingApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -38,6 +40,9 @@ export function createTrackingApplication(dependencies: {
   const facts = new PrismaFactPersistence(dependencies.database)
   const closeDays = new PrismaCloseDayPersistence(dependencies.database)
   const reads = new PrismaTrackingReadPersistence(dependencies.database)
+  const weeklyTasks = new PrismaWeeklyTaskResultPersistence(
+    dependencies.database,
+  )
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -104,6 +109,11 @@ export function createTrackingApplication(dependencies: {
       executor,
       dependencies.workspaceMembers,
       facts,
+    ),
+    recordWeeklyTaskResult: new RecordWeeklyTaskResultCommand(
+      executor,
+      dependencies.workspaceMembers,
+      weeklyTasks,
     ),
     undoLastOwnAction: new UndoLastOwnActionCommand(
       executor,

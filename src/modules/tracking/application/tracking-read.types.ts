@@ -36,6 +36,7 @@ export type TrackingFactReadV1 = {
     | 'checklist_item'
     | 'or_variant'
     | 'fixed_not_done'
+    | 'weekly_task_result'
   readonly contributionId: string | null
   readonly checklistItemId: string | null
   readonly orVariantId: string | null

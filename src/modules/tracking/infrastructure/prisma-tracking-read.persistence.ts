@@ -272,6 +272,19 @@ function groupEvaluationFacts(
         expectationDate: first.local_date,
         value,
       })
+    } else if (
+      first.fact_kind === 'weekly_task_result' &&
+      first.flexible_period_id !== null &&
+      first.period_start !== null &&
+      first.period_end !== null &&
+      value.kind === 'boolean'
+    ) {
+      facts.push({
+        kind: 'weekly_planned_task',
+        periodStart: first.period_start,
+        periodEnd: first.period_end,
+        result: value.result,
+      })
     } else if (first.flexible_period_id !== null) {
       facts.push({
         kind: 'quota_occurrence',
@@ -341,6 +354,7 @@ function factValue(row: FactRow): TrackingStoredFactValueV1 | null {
   if (row.revision_kind === 'tombstoned') return null
   switch (row.fact_kind) {
     case 'boolean':
+    case 'weekly_task_result':
       if (row.boolean_result === null) throw new Error('Invalid Boolean fact')
       return { kind: 'boolean', result: row.boolean_result }
     case 'quantity_add':
@@ -773,6 +787,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
                revision.recorded_by_member_id::text,
                expectation.component_kind,
                expectation.component_id::text,
+               period.period_start::text, period.period_end::text,
                action.after_facts_revision
           FROM tracking_fact_records record
           JOIN tracking_fact_revisions revision
@@ -782,6 +797,8 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
           JOIN tracking_action_groups action ON action.id = change.action_id
           LEFT JOIN fixed_expectations expectation
             ON expectation.id = record.fixed_expectation_id
+          LEFT JOIN flexible_periods period
+            ON period.id = record.flexible_period_id
          WHERE record.publication_id = ${header.publication_id}::uuid
          ORDER BY action.after_facts_revision, record.id
          LIMIT ${MAX_CURRENT_RECORDS + 1}
@@ -849,6 +866,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
     }
     const factsByExpectation = new Map<string, FactRow[]>()
     const factsByPeriodAndDate = new Map<string, FactRow[]>()
+    const factsByPeriod = new Map<string, FactRow[]>()
     for (const row of facts) {
       if (row.fixed_expectation_id !== null) {
         const values = factsByExpectation.get(row.fixed_expectation_id)
@@ -857,6 +875,10 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
         else values.push(row)
       }
       if (row.flexible_period_id !== null) {
+        const periodValues = factsByPeriod.get(row.flexible_period_id)
+        if (periodValues === undefined)
+          factsByPeriod.set(row.flexible_period_id, [row])
+        else periodValues.push(row)
         const key = `${row.flexible_period_id}:${row.local_date}`
         const values = factsByPeriodAndDate.get(key)
         if (values === undefined) factsByPeriodAndDate.set(key, [row])
@@ -944,10 +966,14 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
         const flexible: TrackingFlexiblePeriodV1[] = periodRows.map((row) => {
           const eligibleOnDate =
             row.period_kind === 'weekly_planned_task'
-              ? true
+              ? date >= header.active_local_date
               : row.eligible_dates.includes(date)
           const rows =
-            factsByPeriodAndDate.get(`${row.flexible_period_id}:${date}`) ?? []
+            row.period_kind === 'weekly_planned_task'
+              ? (factsByPeriod.get(row.flexible_period_id) ?? [])
+              : (factsByPeriodAndDate.get(
+                  `${row.flexible_period_id}:${date}`,
+                ) ?? [])
           const actualProgress =
             current.periods.find(
               (period) =>
@@ -1005,7 +1031,13 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
           (fixedRows.length !== 0 ||
             flexible.some((period) => period.eligibleOnDate))
         const writeSupported =
-          goal.config.repetition.kind !== 'weekly_planned_task'
+          goal.config.repetition.kind !== 'weekly_planned_task' ||
+          periodRows.some(
+            (period) =>
+              input.queryLocalDate >= header.active_local_date &&
+              input.queryLocalDate >= period.period_start &&
+              input.queryLocalDate <= period.period_end,
+          )
         const writable =
           applicable &&
           writeSupported &&

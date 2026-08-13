@@ -157,6 +157,15 @@ export type RecordCompositeOccurrencePayload = {
 export type RecordCompositeOccurrenceApplicationCommand =
   ApplicationCommand<RecordCompositeOccurrencePayload>
 
+export type RecordWeeklyTaskResultPayload = {
+  readonly publicationId: string
+  readonly flexiblePeriodId: string
+  readonly result: 'done' | 'not_done'
+}
+
+export type RecordWeeklyTaskResultApplicationCommand =
+  ApplicationCommand<RecordWeeklyTaskResultPayload>
+
 export type CorrectFactValueV1 = RecordSingleFactValueV1
 
 export type CorrectRecordPayload = {

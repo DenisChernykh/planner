@@ -52,6 +52,44 @@ export class FactRevisionConflictError extends Error {
   }
 }
 
+export type ExistingFactRef = {
+  readonly factRecordId: string
+  readonly revision: bigint
+}
+
+export class FactCorrectionRequiredError extends Error {
+  public constructor(public readonly existingRef: ExistingFactRef) {
+    super('Existing fact must be changed through the correction command')
+    this.name = 'FactCorrectionRequiredError'
+  }
+}
+
+export class WeeklyTaskTargetNotFoundError extends Error {
+  public constructor() {
+    super('Weekly planned task target was not found')
+    this.name = 'WeeklyTaskTargetNotFoundError'
+  }
+}
+
+export type WeeklyTaskTargetUnavailableReason =
+  'not_active' | 'future_period' | 'preactivation' | 'stale_period' | 'closed'
+
+export class WeeklyTaskTargetUnavailableError extends Error {
+  public constructor(
+    public readonly reason: WeeklyTaskTargetUnavailableReason,
+  ) {
+    super(`Weekly planned task target is unavailable: ${reason}`)
+    this.name = 'WeeklyTaskTargetUnavailableError'
+  }
+}
+
+export class WeeklyTaskAlreadySystemClosedError extends Error {
+  public constructor(public readonly existingRef: ExistingFactRef) {
+    super('Weekly planned task was already closed by the system')
+    this.name = 'WeeklyTaskAlreadySystemClosedError'
+  }
+}
+
 export type FactUndoUnavailableReason =
   'nothing_to_undo' | 'not_latest' | 'superseded'
 

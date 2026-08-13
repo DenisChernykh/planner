@@ -226,6 +226,7 @@ function installTrackingSchemas(document: OpenAPIObject): void {
           'checklist_item',
           'or_variant',
           'fixed_not_done',
+          'weekly_task_result',
         ],
       },
       contributionId: nullableUuid,

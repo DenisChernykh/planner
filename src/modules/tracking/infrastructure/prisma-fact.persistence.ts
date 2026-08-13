@@ -137,6 +137,7 @@ type StateRow = {
     | 'checklist_item'
     | 'or_variant'
     | 'fixed_not_done'
+    | 'weekly_task_result'
   readonly contribution_id: string | null
   readonly checklist_item_id: string | null
   readonly or_variant_id: string | null
@@ -169,6 +170,8 @@ export type ProgressFactRow = StateRow & {
   readonly component_id: string | null
   readonly fixed_expectation_id: string | null
   readonly flexible_period_id: string | null
+  readonly period_start: string | null
+  readonly period_end: string | null
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -222,6 +225,7 @@ function assertMutationValue(
   const measurement = record(config['measurement'])
   switch (target.fact_kind) {
     case 'boolean':
+    case 'weekly_task_result':
       if (value.kind !== 'boolean') throw new FactValueInvalidError()
       return
     case 'quantity_add':
@@ -634,6 +638,7 @@ export function projectFactValue(
   if (rows.length !== 1) throw new Error('Stored single fact group is invalid')
   switch (first.fact_kind) {
     case 'boolean':
+    case 'weekly_task_result':
       if (first.boolean_result === null) {
         throw new Error('Stored Boolean fact is invalid')
       }
@@ -1617,12 +1622,15 @@ export class PrismaFactPersistence implements FactPersistencePort {
                revision.fixed_outcome,
                revision.recorded_by_member_id::text,
                expectation.component_kind,
-               expectation.component_id::text
+               expectation.component_id::text,
+               period.period_start::text, period.period_end::text
           FROM tracking_fact_records record
           JOIN tracking_fact_revisions revision
             ON revision.id = record.current_revision_id
           LEFT JOIN fixed_expectations expectation
             ON expectation.id = record.fixed_expectation_id
+          LEFT JOIN flexible_periods period
+            ON period.id = record.flexible_period_id
          WHERE record.publication_id = ${input.publicationId}::uuid
            AND record.plan_goal_snapshot_id = ${input.planGoalSnapshotId}::uuid
            AND record.local_date <= ${input.asOfLocalDate}::date
@@ -1706,6 +1714,19 @@ export class PrismaFactPersistence implements FactPersistencePort {
             kind: 'fixed',
             expectationDate: first.local_date,
             value,
+          })
+        } else if (
+          first.fact_kind === 'weekly_task_result' &&
+          first.flexible_period_id !== null &&
+          first.period_start !== null &&
+          first.period_end !== null &&
+          value.kind === 'boolean'
+        ) {
+          facts.push({
+            kind: 'weekly_planned_task',
+            periodStart: first.period_start,
+            periodEnd: first.period_end,
+            result: value.result,
           })
         } else if (first.flexible_period_id !== null) {
           facts.push({

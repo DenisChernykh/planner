@@ -14,6 +14,7 @@ import type { UndoLastOwnActionCommand } from './undo-last-own-action.command'
 import type { GetMonthQuery, GetTodayQuery } from './tracking-read.query'
 import type { CloseDayCommand } from './close-day.command'
 import type { PreviewCloseDayQuery } from './preview-close-day.query'
+import type { RecordWeeklyTaskResultCommand } from './record-weekly-task-result.command'
 
 export const TRACKING_APPLICATION: unique symbol = Symbol(
   'TRACKING_APPLICATION',
@@ -32,6 +33,7 @@ export type TrackingApplication = {
   readonly recordChecklistItem: RecordChecklistItemCommand
   readonly recordOrVariant: RecordOrVariantCommand
   readonly recordCompositeOccurrence: RecordCompositeOccurrenceCommand
+  readonly recordWeeklyTaskResult: RecordWeeklyTaskResultCommand
   readonly undoLastOwnAction: UndoLastOwnActionCommand
   readonly getFactState: GetFactStateQuery
   readonly getGoalProgress: GetGoalProgressQuery

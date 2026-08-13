@@ -731,7 +731,7 @@ describe('T07 Today and Month read models on PostgreSQL', () => {
       april10.goals.find((goal) => goal.planGoalSnapshotId === outreachWeek2Id),
     ).toMatchObject({
       applicable: true,
-      writable: false,
+      writable: true,
       state: 'no_data',
       coverage: { filled: '0', applicable: '0' },
       flexiblePeriods: [

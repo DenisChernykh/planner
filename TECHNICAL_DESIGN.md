@@ -1134,7 +1134,8 @@ tombstones, fixed expectations, flexible/weekly periods и чистый P05 prog
 record не превращается в `not_done`. Full audit revision history не входит в
 read model. Quota period дополнительно содержит вычисленные P04
 `expectedProgress` и P05 `actualProgress` на тот же as-of; weekly planned task
-имеет `expectedProgress = null` и доступна как read-only period до T09.
+имеет `expectedProgress = null`, а после T09 содержит current week-level
+`done/not_done` fact с record ID, revision и автором.
 Flexible-only цель считается применимой по календарю периода и получает
 `no_data|partial|filled` по current period facts, хотя её P05 coverage остаётся
 намеренно `0/0`; агрегат дня учитывает такую применимость отдельно от coverage.
@@ -1386,7 +1387,33 @@ closure metadata, но полная audit history остаётся вне read m
 `20260811166000_close_day` сохраняет populated T01–T07 rows и deferred-проверяет
 set, ownership, dates, adjacent facts revision, effects и receipt.
 
-### 9.5. `CloseWeek`
+### 9.5. Weekly planned task result
+
+T09 добавляет durable `tracking.record-weekly-task-result.v1` с exact payload
+`{ publicationId, flexiblePeriodId, result }`. Initial запись не принимает
+`expectedRevision`: logical identity задаётся immutable `flexible_period_id`, а
+повторный новый intent требует существующую `tracking.correct-record.v1` с
+positive record revision и причиной. Exact replay выполняется до clock,
+membership и target lookup.
+
+Member может записать personal period только как owner, а shared — как любой
+участник пространства. Target обязан быть physical `weekly_planned_task`
+period active publication; запись разрешена только между
+`max(period_start, active_local_date)` и `period_end` включительно. Canonical
+storage anchor `local_date = period_start` не создаёт daily expectation и не
+делает результат quota occurrence.
+
+Одна transaction блокирует month и period, повторно читает logical identity
+после lock, создаёт record/revision/pointer, увеличивает `facts_revision` ровно
+на один и сохраняет action/change/receipt. Fact kind `weekly_task_result`
+использует `boolean_result`; T05 correction/personal delete и T06 Undo работают
+через расширенные dispatchers. Today/Month прикрепляют current revision ко
+всему period, а P05 считает `done = 100%`, `not_done|no_data = 0%`. Physical
+system actor result и автоматический already-system-closed path появляются
+только вместе с T10 `CloseWeek`; T09 фиксирует конечную application error для
+этой границы без создания системных строк.
+
+### 9.6. `CloseWeek`
 
 Владелец weekly planned task может выставить ей `done/not_done` в течение
 недели через web или Telegram. В `00:00` следующего понедельника либо на
@@ -1400,7 +1427,7 @@ set, ownership, dates, adjacent facts revision, effects и receipt.
 
 Повторный запуск не меняет уже выставленный пользователем результат.
 
-### 9.6. `CloseMonth` и `RecloseMonth`
+### 9.7. `CloseMonth` и `RecloseMonth`
 
 Owner lifecycle — `planning`; `reporting` предоставляет детерминированный
 calculator и transaction-scoped repository participant. Одна transaction:
@@ -1426,7 +1453,7 @@ Reopen не удаляет report revisions, не разблокирует confi
 возобновляет notifications. Каждая последующая correction увеличивает
 `factsRevision`; reclose создаёт следующую report revision.
 
-### 9.7. Scheduled lifecycle enforcement
+### 9.8. Scheduled lifecycle enforcement
 
 Publication хранит `activeLocalDate`. Для будущего месяца это первое число, для
 late publication — local date публикации. До этой даты API запрещает facts и
