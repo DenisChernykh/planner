@@ -13,7 +13,7 @@ import {
 } from '@/modules/planning'
 import {
   createTrackingApplication,
-  FactRevisionConflictError,
+  FactTargetUnavailableError,
   PrismaFactPersistence,
   RecordCompositeOccurrenceCommand,
   TrackingDependencyUnavailableError,
@@ -410,17 +410,14 @@ describe('T04 OR, informational and flexible composite facts', () => {
       progress: { basisPoints: '6667' },
       coverage: { filled: '1', applicable: '1' },
     })
-    await tracking.recordOrVariant.execute({
+    await tracking.correctRecord.execute({
       commandId: randomUUID(),
       trustedActor: actor(),
       expectedRevision: first.aggregateRevision,
       payload: {
-        publicationId: fixture.publicationId,
-        planGoalSnapshotId: fixture.snapshots.fixedOr,
-        expectationDate: '2026-04-10',
-        checkpointId: null,
-        variantId: fixture.fixedVariants[0]!,
-        value: '100',
+        factRecordId: first.aggregateId,
+        value: { kind: 'or_variant', value: '100' },
+        reason: 'Уточнён вариант',
       },
     })
     await expect(
@@ -579,7 +576,9 @@ describe('T04 OR, informational and flexible composite facts', () => {
     const loser = attempts.find(
       (item): item is PromiseRejectedResult => item.status === 'rejected',
     )
-    expect(loser?.reason).toBeInstanceOf(FactRevisionConflictError)
+    expect(loser?.reason).toEqual(
+      new FactTargetUnavailableError('correction_required'),
+    )
     const count = await pool.query<{ readonly count: string }>(
       `SELECT count(*)::text count FROM tracking_fact_records
         WHERE plan_goal_snapshot_id = $1::uuid`,

@@ -7,6 +7,8 @@ import type { ProductClock } from '@/shared/application/product-clock'
 
 import { GetFactStateQuery } from '../application/get-fact-state.query'
 import { GetGoalProgressQuery } from '../application/get-goal-progress.query'
+import { CorrectRecordCommand } from '../application/correct-record.command'
+import { DeleteRecordCommand } from '../application/delete-record.command'
 import { RecordCheckpointCommand } from '../application/record-checkpoint.command'
 import { RecordChecklistItemCommand } from '../application/record-checklist-item.command'
 import { RecordCompositeOccurrenceCommand } from '../application/record-composite-occurrence.command'
@@ -31,6 +33,16 @@ export function createTrackingApplication(dependencies: {
     dependencies.clock,
   )
   return Object.freeze({
+    correctRecord: new CorrectRecordCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
+    deleteRecord: new DeleteRecordCommand(
+      executor,
+      dependencies.workspaceMembers,
+      facts,
+    ),
     recordFact: new RecordFactCommand(
       executor,
       dependencies.workspaceMembers,

@@ -580,6 +580,7 @@ model TrackingActionGroup {
   commandId           String   @map("command_id") @db.Uuid
   beforeFactsRevision BigInt   @map("before_facts_revision") @db.BigInt
   afterFactsRevision  BigInt   @map("after_facts_revision") @db.BigInt
+  reason              String?  @db.Text
   occurredAt          DateTime @map("occurred_at") @db.Timestamptz(3)
 
   member           Membership          @relation(fields: [spaceId, memberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)

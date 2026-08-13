@@ -12,7 +12,6 @@ import { createPlanningApplication } from '@/modules/planning'
 import type { PlanningApplication } from '@/modules/planning'
 import {
   createTrackingApplication,
-  FactRevisionConflictError,
   FactTargetNotFoundError,
   FactTargetUnavailableError,
   FactValueInvalidError,
@@ -368,15 +367,14 @@ describe('T02 actual time, rating and checkpoints in real PostgreSQL', () => {
       progress: { available: true, basisPoints: '10000' },
       coverage: { filled: '1', applicable: '1' },
     })
-    await tracking.recordTime.execute({
+    await tracking.correctRecord.execute({
       commandId: randomUUID(),
       trustedActor: actor(),
       expectedRevision: first.aggregateRevision,
       payload: {
-        publicationId: fixture.publicationId,
-        planGoalSnapshotId: fixture.snapshots.sleep,
-        expectationDate: '2026-04-10',
-        value: '12:00',
+        factRecordId: first.aggregateId,
+        value: { kind: 'actual_time', value: '12:00' },
+        reason: 'Уточнено время',
       },
     })
     await expect(progress(fixture, 'sleep')).resolves.toMatchObject({
@@ -398,15 +396,14 @@ describe('T02 actual time, rating and checkpoints in real PostgreSQL', () => {
       coverage: { filled: '1', applicable: '1' },
     })
     await expect(
-      tracking.recordTime.execute({
+      tracking.correctRecord.execute({
         commandId: randomUUID(),
         trustedActor: actor(),
         expectedRevision: 1n,
         payload: {
-          publicationId: fixture.publicationId,
-          planGoalSnapshotId: fixture.snapshots.sleep,
-          expectationDate: '2026-04-10',
-          value: '23:00',
+          factRecordId: first.aggregateId,
+          value: { kind: 'actual_time', value: '23:00' },
+          reason: 'Stale correction',
         },
       }),
     ).rejects.toMatchObject({
@@ -506,15 +503,14 @@ describe('T02 actual time, rating and checkpoints in real PostgreSQL', () => {
       score: { basisPoints: '10000' },
       coverage: { filled: '1', applicable: '1' },
     })
-    await tracking.recordRating.execute({
+    await tracking.correctRecord.execute({
       commandId: randomUUID(),
       trustedActor: actor(),
       expectedRevision: low.aggregateRevision,
       payload: {
-        publicationId: fixture.publicationId,
-        planGoalSnapshotId: fixture.snapshots.energy,
-        expectationDate: '2026-04-10',
-        value: ratingMaximum,
+        factRecordId: low.aggregateId,
+        value: { kind: 'rating', value: ratingMaximum },
+        reason: 'Уточнена оценка',
       },
     })
     await expect(
@@ -736,7 +732,7 @@ describe('T02 actual time, rating and checkpoints in real PostgreSQL', () => {
           (item) => item.status === 'rejected',
         ) as PromiseRejectedResult
       ).reason,
-    ).toBeInstanceOf(FactRevisionConflictError)
+    ).toEqual(new FactTargetUnavailableError('correction_required'))
     const audit = await pool.query<Record<string, string>>(`
       SELECT (SELECT count(*)::text FROM tracking_fact_records) records,
              (SELECT count(*)::text FROM tracking_fact_revisions) revisions,

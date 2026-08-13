@@ -338,14 +338,16 @@ describe('T01 Boolean and quantity record kernel', () => {
     const first = await tracking.recordFact.execute(
       command(fixture, 'steps', { kind: 'quantity', value: '2000' }),
     )
-    const latest = await tracking.recordFact.execute(
-      command(
-        fixture,
-        'steps',
-        { kind: 'quantity', value: '7000' },
-        { expectedRevision: 1n },
-      ),
-    )
+    const latest = await tracking.correctRecord.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: 1n,
+      payload: {
+        factRecordId: first.aggregateId,
+        value: { kind: 'quantity', value: '7000' },
+        reason: 'Уточнено значение',
+      },
+    })
     expect({ first, latest }).toMatchObject({
       first: { aggregateRevision: 1n },
       latest: { aggregateId: first.aggregateId, aggregateRevision: 2n },
@@ -435,9 +437,9 @@ describe('T01 Boolean and quantity record kernel', () => {
       shared.filter((result) => result.status === 'fulfilled'),
     ).toHaveLength(1)
     const rejected = shared.find((result) => result.status === 'rejected')
-    expect(
-      rejected?.status === 'rejected' ? rejected.reason : null,
-    ).toBeInstanceOf(FactRevisionConflictError)
+    expect(rejected?.status === 'rejected' ? rejected.reason : null).toEqual(
+      new FactTargetUnavailableError('correction_required'),
+    )
     const state = await tracking.getFactState.execute({
       trustedActor: actor(),
       publicationId: fixture.publicationId,
@@ -498,23 +500,27 @@ describe('T01 Boolean and quantity record kernel', () => {
     const first = await tracking.recordFact.execute(
       command(fixture, 'steps', { kind: 'quantity', value: '2000' }),
     )
-    await tracking.recordFact.execute(
-      command(
-        fixture,
-        'steps',
-        { kind: 'quantity', value: '7000' },
-        { expectedRevision: first.aggregateRevision },
-      ),
-    )
+    await tracking.correctRecord.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: first.aggregateRevision,
+      payload: {
+        factRecordId: first.aggregateId,
+        value: { kind: 'quantity', value: '7000' },
+        reason: 'Уточнено значение',
+      },
+    })
     await expect(
-      tracking.recordFact.execute(
-        command(
-          fixture,
-          'steps',
-          { kind: 'quantity', value: '6000' },
-          { expectedRevision: 1n },
-        ),
-      ),
+      tracking.correctRecord.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        expectedRevision: 1n,
+        payload: {
+          factRecordId: first.aggregateId,
+          value: { kind: 'quantity', value: '6000' },
+          reason: 'Stale correction',
+        },
+      }),
     ).rejects.toMatchObject({
       name: 'FactRevisionConflictError',
       expectedRevision: 1n,
@@ -634,14 +640,16 @@ describe('T01 Boolean and quantity record kernel', () => {
     const first = await tracking.recordFact.execute(
       command(fixture, 'vitamin', { kind: 'boolean', result: 'done' }),
     )
-    const result = await tracking.recordFact.execute(
-      command(
-        fixture,
-        'vitamin',
-        { kind: 'boolean', result: 'not_done' },
-        { expectedRevision: first.aggregateRevision },
-      ),
-    )
+    const result = await tracking.correctRecord.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: first.aggregateRevision,
+      payload: {
+        factRecordId: first.aggregateId,
+        value: { kind: 'boolean', result: 'not_done' },
+        reason: 'Direct SQL fixture correction',
+      },
+    })
     const shape = await pool.query<{ valid: boolean }>(
       `SELECT t01_action_has_exact_shape(action.id) valid
          FROM tracking_action_groups action
@@ -658,11 +666,11 @@ describe('T01 Boolean and quantity record kernel', () => {
           (id, action_kind, actor_kind, actor_scope, member_id, space_id,
            plan_month_id, publication_id, plan_goal_snapshot_id,
            command_type, command_id, before_facts_revision,
-           after_facts_revision, occurred_at)
+           after_facts_revision, reason, occurred_at)
          SELECT gen_random_uuid(), action_kind, actor_kind, actor_scope,
                 member_id, space_id, plan_month_id, publication_id,
                 plan_goal_snapshot_id, command_type, gen_random_uuid(),
-                before_facts_revision, after_facts_revision, occurred_at
+                before_facts_revision, after_facts_revision, reason, occurred_at
            FROM tracking_action_groups
           WHERE plan_month_id = $1::uuid
             AND after_facts_revision = 2`,

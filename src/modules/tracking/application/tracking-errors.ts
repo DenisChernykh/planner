@@ -13,7 +13,13 @@ export class FactTargetNotFoundError extends Error {
 }
 
 export type FactTargetUnavailableReason =
-  'not_active' | 'future_date' | 'not_applicable' | 'closed' | 'unsupported'
+  | 'not_active'
+  | 'future_date'
+  | 'not_applicable'
+  | 'closed'
+  | 'unsupported'
+  | 'correction_required'
+  | 'already_deleted'
 
 export class FactTargetUnavailableError extends Error {
   public constructor(public readonly reason: FactTargetUnavailableReason) {

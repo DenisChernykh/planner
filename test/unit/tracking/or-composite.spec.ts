@@ -83,6 +83,7 @@ function facts(
       inputs.push(input)
       return Promise.resolve({ factRecordId, factRevision: 1n })
     },
+    mutate: () => Promise.reject(new Error('unexpected mutate')),
     getState: () => Promise.reject(new Error('unexpected getState')),
     getGoalProgressInput: () =>
       Promise.reject(new Error('unexpected getGoalProgressInput')),

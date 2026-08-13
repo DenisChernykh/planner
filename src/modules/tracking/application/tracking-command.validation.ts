@@ -7,6 +7,11 @@ import { CommandValidationError } from '@/shared/application/application-command
 import type {
   GetFactStateInput,
   GetGoalProgressInput,
+  CorrectFactValueV1,
+  CorrectRecordApplicationCommand,
+  CorrectRecordPayload,
+  DeleteRecordApplicationCommand,
+  DeleteRecordPayload,
   RecordCheckpointApplicationCommand,
   RecordCheckpointPayload,
   RecordCheckpointValueV1,
@@ -327,6 +332,12 @@ function nonEmptyText(value: unknown): string {
   return value
 }
 
+function mutationReason(value: unknown): string {
+  const result = nonEmptyText(value)
+  if (result.length > 2_000) throw new CommandValidationError()
+  return result
+}
+
 function textPayload(value: unknown): RecordTextPayload {
   if (!isRecord(value)) throw new CommandValidationError()
   exactKeys(value, [
@@ -436,6 +447,75 @@ function compositeOccurrencePayload(
   })
 }
 
+function correctValue(value: unknown): CorrectFactValueV1 {
+  if (!isRecord(value)) throw new CommandValidationError()
+  const kind = ownData(value, 'kind')
+  if (kind === 'boolean' || kind === 'quantity') return factValue(value)
+  if (kind === 'actual_time') {
+    exactKeys(value, ['kind', 'value'])
+    return Object.freeze({
+      kind,
+      value: canonicalLocalTime(ownData(value, 'value')),
+    })
+  }
+  if (kind === 'rating') {
+    exactKeys(value, ['kind', 'value'])
+    return Object.freeze({ kind, value: safeRating(ownData(value, 'value')) })
+  }
+  if (kind === 'text') {
+    exactKeys(value, ['kind', 'text', 'result'])
+    return Object.freeze({
+      kind,
+      text: nonEmptyText(ownData(value, 'text')),
+      result: completion(ownData(value, 'result')),
+    })
+  }
+  if (kind === 'checklist_item') {
+    exactKeys(value, ['kind', 'state'])
+    return Object.freeze({ kind, state: completion(ownData(value, 'state')) })
+  }
+  if (kind === 'or_variant') {
+    exactKeys(value, ['kind', 'value'])
+    return Object.freeze({
+      kind,
+      value: canonicalDecimal(ownData(value, 'value')),
+    })
+  }
+  throw new CommandValidationError()
+}
+
+function correctRecordPayload(value: unknown): CorrectRecordPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, ['factRecordId', 'value', 'reason'])
+  return Object.freeze({
+    factRecordId: uuid(ownData(value, 'factRecordId')),
+    value: correctValue(ownData(value, 'value')),
+    reason: mutationReason(ownData(value, 'reason')),
+  })
+}
+
+function deleteRecordPayload(value: unknown): DeleteRecordPayload {
+  if (!isRecord(value)) throw new CommandValidationError()
+  exactKeys(value, ['factRecordId', 'reason'])
+  return Object.freeze({
+    factRecordId: uuid(ownData(value, 'factRecordId')),
+    reason: mutationReason(ownData(value, 'reason')),
+  })
+}
+
+function mutationEnvelope<TPayload>(
+  value: unknown,
+  readPayload: (payloadValue: unknown) => TPayload,
+): ApplicationCommand<TPayload> & { readonly expectedRevision: bigint } {
+  const snapshot = commandEnvelope(value, readPayload)
+  if (snapshot.expectedRevision === undefined) {
+    throw new CommandValidationError()
+  }
+  return snapshot as ApplicationCommand<TPayload> & {
+    readonly expectedRevision: bigint
+  }
+}
+
 export function snapshotRecordTimeCommand(
   value: unknown,
 ): RecordTimeApplicationCommand {
@@ -478,6 +558,18 @@ export function snapshotRecordCompositeOccurrenceCommand(
   return commandEnvelope(value, compositeOccurrencePayload)
 }
 
+export function snapshotCorrectRecordCommand(
+  value: unknown,
+): CorrectRecordApplicationCommand & { readonly expectedRevision: bigint } {
+  return mutationEnvelope(value, correctRecordPayload)
+}
+
+export function snapshotDeleteRecordCommand(
+  value: unknown,
+): DeleteRecordApplicationCommand & { readonly expectedRevision: bigint } {
+  return mutationEnvelope(value, deleteRecordPayload)
+}
+
 export function canonicalRecordTimePayload(
   value: RecordTimePayload,
 ): RecordTimePayload {
@@ -518,6 +610,18 @@ export function canonicalRecordCompositeOccurrencePayload(
   value: RecordCompositeOccurrencePayload,
 ): RecordCompositeOccurrencePayload {
   return compositeOccurrencePayload(value)
+}
+
+export function canonicalCorrectRecordPayload(
+  value: CorrectRecordPayload,
+): CorrectRecordPayload {
+  return correctRecordPayload(value)
+}
+
+export function canonicalDeleteRecordPayload(
+  value: DeleteRecordPayload,
+): DeleteRecordPayload {
+  return deleteRecordPayload(value)
 }
 
 export function canonicalRecordFactPayload(value: RecordFactPayload): {

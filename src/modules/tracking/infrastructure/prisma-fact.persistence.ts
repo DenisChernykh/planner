@@ -18,6 +18,7 @@ import type {
   FactRecordRef,
   GetFactStatePersistenceInput,
   GetGoalProgressPersistenceInput,
+  MutateFactPersistenceInput,
   RecordFactPersistenceInput,
 } from '../application/fact-persistence.port'
 import {
@@ -62,6 +63,27 @@ type CurrentRecordRow = {
   readonly id: string
   readonly current_revision_id: string | null
   readonly revision_number: bigint | null
+}
+
+type MutationTargetRow = {
+  readonly id: string
+  readonly fact_kind: StateRow['fact_kind']
+  readonly current_revision_id: string
+  readonly revision_number: bigint
+  readonly revision_kind: 'recorded' | 'tombstoned'
+  readonly plan_month_id: string
+  readonly facts_revision: bigint
+  readonly status: string
+  readonly active_publication_id: string | null
+  readonly publication_id: string
+  readonly plan_goal_snapshot_id: string
+  readonly active_local_date: string
+  readonly correction_deadline: string
+  readonly space_id: string
+  readonly scope_kind: 'personal' | 'shared'
+  readonly owner_member_id: string | null
+  readonly config: unknown
+  readonly or_variant_id: string | null
 }
 
 type StateRow = {
@@ -148,6 +170,84 @@ function exactString(value: unknown, message: string): string {
 function exactInteger(value: unknown, message: string): number {
   if (!Number.isSafeInteger(value)) throw new Error(message)
   return value as number
+}
+
+function assertMutationValue(
+  target: MutationTargetRow,
+  value: MutateFactPersistenceInput['value'],
+): void {
+  if (value === null) return
+  const config = record(target.config)
+  const measurement = record(config['measurement'])
+  switch (target.fact_kind) {
+    case 'boolean':
+      if (value.kind !== 'boolean') throw new FactValueInvalidError()
+      return
+    case 'quantity_add':
+    case 'quantity_latest': {
+      if (value.kind !== 'quantity' || measurement['kind'] !== 'quantity') {
+        throw new FactValueInvalidError()
+      }
+      const precision = measurement['precision']
+      if (
+        !Number.isInteger(precision) ||
+        ![0, 1, 2, 3].includes(precision as number) ||
+        quantityScale(value.value) > (precision as number)
+      ) {
+        throw new FactValueInvalidError()
+      }
+      return
+    }
+    case 'actual_time':
+      if (value.kind !== 'actual_time') throw new FactValueInvalidError()
+      return
+    case 'rating': {
+      if (value.kind !== 'rating' || measurement['kind'] !== 'rating') {
+        throw new FactValueInvalidError()
+      }
+      const minimum = measurement['minimum']
+      const maximum = measurement['maximum']
+      if (
+        !Number.isSafeInteger(minimum) ||
+        !Number.isSafeInteger(maximum) ||
+        value.value < (minimum as number) ||
+        value.value > (maximum as number)
+      ) {
+        throw new FactValueInvalidError()
+      }
+      return
+    }
+    case 'text':
+      if (value.kind !== 'text') throw new FactValueInvalidError()
+      return
+    case 'checklist_item':
+      if (value.kind !== 'checklist_item') throw new FactValueInvalidError()
+      return
+    case 'or_variant': {
+      if (
+        value.kind !== 'or_variant' ||
+        measurement['kind'] !== 'any_of' ||
+        target.or_variant_id === null
+      ) {
+        throw new FactValueInvalidError()
+      }
+      const variants: unknown = measurement['variants']
+      if (!Array.isArray(variants)) throw new FactValueInvalidError()
+      const variant = (variants as unknown[]).find(
+        (item) => record(item)['variantId'] === target.or_variant_id,
+      )
+      if (variant === undefined) throw new FactValueInvalidError()
+      const precision = record(variant)['precision']
+      if (
+        !Number.isInteger(precision) ||
+        ![0, 1, 2, 3].includes(precision as number) ||
+        quantityScale(value.value) > (precision as number)
+      ) {
+        throw new FactValueInvalidError()
+      }
+      return
+    }
+  }
 }
 
 function projectRepetition(value: unknown): CalendarRepetitionV1 {
@@ -755,31 +855,19 @@ export class PrismaFactPersistence implements FactPersistencePort {
         factKind === 'quantity_add'
           ? null
           : await this.findCurrentRecord(client, input, target)
-      if (factKind === 'quantity_add') {
-        if (input.expectedRevision !== null) {
-          throw new FactRevisionConflictError(input.expectedRevision, null)
-        }
-      } else if (existing === null) {
-        if (input.expectedRevision !== null) {
-          throw new FactRevisionConflictError(input.expectedRevision, null)
-        }
-      } else if (
-        input.expectedRevision === null ||
-        existing.revision_number !== input.expectedRevision
-      ) {
-        throw new FactRevisionConflictError(
-          input.expectedRevision,
-          existing.revision_number,
-        )
+      if (existing !== null) {
+        throw new FactTargetUnavailableError('correction_required')
+      }
+      if (input.expectedRevision !== null) {
+        throw new FactRevisionConflictError(input.expectedRevision, null)
       }
 
-      const factRecordId = existing?.id ?? randomUUID()
-      const beforeRevisionId = existing?.current_revision_id ?? null
-      const factRevision = (existing?.revision_number ?? 0n) + 1n
+      const factRecordId = randomUUID()
+      const beforeRevisionId = null
+      const factRevision = 1n
       const afterRevisionId = randomUUID()
-      if (existing === null) {
-        const contributionId = factKind === 'quantity_add' ? randomUUID() : null
-        await client.$executeRaw`
+      const contributionId = factKind === 'quantity_add' ? randomUUID() : null
+      await client.$executeRaw`
           INSERT INTO tracking_fact_records
             (id, space_id, plan_month_id, publication_id,
              plan_goal_snapshot_id, local_date, fact_kind,
@@ -795,9 +883,8 @@ export class PrismaFactPersistence implements FactPersistencePort {
              ${input.checklistItemId}::uuid, ${input.orVariantId}::uuid,
              NULL, ${input.memberId}::uuid, ${input.occurredAt},
              ${input.occurredAt})
-        `
-        await this.afterWritePhase('record')
-      }
+      `
+      await this.afterWritePhase('record')
 
       const booleanResult =
         input.value.kind === 'boolean' ? input.value.result : null
@@ -871,6 +958,177 @@ export class PrismaFactPersistence implements FactPersistencePort {
       `
       await this.afterWritePhase('history')
       return { factRecordId, factRevision }
+    })
+  }
+
+  public mutate(input: MutateFactPersistenceInput): Promise<FactRecordRef> {
+    return this.database.withClient(async (client) => {
+      const lockedMonth = await client.$queryRaw<{ readonly id: string }[]>`
+        SELECT month.id::text
+          FROM tracking_fact_records record
+          JOIN plan_months month ON month.id = record.plan_month_id
+         WHERE record.id = ${input.factRecordId}::uuid
+           AND record.space_id = ${input.spaceId}::uuid
+         FOR UPDATE OF month
+      `
+      if (lockedMonth.length === 0) throw new FactTargetNotFoundError()
+      await client.$queryRaw<{ readonly id: string }[]>`
+        SELECT id::text FROM tracking_fact_records
+         WHERE id = ${input.factRecordId}::uuid
+           AND space_id = ${input.spaceId}::uuid
+         FOR UPDATE
+      `
+      const rows = await client.$queryRaw<MutationTargetRow[]>`
+        SELECT record.id::text, record.fact_kind,
+               record.current_revision_id::text,
+               revision.revision_number, revision.revision_kind,
+               record.plan_month_id::text, month.facts_revision, month.status,
+               month.active_publication_id::text,
+               record.publication_id::text,
+               record.plan_goal_snapshot_id::text,
+               publication.active_local_date::text,
+               (month.month_start + INTERVAL '1 month + 2 days')::date::text
+                 correction_deadline,
+               record.space_id::text, snapshot.scope_kind,
+               snapshot.owner_member_id::text, snapshot.config,
+               record.or_variant_id::text
+          FROM tracking_fact_records record
+          JOIN tracking_fact_revisions revision
+            ON revision.id = record.current_revision_id
+          JOIN plan_months month ON month.id = record.plan_month_id
+          JOIN plan_publications publication
+            ON publication.id = record.publication_id
+          JOIN plan_goal_snapshots snapshot
+            ON snapshot.id = record.plan_goal_snapshot_id
+         WHERE record.id = ${input.factRecordId}::uuid
+           AND record.space_id = ${input.spaceId}::uuid
+      `
+      const target = rows[0]
+      if (target === undefined) throw new FactTargetNotFoundError()
+      if (
+        target.status === 'closed' ||
+        input.currentLocalDate > target.correction_deadline
+      ) {
+        throw new FactTargetUnavailableError('closed')
+      }
+      if (
+        target.active_publication_id !== target.publication_id ||
+        !['published', 'grace'].includes(target.status) ||
+        input.currentLocalDate < target.active_local_date
+      ) {
+        throw new FactTargetUnavailableError('not_active')
+      }
+      if (
+        target.scope_kind === 'personal' &&
+        target.owner_member_id !== input.memberId
+      ) {
+        throw new TrackingAuthorizationDeniedError()
+      }
+      if (
+        input.commandType === 'tracking.delete-record.v1' &&
+        target.scope_kind !== 'personal'
+      ) {
+        throw new TrackingAuthorizationDeniedError()
+      }
+      if (
+        input.commandType === 'tracking.delete-record.v1' &&
+        target.revision_kind === 'tombstoned'
+      ) {
+        throw new FactTargetUnavailableError('already_deleted')
+      }
+      if (target.revision_number !== input.expectedRevision) {
+        throw new FactRevisionConflictError(
+          input.expectedRevision,
+          target.revision_number,
+        )
+      }
+      if (
+        (input.commandType === 'tracking.correct-record.v1' &&
+          input.value === null) ||
+        (input.commandType === 'tracking.delete-record.v1' &&
+          input.value !== null)
+      ) {
+        throw new FactValueInvalidError()
+      }
+      assertMutationValue(target, input.value)
+
+      const afterRevisionId = randomUUID()
+      const factRevision = target.revision_number + 1n
+      const booleanResult =
+        input.value?.kind === 'boolean' ? input.value.result : null
+      const quantityValue =
+        input.value?.kind === 'quantity' ? input.value.value : null
+      const actualTimeValue =
+        input.value?.kind === 'actual_time' ? input.value.value : null
+      const ratingValue =
+        input.value?.kind === 'rating' ? input.value.value : null
+      const textValue = input.value?.kind === 'text' ? input.value.text : null
+      const textResult =
+        input.value?.kind === 'text' ? input.value.result : null
+      const checklistItemState =
+        input.value?.kind === 'checklist_item' ? input.value.state : null
+      const orVariantValue =
+        input.value?.kind === 'or_variant' ? input.value.value : null
+      const revisionKind = input.value === null ? 'tombstoned' : 'recorded'
+      await client.$executeRaw`
+        INSERT INTO tracking_fact_revisions
+          (id, fact_record_id, revision_number, revision_kind,
+           boolean_result, quantity_value, actual_time_value, rating_value,
+           text_value, text_result, checklist_item_state, or_variant_value,
+           recorded_by_member_id, created_at)
+        VALUES
+          (${afterRevisionId}::uuid, ${target.id}::uuid, ${factRevision},
+           ${revisionKind}, ${booleanResult}, ${quantityValue},
+           ${actualTimeValue}::time, ${ratingValue}::bigint,
+           ${textValue}, ${textResult}, ${checklistItemState},
+           ${orVariantValue}, ${input.memberId}::uuid, ${input.occurredAt})
+      `
+      await this.afterWritePhase('revision')
+      await client.$executeRaw`
+        UPDATE tracking_fact_records
+           SET current_revision_id = ${afterRevisionId}::uuid,
+               updated_at = ${input.occurredAt}
+         WHERE id = ${target.id}::uuid
+      `
+      await this.afterWritePhase('pointer')
+
+      const afterFactsRevision = target.facts_revision + 1n
+      await client.$executeRaw`
+        UPDATE plan_months
+           SET facts_revision = ${afterFactsRevision}
+         WHERE id = ${target.plan_month_id}::uuid
+           AND facts_revision = ${target.facts_revision}
+      `
+      await this.afterWritePhase('facts_revision')
+
+      const actionId = randomUUID()
+      const actionKind =
+        input.commandType === 'tracking.correct-record.v1'
+          ? 'fact_corrected'
+          : 'fact_tombstoned'
+      await client.$executeRaw`
+        INSERT INTO tracking_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id, space_id,
+           plan_month_id, publication_id, plan_goal_snapshot_id,
+           command_type, command_id, before_facts_revision,
+           after_facts_revision, reason, occurred_at)
+        VALUES
+          (${actionId}::uuid, ${actionKind}, 'member', ${input.actorScope},
+           ${input.memberId}::uuid, ${input.spaceId}::uuid,
+           ${target.plan_month_id}::uuid, ${target.publication_id}::uuid,
+           ${target.plan_goal_snapshot_id}::uuid, ${input.commandType},
+           ${input.commandId}::uuid, ${target.facts_revision},
+           ${afterFactsRevision}, ${input.reason}, ${input.occurredAt})
+      `
+      await client.$executeRaw`
+        INSERT INTO tracking_fact_changes
+          (action_id, fact_record_id, before_revision_id, after_revision_id)
+        VALUES
+          (${actionId}::uuid, ${target.id}::uuid,
+           ${target.current_revision_id}::uuid, ${afterRevisionId}::uuid)
+      `
+      await this.afterWritePhase('history')
+      return { factRecordId: target.id, factRevision }
     })
   }
 

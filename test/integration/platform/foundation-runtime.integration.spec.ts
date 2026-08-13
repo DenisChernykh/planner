@@ -89,6 +89,7 @@ describe('Planner foundation database runtime', () => {
       { migration_name: '20260811161000_time_rating_checkpoints' },
       { migration_name: '20260811162000_text_checklist_facts' },
       { migration_name: '20260811163000_or_composite_facts' },
+      { migration_name: '20260811164000_fact_corrections_tombstones' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name

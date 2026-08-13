@@ -149,6 +149,25 @@ export type RecordCompositeOccurrencePayload = {
 export type RecordCompositeOccurrenceApplicationCommand =
   ApplicationCommand<RecordCompositeOccurrencePayload>
 
+export type CorrectFactValueV1 = RecordSingleFactValueV1
+
+export type CorrectRecordPayload = {
+  readonly factRecordId: string
+  readonly value: CorrectFactValueV1
+  readonly reason: string
+}
+
+export type CorrectRecordApplicationCommand =
+  ApplicationCommand<CorrectRecordPayload>
+
+export type DeleteRecordPayload = {
+  readonly factRecordId: string
+  readonly reason: string
+}
+
+export type DeleteRecordApplicationCommand =
+  ApplicationCommand<DeleteRecordPayload>
+
 export type GetFactStateInput = {
   readonly trustedActor: ActorRef
   readonly publicationId: string

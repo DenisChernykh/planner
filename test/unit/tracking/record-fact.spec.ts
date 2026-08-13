@@ -83,6 +83,7 @@ function facts(
 ): FactPersistencePort {
   return {
     record: () => Promise.reject(new Error('unexpected record')),
+    mutate: () => Promise.reject(new Error('unexpected mutate')),
     getState: () => Promise.reject(new Error('unexpected state')),
     getGoalProgressInput: () =>
       Promise.reject(new Error('unexpected progress input')),

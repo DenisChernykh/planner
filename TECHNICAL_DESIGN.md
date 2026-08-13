@@ -899,10 +899,11 @@ date, не раньше `activeLocalDate` и соответствовать phys
 weekly planned task и другой measurement kind. Personal fact изменяет только
 owner; shared snapshot имеет один logical stream, доступный обоим участникам.
 
-Для Boolean и quantity `latest` отсутствие `expectedRevision` означает create;
-повторная запись требует positive current fact revision и создаёт следующую
-append-only revision. Конкурентный create одного logical stream даёт одному
-command success, второму finite stale conflict. Quantity `add` запрещает
+Для Boolean и quantity `latest` отсутствие `expectedRevision` означает create.
+Начиная с T05 существующий logical stream изменяется только dedicated
+`tracking.correct-record.v1`; повтор typed record-команды возвращает finite
+`correction_required`. Конкурентный create одного logical stream даёт одному
+command success, второму finite conflict. Quantity `add` запрещает
 `expectedRevision`: каждый новый command создаёт отдельный opaque contribution
 record revision `1`, поэтому конкурентные независимые вклады не конфликтуют.
 Exact command replay выполняется до clock, membership и target lookup.
@@ -934,8 +935,8 @@ membership boundary, owner rule и CAS revision chain, что T01. HTTP, OpenAPI
 Telegram остаются границей H01/G03. Time и rating payload фиксируют
 `{ publicationId, planGoalSnapshotId, expectationDate, value }`, checkpoint
 добавляет обязательный stable `checkpointId` и discriminated Boolean/time/rating
-value. Create не принимает `expectedRevision`, correction требует текущую
-positive fact revision.
+value. Create не принимает `expectedRevision`; начиная с T05 correction
+исполняет dedicated audited command с текущей positive fact revision.
 
 `expectationDate` является частью identity и не выводится из времени ввода:
 overnight значение после полуночи можно связать с ожиданием предыдущего дня.
@@ -979,8 +980,9 @@ result }`, где `checkpointId` — stable UUID либо `null`, `text` — и�
 exact shape
 `{ publicationId, planGoalSnapshotId, expectationDate, checkpointId,
 checklistItemId, state }`, где `state` — `done|not_done`. Отсутствие
-`expectedRevision` означает create; correction требует текущую positive
-revision. Exact replay предшествует clock, membership и target lookup.
+`expectedRevision` означает create; начиная с T05 correction исполняет
+dedicated audited command с текущей positive revision. Exact replay
+предшествует clock, membership и target lookup.
 
 Без checkpoints text адресует physical `goal` expectation, а checklist item —
 ровно свой physical `checklist_item` expectation. При checkpoints обе команды
@@ -1041,6 +1043,43 @@ Deferred checks связывают exact command mode, published variant/item,
 precision, calendar period/date, typed revision history, owner, month
 `facts_revision`, action и receipt. Populated T01–T03 rows остаются byte-stable,
 valid и immutable после upgrade.
+
+#### 7.6.5. T05 Corrections and tombstones
+
+T05 добавляет application-only команды `tracking.correct-record.v1` и
+`tracking.delete-record.v1`. Exact correction payload —
+`{ factRecordId, value, reason }`, deletion — `{ factRecordId, reason }`;
+обе команды требуют positive `expectedRevision`, trusted member и непустую
+причину длиной не более 2000 символов. Result остаётся
+`tracking.fact-record.v1` с тем же record ID и новой revision. HTTP, OpenAPI,
+Telegram, undo и reopen остаются H02/G04, T06 и L02.
+
+Correction адресует record по opaque ID внутри пространства, повторно
+проверяет active publication, effective `published|grace` lifecycle и текущую
+revision. Она создаёт следующую typed `recorded` revision и может восстановить
+текущий tombstone. Personal record изменяет только owner; shared record может
+исправить любой участник, но причина всегда обязательна. Первоначальный
+`created_by_member_id` immutable, текущий revision actor является last editor.
+
+Delete разрешён только owner personal record. Он не удаляет record, revisions
+или history, а добавляет `tombstoned` revision со всеми value columns `NULL`.
+Shared delete и повторный delete отклоняются. Read state и P05 используют
+только current `recorded` revisions, поэтому tombstone даёт derived `no_data`;
+последующая correction с current tombstone revision восстанавливает факт.
+
+Обычное correction window заканчивается в `00:00` четвёртого локального дня
+после месяца независимо от задержки worker: effect с local date позже третьего
+дня отклоняется как `closed`. Reopened lifecycle добавит L02; T05 не расширяет
+окно и не меняет plan configuration.
+
+Migration `20260811164000_fact_corrections_tombstones` добавляет finite
+`fact_corrected|fact_tombstoned`, exact command discriminators и bounded
+immutable action reason. Одна durable transaction блокирует month/record,
+проверяет CAS/ownership/window, добавляет revision, переводит pointer,
+увеличивает `facts_revision` ровно один раз и связывает action/change/receipt.
+Deferred constraints запрещают old record-командам создавать новые revisions,
+связывают before/after chain, actor, reason, typed current value/tombstone и
+сохраняют старые T01–T04 actions/revisions неизменными.
 
 ### 7.7. Action history
 

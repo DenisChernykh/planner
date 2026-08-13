@@ -1750,13 +1750,13 @@ editor, reason and history; personal/shared mutation rights are enforced.
 - Create: `src/modules/tracking/application/delete-record.command.ts`
 - Test: `test/integration/tracking/correction-delete.integration.spec.ts`
 
-- [ ] Написать RED authorization/history/CAS cases for owner personal mutation,
+- [x] Написать RED authorization/history/CAS cases for owner personal mutation,
   shared correction reason and partner personal denial.
-- [ ] Реализовать correction/delete as new revision/tombstone, never destructive
+- [x] Реализовать correction/delete as new revision/tombstone, never destructive
   history deletion.
-- [ ] Проверить original/last actor and one factsRevision increment per command.
-- [ ] Запустить focused integration and `pnpm check:quick`.
-- [ ] Commit: `feat: correct and tombstone planner facts`.
+- [x] Проверить original/last actor and one factsRevision increment per command.
+- [x] Запустить focused integration and `pnpm check:quick`.
+- [x] Commit: `feat: correct and tombstone planner facts`.
 
 ### T06 — Undo last own action
 

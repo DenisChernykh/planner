@@ -14,7 +14,6 @@ import {
 } from '@/modules/planning'
 import {
   createTrackingApplication,
-  FactRevisionConflictError,
   FactTargetNotFoundError,
   FactTargetUnavailableError,
   PrismaFactPersistence,
@@ -368,14 +367,18 @@ describe('T03 text and checklist facts in real PostgreSQL', () => {
     const first = await tracking.recordText.execute(command)
     await expect(tracking.recordText.execute(command)).resolves.toEqual(first)
     await expect(
-      tracking.recordText.execute({
-        ...command,
+      tracking.correctRecord.execute({
         commandId: randomUUID(),
         expectedRevision: first.aggregateRevision,
+        trustedActor: actor(secondMemberId),
         payload: {
-          ...command.payload,
-          text: 'Партнёр недоступен',
-          result: 'not_done',
+          factRecordId: first.aggregateId,
+          value: {
+            kind: 'text',
+            text: 'Партнёр недоступен',
+            result: 'not_done',
+          },
+          reason: 'Уточнён результат',
         },
       }),
     ).resolves.toMatchObject({ aggregateRevision: 2n })
@@ -567,7 +570,9 @@ describe('T03 text and checklist facts in real PostgreSQL', () => {
     const rejected = competing.find(
       (item): item is PromiseRejectedResult => item.status === 'rejected',
     )
-    expect(rejected?.reason).toBeInstanceOf(FactRevisionConflictError)
+    expect(rejected?.reason).toEqual(
+      new FactTargetUnavailableError('correction_required'),
+    )
     const counts = await pool.query<Record<string, string>>(
       `SELECT count(*)::text records,
               (SELECT facts_revision::text FROM plan_months WHERE id = $1::uuid)

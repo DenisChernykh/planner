@@ -1,4 +1,6 @@
 export * from './fact-persistence.port'
+export * from './correct-record.command'
+export * from './delete-record.command'
 export * from './get-fact-state.query'
 export * from './get-goal-progress.query'
 export * from './record-checkpoint.command'
