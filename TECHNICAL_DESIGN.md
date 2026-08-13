@@ -2638,6 +2638,23 @@ hardcoded domain constants:
 - authoritative target рассчитывается calendar formulas для выбранного месяца;
 - 30–31 марта не создают April expectations.
 
+Версионированный контракт `planner.april-plan-seed.v1` живёт в
+`planning/seed`, не обращается к БД и не запускает application commands. Он
+содержит ровно 41 упорядоченную цель: 34 цели Участник Б, 4 цели Участник А и 3 shared.
+Владельцы в исходных данных символические; `resolveAprilPlanSeed` принимает два
+различных canonical member UUID, подставляет personal/shared scope, повторно
+snapshot-ит конфигурацию и пропускает каждую цель через общий publish
+validator. Результат и вложенные данные immutable. Стабильные component IDs
+являются частью версии seed, а не генерируются при чтении.
+
+`april-plan.provenance.json` независимо фиксирует для каждой цели source page,
+нормализованный raw text, бумажный denominator и принятое решение. Сводки,
+среднее настроение и мартовские даты отмечены отдельными non-goal entries.
+Ручная сверка семи отрендеренных страниц и автоматический exact seed digest
+зафиксированы в `docs/provenance/april-seed.md`. Создание draft, consumption
+receipt и любая durable запись принадлежат P11; импорт P10 сам по себе не имеет
+side effects.
+
 Generic validation сохраняется: будущий пользовательский draft с range,
 невыбранным owner, невалидной unit или отсутствующим required field не может
 быть опубликован.

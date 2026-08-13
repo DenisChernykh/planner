@@ -1584,19 +1584,21 @@ publish-validation without creating a draft or automatic publication.
 
 - Create: `src/modules/planning/seed/april-plan.seed.ts`
 - Create: `src/modules/planning/seed/april-plan.provenance.json`
+- Create: `docs/provenance/april-seed.md`
+- Modify: `TECHNICAL_DESIGN.md`
 - Test: `test/unit/planning/april-seed.spec.ts`
 
 **Produces:** prefilled focus; meditation monthly Boolean N=16; exact N=2 for
 both former ranges; all-channel checklists; collaborations `add` target 7;
 shared important task; MemberB outreach; calendar-derived denominators.
 
-- [ ] Написать RED assertions on every resolved source decision and provenance
+- [x] Написать RED assertions on every resolved source decision and provenance
   page/raw denominator.
-- [ ] Реализовать versioned seed as data, not domain constants.
-- [ ] Доказать generic validation and no 30–31 March expectations in seed
+- [x] Реализовать versioned seed as data, not domain constants.
+- [x] Доказать generic validation and no 30–31 March expectations in seed
   materialization preview.
-- [ ] Выполнить manual provenance checklist AC-SM-01 and save evidence note.
-- [ ] Commit: `feat: add resolved April plan seed`.
+- [x] Выполнить manual provenance checklist AC-SM-01 and save evidence note.
+- [x] Commit: `feat: add resolved April plan seed`.
 
 ### P11 — Create draft from April seed
 

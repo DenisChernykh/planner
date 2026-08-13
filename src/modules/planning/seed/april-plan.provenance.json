@@ -1,0 +1,403 @@
+{
+  "schemaVersion": "planner.april-plan-provenance.v1",
+  "seedSchemaVersion": "planner.april-plan-seed.v1",
+  "sourceDocument": "monthly-plan-template",
+  "renderedPageCount": 7,
+  "goals": [
+    {
+      "seedGoalKey": "memberB_wake_time",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 1,
+      "rawValue": "Показатель 102",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 063"
+    },
+    {
+      "seedGoalKey": "memberB_sleep_time",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 1,
+      "rawValue": "Показатель 081",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 064"
+    },
+    {
+      "seedGoalKey": "goal_29",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 1,
+      "rawValue": "Показатель 004",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 092"
+    },
+    {
+      "seedGoalKey": "goal_22",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 1,
+      "rawValue": "Показатель 094",
+      "rawDenominator": null,
+      "resolution": "Показатель 130"
+    },
+    {
+      "seedGoalKey": "memberB_water",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 1,
+      "rawValue": "Показатель 046",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 065"
+    },
+    {
+      "seedGoalKey": "goal_36",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 1,
+      "rawValue": "Показатель 056",
+      "rawDenominator": "/26",
+      "resolution": "Показатель 129"
+    },
+    {
+      "seedGoalKey": "memberB_meal_schedule",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 2,
+      "rawValue": "Показатель 118",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 045"
+    },
+    {
+      "seedGoalKey": "memberB_fresh_juice",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 2,
+      "rawValue": "Показатель 047",
+      "rawDenominator": "/8",
+      "resolution": "Flexible monthly Boolean N=8."
+    },
+    {
+      "seedGoalKey": "memberB_vitamin_d",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 2,
+      "rawValue": "Показатель 031",
+      "rawDenominator": "/30",
+      "resolution": "Ежедневный Boolean."
+    },
+    {
+      "seedGoalKey": "memberB_iron",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 2,
+      "rawValue": "ЖЕЛЕЗО – здоровье",
+      "rawDenominator": "/30",
+      "resolution": "Ежедневный Boolean."
+    },
+    {
+      "seedGoalKey": "memberB_hair_care",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 2,
+      "rawValue": "Показатель 125",
+      "rawDenominator": "/8",
+      "resolution": "Flexible monthly Boolean N=8."
+    },
+    {
+      "seedGoalKey": "memberB_face_massage",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 2,
+      "rawValue": "Показатель 126",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 083"
+    },
+    {
+      "seedGoalKey": "memberB_meditations",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 3,
+      "rawValue": "Показатель 123",
+      "rawDenominator": "/20",
+      "resolution": "Показатель 095"
+    },
+    {
+      "seedGoalKey": "goal_14",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 3,
+      "rawValue": "Показатель 070",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 067"
+    },
+    {
+      "seedGoalKey": "memberB_fitness",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 3,
+      "rawValue": "Показатель 101",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 059"
+    },
+    {
+      "seedGoalKey": "memberB_mfr",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 3,
+      "rawValue": "Показатель 124",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 016"
+    },
+    {
+      "seedGoalKey": "memberB_steps",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 3,
+      "rawValue": "Показатель 109",
+      "rawDenominator": "/20",
+      "resolution": "Показатель 028"
+    },
+    {
+      "seedGoalKey": "goal_31",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 3,
+      "rawValue": "Показатель 110",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 027"
+    },
+    {
+      "seedGoalKey": "shared_activity",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 4,
+      "rawValue": "Показатель 007",
+      "rawDenominator": "/10",
+      "resolution": "Показатель 058"
+    },
+    {
+      "seedGoalKey": "memberB_relax_evening",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 4,
+      "rawValue": "Показатель 119",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 017"
+    },
+    {
+      "seedGoalKey": "memberB_new_skill",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 4,
+      "rawValue": "Показатель 002",
+      "rawDenominator": "/4",
+      "resolution": "Показатель 025"
+    },
+    {
+      "seedGoalKey": "goal_32",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 4,
+      "rawValue": "Показатель 079",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 015"
+    },
+    {
+      "seedGoalKey": "goal_08",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 4,
+      "rawValue": "Показатель 080",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 014"
+    },
+    {
+      "seedGoalKey": "goal_09",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 5,
+      "rawValue": "Показатель 077",
+      "rawDenominator": null,
+      "resolution": "Показатель 021"
+    },
+    {
+      "seedGoalKey": "goal_17",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 5,
+      "rawValue": "Показатель 100",
+      "rawDenominator": "/12",
+      "resolution": "Показатель 037"
+    },
+    {
+      "seedGoalKey": "goal_41",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 5,
+      "rawValue": "Показатель 098",
+      "rawDenominator": "/20",
+      "resolution": "Показатель 026"
+    },
+    {
+      "seedGoalKey": "memberB_promote_memberA",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 5,
+      "rawValue": "Показатель 107",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 038"
+    },
+    {
+      "seedGoalKey": "memberA_fitness",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 5,
+      "rawValue": "Показатель 050",
+      "rawDenominator": "/8",
+      "resolution": "Показатель 034"
+    },
+    {
+      "seedGoalKey": "memberA_steps",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 5,
+      "rawValue": "Показатель 109",
+      "rawDenominator": "/20",
+      "resolution": "Показатель 035"
+    },
+    {
+      "seedGoalKey": "goal_04",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 5,
+      "rawValue": "Показатель 052",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 036"
+    },
+    {
+      "seedGoalKey": "shared_order",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 6,
+      "rawValue": "Показатель 049",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 023"
+    },
+    {
+      "seedGoalKey": "goal_01",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 6,
+      "rawValue": "Показатель 051",
+      "rawDenominator": "/30",
+      "resolution": "Показатель 036"
+    },
+    {
+      "seedGoalKey": "goal_06",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 6,
+      "rawValue": "Показатель 001",
+      "rawDenominator": null,
+      "resolution": "Показатель 022"
+    },
+    {
+      "seedGoalKey": "goal_24",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 6,
+      "rawValue": "Показатель 003",
+      "rawDenominator": null,
+      "resolution": "Показатель 039"
+    },
+    {
+      "seedGoalKey": "goal_25",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 6,
+      "rawValue": "Показатель 006",
+      "rawDenominator": null,
+      "resolution": "Показатель 040"
+    },
+    {
+      "seedGoalKey": "goal_26",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 6,
+      "rawValue": "Показатель 008",
+      "rawDenominator": null,
+      "resolution": "Показатель 041"
+    },
+    {
+      "seedGoalKey": "goal_27",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 6,
+      "rawValue": "Показатель 010",
+      "rawDenominator": null,
+      "resolution": "Показатель 042"
+    },
+    {
+      "seedGoalKey": "goal_28",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 6,
+      "rawValue": "Показатель 011",
+      "rawDenominator": null,
+      "resolution": "Показатель 043"
+    },
+    {
+      "seedGoalKey": "goal_10",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 7,
+      "rawValue": "Показатель 076",
+      "rawDenominator": null,
+      "resolution": "Показатель 061"
+    },
+    {
+      "seedGoalKey": "goal_37",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 7,
+      "rawValue": "Показатель 090",
+      "rawDenominator": "/50",
+      "resolution": "Показатель 020"
+    },
+    {
+      "seedGoalKey": "memberB_max_followers",
+      "schemaVersion": 1,
+      "sourceDocument": "monthly-plan-template",
+      "sourcePage": 7,
+      "rawValue": "Показатель 089",
+      "rawDenominator": null,
+      "resolution": "Показатель 019"
+    }
+  ],
+  "nonGoalEntries": [
+    {
+      "sourcePage": 1,
+      "rawValue": "Показатель 009",
+      "disposition": "visual_context_only",
+      "resolution": "Показатель 074"
+    },
+    {
+      "sourcePage": 7,
+      "rawValue": "ИТОГИ Апреля: УЧАСТНИК Б",
+      "disposition": "provenance_summary",
+      "resolution": "Показатель 104"
+    },
+    {
+      "sourcePage": 7,
+      "rawValue": "Показатель 128",
+      "disposition": "derived_report_only",
+      "resolution": "Показатель 048"
+    },
+    {
+      "sourcePage": 7,
+      "rawValue": "ИТОГИ Апреля: УЧАСТНИК А",
+      "disposition": "provenance_summary",
+      "resolution": "Показатель 105"
+    }
+  ]
+}
