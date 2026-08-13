@@ -81,3 +81,43 @@ export const DRAFT_REVISION_CONFLICT_PROBLEM = defineProblemDefinition({
   title: 'Plan draft revision conflict',
   detail: 'The plan draft changed before this request completed.',
 })
+
+export const PUBLICATION_PREVIEW_CONFLICT_PROBLEM = defineProblemDefinition({
+  slug: 'publication-preview-conflict',
+  code: 'PUBLICATION_PREVIEW_CONFLICT',
+  status: 409,
+  title: 'Publication preview conflict',
+  detail: 'The confirmed publication preview is no longer current.',
+})
+
+export const PLAN_PUBLICATION_BLOCKED_PROBLEM = defineProblemDefinition({
+  slug: 'plan-publication-blocked',
+  code: 'PLAN_PUBLICATION_BLOCKED',
+  status: 409,
+  title: 'Plan publication blocked',
+  detail: 'The current plan draft contains publication blockers.',
+})
+
+export const PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM = defineProblemDefinition({
+  slug: 'plan-month-already-published',
+  code: 'PLAN_MONTH_ALREADY_PUBLISHED',
+  status: 409,
+  title: 'Plan month already published',
+  detail: 'The plan month already has an active immutable publication.',
+})
+
+export const PLAN_PUBLICATION_NOT_FOUND_PROBLEM = defineProblemDefinition({
+  slug: 'plan-publication-not-found',
+  code: 'PLAN_PUBLICATION_NOT_FOUND',
+  status: 404,
+  title: 'Plan publication not found',
+  detail: 'The requested plan publication was not found.',
+})
+
+export const ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM = defineProblemDefinition({
+  slug: 'active-plan-month-not-found',
+  code: 'ACTIVE_PLAN_MONTH_NOT_FOUND',
+  status: 404,
+  title: 'Active plan month not found',
+  detail: 'There is no active published plan for the current local date.',
+})

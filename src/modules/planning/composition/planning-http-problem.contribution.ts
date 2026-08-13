@@ -16,6 +16,11 @@ import {
   GoalDefinitionVersionNotFoundError,
   PlanDraftNotEditableError,
   PlanDraftNotFoundError,
+  ActivePlanMonthNotFoundError,
+  PlanMonthAlreadyPublishedError,
+  PlanPublicationBlockedError,
+  PlanPublicationNotFoundError,
+  PublicationPreviewConflictError,
   PlanningAuthorizationDeniedError,
   PlanningDependencyUnavailableError,
 } from '../application/planning-errors'
@@ -30,6 +35,11 @@ import {
   PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
   PLAN_DRAFT_NOT_FOUND_PROBLEM,
   PLANNING_AUTHORIZATION_DENIED_PROBLEM,
+  ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM,
+  PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
+  PLAN_PUBLICATION_BLOCKED_PROBLEM,
+  PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
+  PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
 } from '../presentation/planning-problem.definitions'
 
 const bodyIssue = Object.freeze({
@@ -51,6 +61,11 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM,
       PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
       DRAFT_REVISION_CONFLICT_PROBLEM,
+      PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
+      PLAN_PUBLICATION_BLOCKED_PROBLEM,
+      PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
+      PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
+      ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM,
     ]),
     mappedCodes: Object.freeze([
       'PLANNING_AUTHORIZATION_DENIED',
@@ -63,6 +78,11 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       'GOAL_DEFINITION_VERSION_NOT_FOUND',
       'PLAN_DRAFT_NOT_EDITABLE',
       'DRAFT_REVISION_CONFLICT',
+      'PUBLICATION_PREVIEW_CONFLICT',
+      'PLAN_PUBLICATION_BLOCKED',
+      'PLAN_MONTH_ALREADY_PUBLISHED',
+      'PLAN_PUBLICATION_NOT_FOUND',
+      'ACTIVE_PLAN_MONTH_NOT_FOUND',
       'VALIDATION_FAILED',
       'DEPENDENCY_UNAVAILABLE',
     ]),
@@ -119,6 +139,37 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
             currentRevision: error.currentRevision.toString(10),
           },
         }
+      }
+      if (error instanceof PublicationPreviewConflictError) {
+        return {
+          code: 'PUBLICATION_PREVIEW_CONFLICT',
+          conflict: {
+            currentDraftRevision: error.currentDraftRevision.toString(10),
+            currentPreviewSchemaVersion: error.currentPreviewSchemaVersion,
+            currentPreviewHashVersion: error.currentPreviewHashVersion,
+            currentPreviewHash: error.currentPreviewHash,
+            nextAction: 'reload-publication-preview-and-retry',
+          },
+        }
+      }
+      if (error instanceof PlanPublicationBlockedError) {
+        return { code: 'PLAN_PUBLICATION_BLOCKED', blockers: error.blockers }
+      }
+      if (error instanceof PlanMonthAlreadyPublishedError) {
+        return {
+          code: 'PLAN_MONTH_ALREADY_PUBLISHED',
+          conflict: {
+            publicationId: error.publicationId,
+            publicationRevision: error.publicationRevision.toString(10),
+            nextAction: 'open-published-plan',
+          },
+        }
+      }
+      if (error instanceof PlanPublicationNotFoundError) {
+        return { code: 'PLAN_PUBLICATION_NOT_FOUND' }
+      }
+      if (error instanceof ActivePlanMonthNotFoundError) {
+        return { code: 'ACTIVE_PLAN_MONTH_NOT_FOUND' }
       }
       if (error instanceof PlanningDependencyUnavailableError) {
         return { code: 'DEPENDENCY_UNAVAILABLE' }

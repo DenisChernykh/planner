@@ -28,9 +28,13 @@ import {
 import { GetDraftQuery } from '../application/get-draft.query'
 import type { PlanningApplication } from '../application/planning-application'
 import { UpdateMonthFocusCommand } from '../application/update-month-focus.command'
+import { PublishMonthCommand } from '../application/publish-month.command'
+import { GetPublishedSnapshotQuery } from '../application/get-published-snapshot.query'
+import { GetActiveMonthQuery } from '../application/get-active-month.query'
 import { PrismaPlanDraftPersistence } from '../infrastructure/prisma-plan-draft.persistence'
 import { PrismaDraftGoalPersistence } from '../infrastructure/prisma-draft-goal.persistence'
 import { PrismaGoalCatalogPersistence } from '../infrastructure/prisma-goal-catalog.persistence'
+import { PrismaPublicationPersistence } from '../infrastructure/prisma-publication.persistence'
 
 export function createPlanningApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -41,6 +45,7 @@ export function createPlanningApplication(dependencies: {
   const drafts = new PrismaPlanDraftPersistence(dependencies.database)
   const draftGoals = new PrismaDraftGoalPersistence(dependencies.database)
   const catalog = new PrismaGoalCatalogPersistence(dependencies.database)
+  const publications = new PrismaPublicationPersistence(dependencies.database)
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -65,6 +70,20 @@ export function createPlanningApplication(dependencies: {
     buildPublicationPreview: new BuildPublicationPreviewQuery(
       dependencies.workspaceMembers,
       draftGoals,
+      dependencies.clock,
+    ),
+    publishMonth: new PublishMonthCommand(
+      executor,
+      dependencies.workspaceMembers,
+      publications,
+    ),
+    getPublishedSnapshot: new GetPublishedSnapshotQuery(
+      dependencies.workspaceMembers,
+      publications,
+    ),
+    getActiveMonth: new GetActiveMonthQuery(
+      dependencies.workspaceMembers,
+      publications,
       dependencies.clock,
     ),
     addDraftGoal: new AddDraftGoalCommand(

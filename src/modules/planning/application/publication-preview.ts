@@ -19,6 +19,14 @@ export const PUBLICATION_PREVIEW_SCHEMA_VERSION =
   'planner.publication-preview.v1' as const
 export const PUBLICATION_PREVIEW_HASH_VERSION =
   'planner.publication-preview-hash.v1' as const
+export const MAX_PUBLICATION_MATERIALIZED_ROWS = 10_000
+
+const MATERIALIZATION_LIMIT_BLOCKER: PublicationPreviewBlocker = Object.freeze({
+  planGoalId: null,
+  pointer: '/goals',
+  code: 'incompatible',
+  detail: 'Publication materialization exceeds 10000 rows.',
+})
 
 export type PublicationPreviewActivation = {
   readonly mode: 'immediate' | 'scheduled' | 'blocked'
@@ -205,15 +213,52 @@ function sortedBlockers(
     goals.map((goal) => [goal.planGoalId, goal.displayOrder]),
   )
   return [...blockers].sort((left, right) => {
-    if (left.planGoalId === null) return right.planGoalId === null ? 0 : -1
-    if (right.planGoalId === null) return 1
+    const goalOrder =
+      left.planGoalId === null
+        ? right.planGoalId === null
+          ? 0
+          : -1
+        : right.planGoalId === null
+          ? 1
+          : (order.get(left.planGoalId) ?? 0) -
+              (order.get(right.planGoalId) ?? 0) ||
+            compareText(left.planGoalId, right.planGoalId)
     return (
-      (order.get(left.planGoalId) ?? 0) - (order.get(right.planGoalId) ?? 0) ||
-      compareText(left.planGoalId, right.planGoalId) ||
+      goalOrder ||
       compareText(left.pointer, right.pointer) ||
-      compareText(left.code, right.code)
+      compareText(left.code, right.code) ||
+      compareText(left.detail, right.detail)
     )
   })
+}
+
+function fixedComponentCount(config: GoalConfigV1): number {
+  if (config.checkpoints !== null) return config.checkpoints.items.length
+  if (config.measurement.kind === 'checklist') {
+    return config.measurement.items.length
+  }
+  return 1
+}
+
+function materializedRowCount(
+  goals: readonly DraftGoalView[],
+  targets: readonly PublicationCalculatedTarget[],
+): number {
+  const goalById = new Map(goals.map((goal) => [goal.planGoalId, goal]))
+  let count = goals.length
+  for (const target of targets) {
+    if (target.calendar.kind === 'fixed') {
+      const goal = goalById.get(target.planGoalId)
+      if (goal === undefined) continue
+      count +=
+        target.calendar.expectationDates.length *
+        fixedComponentCount(goal.config as GoalConfigV1)
+    } else {
+      count += target.calendar.periods.length
+    }
+    if (count > MAX_PUBLICATION_MATERIALIZED_ROWS) return count
+  }
+  return count
 }
 
 export function publicationPreviewHash(
@@ -274,6 +319,12 @@ export function buildPublicationPreview(
     })
   }
 
+  if (
+    materializedRowCount(orderedGoals, targets) >
+    MAX_PUBLICATION_MATERIALIZED_ROWS
+  ) {
+    blockers.push(MATERIALIZATION_LIMIT_BLOCKER)
+  }
   const sorted = sortedBlockers(blockers, orderedGoals)
   const frozenByGoal = new Map<string, readonly PublicationPreviewBlocker[]>()
   for (const goalBlocker of sorted) {

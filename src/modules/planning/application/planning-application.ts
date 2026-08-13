@@ -20,6 +20,9 @@ import type {
   ListGoalDefinitionsQuery,
 } from './goal-catalog.queries'
 import type { UpdateMonthFocusCommand } from './update-month-focus.command'
+import type { PublishMonthCommand } from './publish-month.command'
+import type { GetPublishedSnapshotQuery } from './get-published-snapshot.query'
+import type { GetActiveMonthQuery } from './get-active-month.query'
 
 export const PLANNING_APPLICATION: unique symbol = Symbol(
   'PLANNING_APPLICATION',
@@ -31,6 +34,9 @@ export type PlanningApplication = {
   readonly getDraft: GetDraftQuery
   readonly getDraftEditor: GetDraftEditorQuery
   readonly buildPublicationPreview: BuildPublicationPreviewQuery
+  readonly publishMonth: PublishMonthCommand
+  readonly getPublishedSnapshot: GetPublishedSnapshotQuery
+  readonly getActiveMonth: GetActiveMonthQuery
   readonly addDraftGoal: AddDraftGoalCommand
   readonly updateDraftGoal: UpdateDraftGoalCommand
   readonly removeDraftGoal: RemoveDraftGoalCommand

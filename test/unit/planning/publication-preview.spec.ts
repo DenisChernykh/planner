@@ -95,6 +95,80 @@ function stripHash(value: PublicationPreview): Record<string, unknown> {
   )
 }
 
+function numberedUuid(value: number): string {
+  return `00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`
+}
+
+function mixedMaterializationGoals(
+  oneOffComponents: 4 | 5,
+): DraftEditorView['goals'] {
+  const checklist = (
+    goalIndex: number,
+    count: number,
+  ): {
+    kind: 'checklist'
+    items: { itemId: string; label: string }[]
+  } => ({
+    kind: 'checklist' as const,
+    items: Array.from({ length: count }, (_, itemIndex) => ({
+      itemId: numberedUuid((goalIndex + 1) * 1000 + itemIndex),
+      label: `Item ${goalIndex}-${itemIndex}`,
+    })),
+  })
+  const identity = (
+    goalIndex: number,
+  ): Pick<
+    DraftEditorView['goals'][number],
+    | 'planGoalId'
+    | 'goalDefinitionId'
+    | 'goalDefinitionVersionId'
+    | 'goalSeriesId'
+    | 'displayOrder'
+  > => ({
+    planGoalId: numberedUuid(goalIndex + 1),
+    goalDefinitionId: numberedUuid(100 + goalIndex),
+    goalDefinitionVersionId: numberedUuid(200 + goalIndex),
+    goalSeriesId: numberedUuid(300 + goalIndex),
+    displayOrder: goalIndex,
+  })
+  return [
+    ...[100, 100, 100, 22].map((componentCount, goalIndex) =>
+      goal({
+        ...identity(goalIndex),
+        config: {
+          ...goal().config,
+          repetition: { kind: 'daily' },
+          measurement: checklist(goalIndex, componentCount),
+        },
+      }),
+    ),
+    goal({
+      ...identity(4),
+      config: {
+        ...goal().config,
+        repetition: { kind: 'one_off', dueDate: '2029-12-31' },
+        measurement: checklist(4, oneOffComponents),
+      },
+    }),
+    goal({
+      ...identity(5),
+      config: {
+        ...goal().config,
+        repetition: { kind: 'weekly', n: '1' },
+        measurement: { kind: 'boolean' },
+      },
+    }),
+    goal({
+      ...identity(6),
+      config: {
+        ...goal().config,
+        repetition: { kind: 'monthly', n: '1' },
+        measurement: { kind: 'boolean' },
+      },
+    }),
+  ]
+}
+
 describe('P06 publication preview projector', () => {
   it('projects a late current monthly goal into one exact actor-free frozen target', () => {
     const value = buildPublicationPreview(editor(), '2026-08-15')
@@ -312,6 +386,82 @@ describe('P06 publication preview projector', () => {
     expect(value.goals).toEqual([])
     expect(value.calculatedTargets).toEqual([])
     expect(value.blockers).toEqual([])
+  })
+
+  it('counts snapshots, fixed expectations and flexible periods at the exact 10000/10001 boundary', () => {
+    const boundary = buildPublicationPreview(
+      editor({ targetMonth: '2029-12', goals: mixedMaterializationGoals(4) }),
+      '2029-12-01',
+    )
+    expect(boundary.blockers).toEqual([])
+    expect(boundary.goals).toHaveLength(7)
+    expect(
+      boundary.calculatedTargets.map(({ calendar }) =>
+        calendar.kind === 'quota'
+          ? `${calendar.kind}:${calendar.cadence}`
+          : calendar.kind,
+      ),
+    ).toEqual([
+      'fixed',
+      'fixed',
+      'fixed',
+      'fixed',
+      'fixed',
+      'quota:weekly',
+      'quota:monthly',
+    ])
+
+    const oversized = buildPublicationPreview(
+      editor({ targetMonth: '2029-12', goals: mixedMaterializationGoals(5) }),
+      '2029-12-01',
+    )
+    expect(oversized.goals).toHaveLength(7)
+    expect(oversized.calculatedTargets).toHaveLength(7)
+    expect(oversized.goals.every((item) => item.blockers.length === 0)).toBe(
+      true,
+    )
+    expect(oversized.blockers).toEqual([
+      {
+        planGoalId: null,
+        pointer: '/goals',
+        code: 'incompatible',
+        detail: 'Publication materialization exceeds 10000 rows.',
+      },
+    ])
+    expect(oversized.previewHash).toBe(
+      createHash('sha256')
+        .update(canonicalJsonStringify(stripHash(oversized) as never), 'utf8')
+        .digest('hex'),
+    )
+  })
+
+  it('sorts two plan-level blockers by pointer before hashing the combined wrong-window and oversized preview', () => {
+    // Returning zero for two null goal IDs must not leave insertion order in the hash.
+    const value = buildPublicationPreview(
+      editor({ targetMonth: '2029-12', goals: mixedMaterializationGoals(5) }),
+      '2029-10-01',
+    )
+    const expectedBlockers = [
+      {
+        planGoalId: null,
+        pointer: '/goals',
+        code: 'incompatible',
+        detail: 'Publication materialization exceeds 10000 rows.',
+      },
+      {
+        planGoalId: null,
+        pointer: '/targetMonth',
+        code: 'incompatible',
+        detail: 'Target month is not current or next.',
+      },
+    ]
+    expect(value.blockers).toEqual(expectedBlockers)
+    expect(canonicalJsonStringify(stripHash(value) as never)).toContain(
+      '"blockers":[{"code":"incompatible","detail":"Publication materialization exceeds 10000 rows.","planGoalId":null,"pointer":"/goals"},{"code":"incompatible","detail":"Target month is not current or next.","planGoalId":null,"pointer":"/targetMonth"}]',
+    )
+    expect(value.previewHash).toBe(
+      '9e6dd67d643d225246d48f080e9861944baff22f2cbc51cabf3df54c38261046',
+    )
   })
 
   it('is byte/hash stable, actor-independent and changes with revision, config, provenance, order, blocker or date', () => {

@@ -14,10 +14,35 @@ export interface ProblemDocument {
   readonly requestId: string
   readonly errors?: readonly ProblemFieldError[]
   readonly conflict?: ProblemConflict
+  readonly blockers?: readonly PublicationProblemBlocker[]
 }
 
 export type ProblemConflict =
-  GoalDefinitionProblemConflict | DraftProblemConflict
+  | GoalDefinitionProblemConflict
+  | DraftProblemConflict
+  | PublicationPreviewProblemConflict
+  | AlreadyPublishedProblemConflict
+
+export interface PublicationPreviewProblemConflict {
+  readonly currentDraftRevision: string
+  readonly currentPreviewSchemaVersion: string
+  readonly currentPreviewHashVersion: string
+  readonly currentPreviewHash: string
+  readonly nextAction: 'reload-publication-preview-and-retry'
+}
+
+export interface AlreadyPublishedProblemConflict {
+  readonly publicationId: string
+  readonly publicationRevision: string
+  readonly nextAction: 'open-published-plan'
+}
+
+export interface PublicationProblemBlocker {
+  readonly planGoalId: string | null
+  readonly pointer: string
+  readonly code: 'required' | 'empty_collection' | 'incompatible'
+  readonly detail: string
+}
 
 export interface GoalDefinitionProblemConflict {
   readonly currentRevision: string
@@ -46,6 +71,7 @@ export interface HttpProblemMapping {
   readonly code: string
   readonly errors?: readonly ProblemFieldError[]
   readonly conflict?: ProblemConflict
+  readonly blockers?: readonly PublicationProblemBlocker[]
 }
 
 export type HttpProblemMapper = (
@@ -62,5 +88,6 @@ export interface MappedHttpProblem {
   readonly definition: RegisteredProblemDefinition
   readonly errors?: readonly ProblemFieldError[]
   readonly conflict?: ProblemConflict
+  readonly blockers?: readonly PublicationProblemBlocker[]
   readonly unexpected: boolean
 }

@@ -1,5 +1,7 @@
 import type { DurableCommandResultRef } from '@/shared/application/application-command'
 
+import type { PublicationPreviewBlocker } from './publication-preview'
+
 export class PlanningAuthorizationDeniedError extends Error {
   public constructor() {
     super('Planning operation is not authorized')
@@ -87,5 +89,50 @@ export class GoalDefinitionVersionNotFoundError extends Error {
   public constructor() {
     super('Goal definition version was not found')
     this.name = 'GoalDefinitionVersionNotFoundError'
+  }
+}
+
+export class PublicationPreviewConflictError extends Error {
+  public constructor(
+    public readonly currentDraftRevision: bigint,
+    public readonly currentPreviewSchemaVersion: string,
+    public readonly currentPreviewHashVersion: string,
+    public readonly currentPreviewHash: string,
+  ) {
+    super('Publication preview no longer matches the draft')
+    this.name = 'PublicationPreviewConflictError'
+  }
+}
+
+export class PlanPublicationBlockedError extends Error {
+  public constructor(
+    public readonly blockers: readonly PublicationPreviewBlocker[],
+  ) {
+    super('Plan publication is blocked')
+    this.name = 'PlanPublicationBlockedError'
+  }
+}
+
+export class PlanMonthAlreadyPublishedError extends Error {
+  public constructor(
+    public readonly publicationId: string,
+    public readonly publicationRevision: bigint,
+  ) {
+    super('Plan month is already published')
+    this.name = 'PlanMonthAlreadyPublishedError'
+  }
+}
+
+export class PlanPublicationNotFoundError extends Error {
+  public constructor() {
+    super('Plan publication was not found')
+    this.name = 'PlanPublicationNotFoundError'
+  }
+}
+
+export class ActivePlanMonthNotFoundError extends Error {
+  public constructor() {
+    super('Active plan month was not found')
+    this.name = 'ActivePlanMonthNotFoundError'
   }
 }

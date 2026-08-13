@@ -420,6 +420,20 @@ export type ProductClock = {
   now(): Date;
   today(timeZone: "Asia/Yekaterinburg"): string;
 };
+
+export type PublishMonthPayload = {
+  readonly planMonthId: PlanMonthId;
+  readonly previewSchemaVersion: string;
+  readonly previewHashVersion: string;
+  readonly previewHash: string;
+};
+
+export type PublishMonthApplicationCommand =
+  ApplicationCommand<PublishMonthPayload>;
+
+// commandType: planning.publish-month.v1
+// mandatory expectedRevision: positive P03 draft revision
+// result: DurableCommandResultRef<'planning.plan-publication.v1'>
 ```
 
 External JSON представляет `bigint` как lossless decimal string. Internal
@@ -1355,6 +1369,7 @@ validation errors before confirmation.
 - Create: `src/modules/planning/application/publication-preview.ts`
 - Modify: `src/modules/planning/application/index.ts`
 - Modify: `src/modules/planning/application/planning-application.ts`
+- Modify: `src/modules/planning/application/planning-errors.ts`
 - Modify: `src/modules/planning/composition/create-planning-application.ts`
 - Create: `src/modules/planning/presentation/publication-preview.response.ts`
 - Modify: `src/modules/planning/presentation/planning.controller.ts`
@@ -1399,24 +1414,95 @@ publish prorates.
 
 **Files:**
 
+- Modify: `TECHNICAL_DESIGN.md`
+- Modify: `PRD.md`
+- Modify: `USER_FLOWS.md`
+- Modify: `SCREEN_MAP.md`
+- Modify: `IMPLEMENTATION_PLAN.md`
+- Modify: `.superpowers/sdd/IMPLEMENTATION_PLAN/task-P07-brief.md`
+- Modify: `.superpowers/sdd/IMPLEMENTATION_PLAN/task-P07-report.md`
 - Create: `src/modules/planning/application/publish-month.command.ts`
+- Create: `src/modules/planning/application/get-published-snapshot.query.ts`
+- Create: `src/modules/planning/application/get-active-month.query.ts`
+- Create: `src/modules/planning/application/publication-persistence.port.ts`
+- Create: `src/modules/planning/application/publication.types.ts`
+- Create: `src/modules/planning/application/publication.validation.ts`
+- Modify: `src/modules/planning/application/publication-preview.ts`
 - Create: `src/modules/planning/domain/publication-builder.ts`
+- Create: `src/modules/planning/domain/publication.ts`
+- Create: `src/modules/planning/infrastructure/prisma-publication.persistence.ts`
+- Modify: `src/modules/planning/application/index.ts`
+- Modify: `src/modules/planning/application/planning-application.ts`
+- Modify: `src/modules/planning/application/planning-errors.ts`
+- Modify: `src/modules/planning/composition/create-planning-application.ts`
+- Modify: `src/modules/planning/composition/planning.module.ts`
+- Modify: `src/modules/planning/infrastructure/prisma-plan-draft.persistence.ts`
+- Modify: `src/modules/planning/presentation/planning.controller.ts`
+- Create: `src/modules/planning/presentation/publication.dto.ts`
+- Create: `src/modules/planning/presentation/publication.response.ts`
+- Modify: `src/modules/planning/presentation/planning-problem.definitions.ts`
+- Modify: `src/modules/planning/composition/planning-http-problem.contribution.ts`
+- Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
+- Modify: `src/platform/http/errors/problem.contracts.ts`
+- Modify: `src/platform/http/errors/http-problem.registry.ts`
+- Modify: `src/platform/http/errors/problem-exception.filter.ts`
+- Modify: `src/platform/http/docs/problem-response.dto.ts`
+- Modify: `src/platform/http/docs/api-problem-responses.decorator.ts`
+- Modify: `docs/api/openapi.json`
 - Modify: `prisma/schema.prisma`
-- Create: `prisma/migrations/20260811150000_plan_publication/migration.sql`
+- Create: `prisma/migrations/20260811151000_plan_publication/migration.sql`
+- Modify: `src/generated/prisma/**`
+- Test: `test/unit/planning/publication-builder.spec.ts`
+- Modify: `test/unit/planning/publication-preview.spec.ts`
+- Test: `test/unit/planning/publish-month.spec.ts`
+- Modify: `test/unit/platform/problem-details.spec.ts`
 - Test: `test/integration/planning/publish-month.integration.spec.ts`
-- Test: `test/e2e/planning/publish-month.e2e-spec.ts`
+- Modify: `test/integration/planning/draft-goal.integration.spec.ts`
+- Modify: `test/integration/platform/foundation-runtime.integration.spec.ts`
+- Test: `test/e2e/planning/publish-month.e2e.spec.ts`
+- Modify: `test/e2e/planning/draft-goal.e2e.spec.ts`
+- Modify: `test/e2e/planning/publication-preview.e2e.spec.ts`
+- Modify: `test/e2e/platform/http-contracts.e2e.spec.ts`
 
-**Produces:** `GetPublishedSnapshotQuery`, `GetActiveMonthQuery` and immutable
-publication revision referenced by facts/reports.
+**Produces:** exact `planning.publish-month.v1`,
+`GetPublishedSnapshotQuery({trustedUserId,publicationId})`,
+`GetActiveMonthQuery({trustedUserId})` and frozen
+`planner.published-snapshot.v1`. POST is exactly
+`/planning/drafts/{planMonthId}/publish`; GETs are exactly
+`/planning/publications/{publicationId}` and `/planning/months/active`.
+Publication result kind is `planning.plan-publication.v1`; confirmed P06 hash is
+the publication snapshot hash without a second algorithm.
 
-- [ ] Написать RED tests rollback on any generation error, stale preview,
-  future/current activation, late dates and duplicate replay.
-- [ ] Revalidate draftRevision/previewHash then materialize with P04 targets and
-  system-derived `not_applicable` before `activeLocalDate`.
-- [ ] Проверить one active publication per space/month and append-only snapshot.
-- [ ] Запустить migration integration, publish E2E, OpenAPI and
-  `pnpm check:quick`.
-- [ ] Commit: `feat: publish immutable monthly plans`.
+- [x] Написать literal RED unit, real-PG integration, live PG+Redis E2E и exact
+  OpenAPI tests до production/schema: activation boundary, byte-exact snapshot,
+  stale/blocker zero-write, component expansion, replay/fingerprint,
+  publish/edit races, failpoint rollback, migration upgrade/inventory/direct
+  SQL invariants, auth/CSRF/media/body/dependency recovery и GET stability.
+- [x] В одной durable transaction: replay/fingerprint precedence, one clock,
+  trusted member, month+draft lock, consistent editor read, one P06 rebuild,
+  revision/schema/hash/blocker checks before first write, materialization,
+  lifecycle pointer/+1, typed action/detail, receipt и deferred commit guards.
+- [x] Создать пять immutable tables и deferred pointer/completeness/effect
+  invariants; заменить P03 mixed month index отдельными partial draft/lifecycle
+  indexes. Fixed stable key использует `UNIQUE NULLS NOT DISTINCT`.
+- [x] Развернуть fixed components по locked rule; сохранить все quota periods,
+  включая target `0`; не создавать physical `not_applicable` и fake
+  preactivation weekly-task period.
+- [x] Ограничить exact materialization суммой `10_000` snapshot/fixed/period
+  rows: P06 plan blocker `/goals` до hash, P07 cap+1 zero-write; три child table
+  писать set-based bounded statements и сохранить transaction timeout `5s`.
+- [x] Закрыть review invariants: immutable month identity/lifecycle, mandatory
+  publication->draft FK, independent fixed/calendar array validation,
+  migration preflight locks и полный Prisma/pg_catalog inventory.
+- [x] Реализовать exact finite Problems/OpenAPI и frozen bounded GET queries;
+  foreign/missing publication concealed, active query read-only и исключает
+  scheduled/non-current/nonpublished states; blockers passthrough сохраняет
+  exact pointer/code/detail порядок и при двух null plan-level IDs.
+- [x] До handoff запустить focused unit/integration/E2E, затронутые planning
+  regressions, Prisma validate/generate, OpenAPI generate/drift/lint, format,
+  lint, source/test typecheck, architecture и diff/scope audits. Broad final
+  gates и Git принадлежат coordinator.
+- [x] Commit: `feat: publish immutable monthly plans`.
 
 ### P08 — Cancel and republish publication
 

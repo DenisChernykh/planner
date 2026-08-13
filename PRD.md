@@ -131,6 +131,11 @@
 
 - Публикация требует preview и явного подтверждения.
 - Preview привязан к exact draft revision, local activation date и deterministic hash; он показывает фокус, ordered goals, owners, весь typed config/provenance, рассчитанный calendar и все blockers, но не меняет план.
+- Подтверждение передаёт только exact preview schema/hash versions и hash вместе
+  с draft revision; activation, target month, goals, owners, config и formula
+  versions сервер заново выводит из locked draft. Изменение любого из этих
+  значений либо local date отклоняет старое подтверждение и предлагает заново
+  открыть preview.
 - Публиковать разрешено только план текущего или следующего календарного месяца по `Asia/Yekaterinburg`; неопубликованный план прошедшего месяца публиковать нельзя.
 - План следующего месяца публикуется как зафиксированная будущая конфигурация и активируется ровно в `00:00` первого дня своего месяца. До этого момента записи и уведомления по нему недоступны.
 - План текущего месяца активируется при публикации; правила поздней публикации применяются с даты публикации.
@@ -138,6 +143,14 @@
 - До начала месяца опубликованный план можно вернуть в `draft`, только если в нём ещё нет записей.
 - После начала месяца состав, типы, владельцы, нормы и расписания опубликованного плана не меняются.
 - Изменение или архивирование каталожной цели влияет только на черновики и будущие месяцы.
+- Успешная публикация атомарно фиксирует один неизменяемый snapshot: focus,
+  ordered goal metadata/config/provenance, exact calendars, prorated targets,
+  formula versions и подтверждённый preview hash. Частично опубликованного
+  месяца, второго активного snapshot или публикации без command receipt/audit
+  не существует.
+- Тот же command ID с тем же подтверждением безопасно возвращает созданную
+  publication revision. Другой command ID после уже состоявшейся публикации
+  открывает существующий published plan, а не создаёт вторую revision.
 
 ### 7.4. Поздняя публикация
 
@@ -148,6 +161,12 @@
 - эти дни не входят в `progressPercent`, `goalScore` или coverage;
 - недельные и месячные нормы пропорционально уменьшаются;
 - уведомления за прошлые дни не создаются.
+
+`not_applicable` не является физической пользовательской записью. Fixed dates и
+полностью preactivation weekly planned task, которые P04 исключил, остаются
+отсутствующими expectations/periods; UI и отчёт выводят N/A из неизменяемой
+activation/repetition metadata. Quota weeks/month сохраняются полностью,
+включая preactivation periods с target `0`.
 
 ### 7.5. Закрытие месяца
 
@@ -630,6 +649,35 @@ preview и hash. Hash включает всё показанное и рассч
 значимая правка draft или смена local date изменяет hash; повтор
 без изменений byte-stable.
 
+### 12.9. Publication snapshot
+
+Публикация повторно строит ровно тот же preview после locked read и сохраняет
+confirmed preview hash как publication snapshot hash; отдельного P07 hash
+algorithm нет. Generated publication/snapshot IDs и timestamps в hash preimage
+не добавляются. Published snapshot возвращает exact source revisions, focus,
+ordered goal snapshots, copied metadata/refined config/provenance, successful
+P04 calendars/targets и calendar/evaluation/score formula versions. Он остаётся
+byte-stable после последующих изменений draft или каталога.
+
+Fixed calendars materialize coverage components так: scalar/`any_of` без
+checkpoints — одно parent expectation на дату; checklist без checkpoints — по
+одному item expectation без дополнительного parent; при checkpoints — по
+одному checkpoint expectation, а его nested checklist/any-of остаётся будущим
+checkpoint fact. Weekly/monthly quota и weekly planned task materialize periods,
+не daily expectations.
+
+Одна publication materialize не более `10 000` строк суммарно: goal snapshots,
+expanded fixed expectations и flexible periods. Ровно `10 000` допустимы.
+Превышение добавляет до preview hash один plan-level blocker
+`{planGoalId:null,pointer:'/goals',code:'incompatible',detail:'Publication
+materialization exceeds 10000 rows.'}`; preview остаётся deterministic и
+доступным как `200`, а подтверждение exact blocked preview не создаёт
+publication, child rows, history или receipt.
+
+Все preview blockers входят в hash в deterministic порядке: plan-level перед
+goal-level; goal-level по display order и goal ID; одинаковая plan/goal позиция
+по pointer, code и detail, включая несколько blockers с null `planGoalId`.
+
 ## 13. Веб-интерфейс
 
 Веб должен быть адаптивным и содержать:
@@ -896,6 +944,11 @@ projectedResult = actualProgress / elapsedEligibleDays × totalEligibleDays
 **Дано:** у гибкой недельной цели не задано точное целое `N`, а у количества в режиме `targeted` отсутствует target.  
 **Когда:** пользователь пытается опубликовать план.  
 **Тогда:** публикация отклоняется с отдельной ошибкой у каждого незаполненного или некорректного поля.
+**Когда:** после preview изменились draft revision, focus/config/order/
+provenance, catalog metadata, local activation date, formula/calendar либо
+появился новый blocker.
+**Тогда:** старое подтверждение отклоняется; publication, snapshots,
+expectations, periods, month pointer/revision, history и receipt не изменяются.
 
 ### AC-04. Неполная неделя
 
@@ -909,7 +962,9 @@ projectedResult = actualProgress / elapsedEligibleDays × totalEligibleDays
 
 **Дано:** в 30-дневном месяце цель равна `N = 10`, а план опубликован 15-го числа.  
 **Когда:** рассчитываются ожидания и цели.  
-**Тогда:** дни 1–14 имеют `not_applicable`, прошлые уведомления отсутствуют, а цель месяца равна `5`.
+**Тогда:** дни 1–14 выводятся как `not_applicable` без физических fixed rows,
+прошлые уведомления отсутствуют, quota calendar сохраняет preactivation period
+с target `0`, а цель месяца равна `5`.
 
 ### AC-06. Количество `add/latest`
 

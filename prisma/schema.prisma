@@ -37,11 +37,13 @@ model Membership {
   slot      Int      @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  space           Space                    @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  allowlist       TelegramAccessAllowlist?
-  planningActions PlanningActionGroup[]
+  space                   Space                    @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  allowlist               TelegramAccessAllowlist?
+  planningActions         PlanningActionGroup[]
   ownedDraftGoalRevisions PlanDraftGoalRevision[]
+  publishedPlans          PlanPublication[]
+  ownedGoalSnapshots      PlanGoalSnapshot[]
 
   @@unique([spaceId, slot])
   @@unique([spaceId, id])
@@ -78,18 +80,23 @@ model TelegramExternalIdentity {
 }
 
 model PlanMonth {
-  id         String   @id @default(uuid()) @db.Uuid
-  spaceId    String   @map("space_id") @db.Uuid
-  monthStart DateTime @map("month_start") @db.Date
-  status     String   @db.VarChar(16)
-  revision   BigInt   @db.BigInt
-  createdAt  DateTime @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime @map("updated_at") @db.Timestamptz(3)
+  id                  String   @id @default(uuid()) @db.Uuid
+  spaceId             String   @map("space_id") @db.Uuid
+  monthStart          DateTime @map("month_start") @db.Date
+  status              String   @db.VarChar(16)
+  revision            BigInt   @db.BigInt
+  createdAt           DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime @map("updated_at") @db.Timestamptz(3)
+  /// Backed by a physical DEFERRABLE composite FK to
+  /// plan_publications(plan_month_id,id), which Prisma cannot model exactly.
+  activePublicationId String?  @map("active_publication_id") @db.Uuid
 
-  space   Space                 @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  draft   PlanDraft?
-  actions PlanningActionGroup[]
-  draftGoals PlanDraftGoal[]
+  space             Space                 @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  draft             PlanDraft?
+  actions           PlanningActionGroup[]
+  draftGoals        PlanDraftGoal[]
+  publications      PlanPublication[]
+  activePublication PlanPublication?      @relation("ActivePlanPublication", fields: [id, activePublicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_months_active_publication_fkey")
 
   @@unique([spaceId, monthStart])
   @@unique([spaceId, id])
@@ -103,7 +110,8 @@ model PlanDraft {
   createdAt   DateTime @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime @map("updated_at") @db.Timestamptz(3)
 
-  planMonth PlanMonth @relation(fields: [planMonthId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  planMonth    PlanMonth         @relation(fields: [planMonthId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  publications PlanPublication[]
 
   @@map("plan_drafts")
 }
@@ -146,6 +154,7 @@ model PlanningActionGroup {
   focusChange       PlanningMonthFocusChange?
   goalCatalogChange PlanningGoalCatalogChange?
   draftGoalChange   PlanningDraftGoalChange?
+  publicationChange PlanningPublicationChange?
 
   @@unique([actorScope, commandType, commandId])
   @@map("planning_action_groups")
@@ -188,9 +197,10 @@ model GoalSeries {
   goalDefinitionId String   @map("goal_definition_id") @db.Uuid
   createdAt        DateTime @map("created_at") @db.Timestamptz(3)
 
-  goalDefinition GoalDefinition          @relation(fields: [goalDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  versions       GoalDefinitionVersion[]
+  goalDefinition     GoalDefinition          @relation(fields: [goalDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  versions           GoalDefinitionVersion[]
   draftGoalRevisions PlanDraftGoalRevision[]
+  goalSnapshots      PlanGoalSnapshot[]
 
   @@unique([goalDefinitionId, id])
   @@map("goal_series")
@@ -212,7 +222,8 @@ model GoalDefinitionVersion {
   catalogBeforeChanges     PlanningGoalCatalogChange[] @relation("CatalogBeforeVersion")
   catalogAfterChanges      PlanningGoalCatalogChange[] @relation("CatalogAfterVersion")
   catalogCopySourceChanges PlanningGoalCatalogChange[] @relation("CatalogCopySourceVersion")
-  draftGoalRevisions      PlanDraftGoalRevision[]
+  draftGoalRevisions       PlanDraftGoalRevision[]
+  goalSnapshots            PlanGoalSnapshot[]
 
   @@unique([goalDefinitionId, versionNumber])
   @@unique([goalDefinitionId, id])
@@ -241,22 +252,23 @@ model PlanningGoalCatalogChange {
 }
 
 model PlanDraftGoal {
-  id                 String    @id @default(uuid()) @db.Uuid
-  spaceId            String    @map("space_id") @db.Uuid
-  planMonthId        String    @map("plan_month_id") @db.Uuid
-  goalDefinitionId   String    @map("goal_definition_id") @db.Uuid
-  displayOrder       Int       @map("display_order")
-  currentRevisionId  String?   @map("current_revision_id") @db.Uuid
-  attachedAt         DateTime  @map("attached_at") @db.Timestamptz(3)
-  detachedAt         DateTime? @map("detached_at") @db.Timestamptz(3)
-  createdAt          DateTime  @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime  @map("updated_at") @db.Timestamptz(3)
+  id                String    @id @default(uuid()) @db.Uuid
+  spaceId           String    @map("space_id") @db.Uuid
+  planMonthId       String    @map("plan_month_id") @db.Uuid
+  goalDefinitionId  String    @map("goal_definition_id") @db.Uuid
+  displayOrder      Int       @map("display_order")
+  currentRevisionId String?   @map("current_revision_id") @db.Uuid
+  attachedAt        DateTime  @map("attached_at") @db.Timestamptz(3)
+  detachedAt        DateTime? @map("detached_at") @db.Timestamptz(3)
+  createdAt         DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @map("updated_at") @db.Timestamptz(3)
 
-  planMonth       PlanMonth      @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  goalDefinition  GoalDefinition @relation(fields: [spaceId, goalDefinitionId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  revisions       PlanDraftGoalRevision[] @relation("DraftGoalRevisions")
-  currentRevision PlanDraftGoalRevision? @relation("CurrentDraftGoalRevision", fields: [id, currentRevisionId], references: [planGoalId, id], onDelete: Restrict, onUpdate: Restrict)
-  changes         PlanningDraftGoalChange[]
+  planMonth          PlanMonth                 @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  goalDefinition     GoalDefinition            @relation(fields: [spaceId, goalDefinitionId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  revisions          PlanDraftGoalRevision[]   @relation("DraftGoalRevisions")
+  currentRevision    PlanDraftGoalRevision?    @relation("CurrentDraftGoalRevision", fields: [id, currentRevisionId], references: [planGoalId, id], onDelete: Restrict, onUpdate: Restrict)
+  changes            PlanningDraftGoalChange[]
+  publishedSnapshots PlanGoalSnapshot[]
 
   @@unique([id, spaceId, goalDefinitionId])
   @@unique([id, currentRevisionId])
@@ -277,13 +289,14 @@ model PlanDraftGoalRevision {
   sourceProvenance        Json?    @map("source_provenance") @db.JsonB
   createdAt               DateTime @map("created_at") @db.Timestamptz(3)
 
-  planGoal             PlanDraftGoal @relation("DraftGoalRevisions", fields: [planGoalId, spaceId, goalDefinitionId], references: [id, spaceId, goalDefinitionId], onDelete: Restrict, onUpdate: Restrict)
-  currentFor           PlanDraftGoal? @relation("CurrentDraftGoalRevision")
-  goalDefinitionVersion GoalDefinitionVersion @relation(fields: [goalDefinitionId, goalDefinitionVersionId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
-  goalSeries          GoalSeries @relation(fields: [goalDefinitionId, goalSeriesId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
-  owner               Membership? @relation(fields: [spaceId, ownerMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  beforeChanges       PlanningDraftGoalChange[] @relation("DraftGoalBeforeRevision")
-  afterChanges        PlanningDraftGoalChange[] @relation("DraftGoalAfterRevision")
+  planGoal              PlanDraftGoal             @relation("DraftGoalRevisions", fields: [planGoalId, spaceId, goalDefinitionId], references: [id, spaceId, goalDefinitionId], onDelete: Restrict, onUpdate: Restrict)
+  currentFor            PlanDraftGoal?            @relation("CurrentDraftGoalRevision")
+  goalDefinitionVersion GoalDefinitionVersion     @relation(fields: [goalDefinitionId, goalDefinitionVersionId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
+  goalSeries            GoalSeries                @relation(fields: [goalDefinitionId, goalSeriesId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict)
+  owner                 Membership?               @relation(fields: [spaceId, ownerMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  beforeChanges         PlanningDraftGoalChange[] @relation("DraftGoalBeforeRevision")
+  afterChanges          PlanningDraftGoalChange[] @relation("DraftGoalAfterRevision")
+  publishedSnapshots    PlanGoalSnapshot[]
 
   @@unique([planGoalId, revisionNumber])
   @@unique([planGoalId, id])
@@ -291,18 +304,141 @@ model PlanDraftGoalRevision {
 }
 
 model PlanningDraftGoalChange {
-  actionId           String @id @map("action_id") @db.Uuid
-  planGoalId         String? @map("plan_goal_id") @db.Uuid
-  beforeRevisionId   String? @map("before_revision_id") @db.Uuid
-  afterRevisionId    String? @map("after_revision_id") @db.Uuid
-  reorderedGoalCount Int? @map("reordered_goal_count")
+  actionId           String   @id @map("action_id") @db.Uuid
+  planGoalId         String?  @map("plan_goal_id") @db.Uuid
+  beforeRevisionId   String?  @map("before_revision_id") @db.Uuid
+  afterRevisionId    String?  @map("after_revision_id") @db.Uuid
+  reorderedGoalCount Int?     @map("reordered_goal_count")
   beforeOrder        String[] @default([]) @map("before_order") @db.Uuid
   afterOrder         String[] @default([]) @map("after_order") @db.Uuid
 
-  action         PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  planGoal       PlanDraftGoal? @relation(fields: [planGoalId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  action         PlanningActionGroup    @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  planGoal       PlanDraftGoal?         @relation(fields: [planGoalId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   beforeRevision PlanDraftGoalRevision? @relation("DraftGoalBeforeRevision", fields: [planGoalId, beforeRevisionId], references: [planGoalId, id], onDelete: Restrict, onUpdate: Restrict)
   afterRevision  PlanDraftGoalRevision? @relation("DraftGoalAfterRevision", fields: [planGoalId, afterRevisionId], references: [planGoalId, id], onDelete: Restrict, onUpdate: Restrict)
 
   @@map("planning_draft_goal_changes")
+}
+
+model PlanPublication {
+  id                         String   @id(map: "plan_publications_pkey") @db.Uuid
+  spaceId                    String   @map("space_id") @db.Uuid
+  planMonthId                String   @map("plan_month_id") @db.Uuid
+  publicationRevision        BigInt   @map("publication_revision") @db.BigInt
+  sourceDraftRevision        BigInt   @map("source_draft_revision") @db.BigInt
+  sourcePlanMonthRevision    BigInt   @map("source_plan_month_revision") @db.BigInt
+  focus                      String   @db.Text
+  activationMode             String   @map("activation_mode") @db.VarChar(16)
+  activeLocalDate            DateTime @map("active_local_date") @db.Date
+  latePublication            Boolean  @map("late_publication")
+  timeZone                   String   @map("time_zone") @db.VarChar(64)
+  sourcePreviewSchemaVersion String   @map("source_preview_schema_version") @db.VarChar(100)
+  previewHashVersion         String   @map("preview_hash_version") @db.VarChar(100)
+  previewHash                String   @map("preview_hash") @db.Char(64)
+  calendarFormulaVersion     String   @map("calendar_formula_version") @db.VarChar(100)
+  evaluationFormulaVersion   String   @map("evaluation_formula_version") @db.VarChar(100)
+  scoreFormulaVersion        String   @map("score_formula_version") @db.VarChar(100)
+  publishedByMemberId        String   @map("published_by_member_id") @db.Uuid
+  publishedAt                DateTime @map("published_at") @db.Timestamptz(3)
+
+  planMonth       PlanMonth                  @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_publications_month_fkey")
+  sourceDraft     PlanDraft                  @relation(fields: [planMonthId], references: [planMonthId], onDelete: Restrict, onUpdate: Restrict, map: "plan_publications_draft_fkey")
+  /// Prisma cannot infer physical one-to-one from unique `plan_months.id`
+  /// inside the deferrable composite FK, so the inverse is modeled as a list.
+  activeForMonths PlanMonth[]                @relation("ActivePlanPublication")
+  publishedBy     Membership                 @relation(fields: [spaceId, publishedByMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_publications_publisher_fkey")
+  goalSnapshots   PlanGoalSnapshot[]
+  change          PlanningPublicationChange?
+
+  @@unique([planMonthId, publicationRevision], map: "plan_publications_month_revision_key")
+  @@unique([planMonthId, id], map: "plan_publications_month_id_key")
+  @@unique([spaceId, id], map: "plan_publications_space_id_key")
+  @@map("plan_publications")
+}
+
+model PlanGoalSnapshot {
+  id                        String  @id(map: "plan_goal_snapshots_pkey") @db.Uuid
+  publicationId             String  @map("publication_id") @db.Uuid
+  spaceId                   String  @map("space_id") @db.Uuid
+  planMonthId               String  @map("plan_month_id") @db.Uuid
+  sourcePlanGoalId          String  @map("source_plan_goal_id") @db.Uuid
+  sourceDraftGoalRevisionId String  @map("source_draft_goal_revision_id") @db.Uuid
+  sourceConfigRevision      BigInt  @map("source_config_revision") @db.BigInt
+  goalDefinitionId          String  @map("goal_definition_id") @db.Uuid
+  goalDefinitionVersionId   String  @map("goal_definition_version_id") @db.Uuid
+  goalSeriesId              String  @map("goal_series_id") @db.Uuid
+  displayOrder              Int     @map("display_order")
+  title                     String  @db.Text
+  why                       String  @db.Text
+  category                  String  @db.Text
+  scopeKind                 String  @map("scope_kind") @db.VarChar(16)
+  ownerMemberId             String? @map("owner_member_id") @db.Uuid
+  config                    Json    @db.JsonB
+  sourceProvenance          Json?   @map("source_provenance") @db.JsonB
+  calendar                  Json    @db.JsonB
+
+  publication             PlanPublication       @relation(fields: [planMonthId, publicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_goal_snapshots_publication_fkey")
+  sourcePlanGoal          PlanDraftGoal         @relation(fields: [sourcePlanGoalId, spaceId, goalDefinitionId], references: [id, spaceId, goalDefinitionId], onDelete: Restrict, onUpdate: Restrict, map: "plan_goal_snapshots_source_root_fkey")
+  sourceDraftGoalRevision PlanDraftGoalRevision @relation(fields: [sourcePlanGoalId, sourceDraftGoalRevisionId], references: [planGoalId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_goal_snapshots_source_revision_fkey")
+  goalDefinitionVersion   GoalDefinitionVersion @relation(fields: [goalDefinitionId, goalDefinitionVersionId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_goal_snapshots_definition_version_fkey")
+  goalSeries              GoalSeries            @relation(fields: [goalDefinitionId, goalSeriesId], references: [goalDefinitionId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_goal_snapshots_series_fkey")
+  owner                   Membership?           @relation(fields: [spaceId, ownerMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_goal_snapshots_owner_fkey")
+  fixedExpectations       FixedExpectation[]
+  flexiblePeriods         FlexiblePeriod[]
+
+  @@unique([publicationId, sourcePlanGoalId], map: "plan_goal_snapshots_publication_source_key")
+  @@unique([publicationId, displayOrder], map: "plan_goal_snapshots_publication_order_key")
+  @@unique([publicationId, id], map: "plan_goal_snapshots_publication_id_key")
+  @@map("plan_goal_snapshots")
+}
+
+model FixedExpectation {
+  id                 String   @id(map: "fixed_expectations_pkey") @db.Uuid
+  publicationId      String   @map("publication_id") @db.Uuid
+  planGoalSnapshotId String   @map("plan_goal_snapshot_id") @db.Uuid
+  expectationDate    DateTime @map("expectation_date") @db.Date
+  componentKind      String   @map("component_kind") @db.VarChar(24)
+  componentId        String?  @map("component_id") @db.Uuid
+
+  planGoalSnapshot PlanGoalSnapshot @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict, map: "fixed_expectations_publication_snapshot_fkey")
+
+  /// The null-safe stable key is physical PostgreSQL `UNIQUE NULLS NOT DISTINCT`
+  /// in migration 20260811151000 and intentionally has no Prisma @@unique model.
+  @@map("fixed_expectations")
+}
+
+model FlexiblePeriod {
+  id                 String     @id(map: "flexible_periods_pkey") @db.Uuid
+  publicationId      String     @map("publication_id") @db.Uuid
+  planGoalSnapshotId String     @map("plan_goal_snapshot_id") @db.Uuid
+  periodKind         String     @map("period_kind") @db.VarChar(24)
+  ordinal            Int
+  periodStart        DateTime   @map("period_start") @db.Date
+  periodEnd          DateTime   @map("period_end") @db.Date
+  periodDays         Int?       @map("period_days")
+  activeDates        DateTime[] @map("active_dates") @db.Date
+  eligibleDates      DateTime[] @map("eligible_dates") @db.Date
+  periodTarget       Int        @map("period_target")
+
+  planGoalSnapshot PlanGoalSnapshot @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict, map: "flexible_periods_publication_snapshot_fkey")
+
+  @@unique([publicationId, planGoalSnapshotId, periodKind, periodStart, periodEnd], map: "flexible_periods_stable_key")
+  @@unique([publicationId, planGoalSnapshotId, periodKind, ordinal], map: "flexible_periods_ordinal_key")
+  @@map("flexible_periods")
+}
+
+model PlanningPublicationChange {
+  actionId                      String  @id(map: "planning_publication_changes_pkey") @map("action_id") @db.Uuid
+  publicationId                 String  @unique(map: "planning_publication_changes_publication_key") @map("publication_id") @db.Uuid
+  confirmedDraftRevision        BigInt  @map("confirmed_draft_revision") @db.BigInt
+  confirmedPreviewSchemaVersion String  @map("confirmed_preview_schema_version") @db.VarChar(100)
+  confirmedPreviewHashVersion   String  @map("confirmed_preview_hash_version") @db.VarChar(100)
+  confirmedPreviewHash          String  @map("confirmed_preview_hash") @db.Char(64)
+  beforeActivePublicationId     String? @map("before_active_publication_id") @db.Uuid
+  afterActivePublicationId      String  @map("after_active_publication_id") @db.Uuid
+
+  action      PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "planning_publication_changes_action_fkey")
+  publication PlanPublication     @relation(fields: [publicationId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "planning_publication_changes_publication_fkey")
+
+  @@map("planning_publication_changes")
 }

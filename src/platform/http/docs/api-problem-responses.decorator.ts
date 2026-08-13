@@ -15,6 +15,12 @@ import {
   ProblemConflictResponseDto,
   ProblemResponseDto,
   ValidationProblemResponseDto,
+  PublicationPreviewConflictProblemResponseDto,
+  PublicationPreviewConflictResponseDto,
+  PlanMonthAlreadyPublishedProblemResponseDto,
+  AlreadyPublishedConflictResponseDto,
+  PlanPublicationBlockedProblemResponseDto,
+  PublicationBlockerResponseDto,
 } from './problem-response.dto'
 
 const problemContentType = 'application/problem+json'
@@ -43,6 +49,15 @@ export function ApiProblemResponses(
           }
           if (code === 'DRAFT_REVISION_CONFLICT') {
             return DraftConflictProblemResponseDto
+          }
+          if (code === 'PUBLICATION_PREVIEW_CONFLICT') {
+            return PublicationPreviewConflictProblemResponseDto
+          }
+          if (code === 'PLAN_MONTH_ALREADY_PUBLISHED') {
+            return PlanMonthAlreadyPublishedProblemResponseDto
+          }
+          if (code === 'PLAN_PUBLICATION_BLOCKED') {
+            return PlanPublicationBlockedProblemResponseDto
           }
           return ProblemResponseDto
         }),
@@ -80,6 +95,12 @@ export function ApiProblemResponses(
       DraftProblemConflictResponseDto,
       DraftConflictProblemResponseDto,
       ValidationProblemResponseDto,
+      PublicationPreviewConflictResponseDto,
+      PublicationPreviewConflictProblemResponseDto,
+      AlreadyPublishedConflictResponseDto,
+      PlanMonthAlreadyPublishedProblemResponseDto,
+      PublicationBlockerResponseDto,
+      PlanPublicationBlockedProblemResponseDto,
     ),
     ...responses,
   )
@@ -118,6 +139,38 @@ function problemExample(definition: RegisteredProblemDefinition): object {
     ...(definition.code === 'DRAFT_REVISION_CONFLICT'
       ? {
           conflict: { expectedRevision: '1', currentRevision: '2' },
+        }
+      : {}),
+    ...(definition.code === 'PUBLICATION_PREVIEW_CONFLICT'
+      ? {
+          conflict: {
+            currentDraftRevision: '2',
+            currentPreviewSchemaVersion: 'planner.publication-preview.v1',
+            currentPreviewHashVersion: 'planner.publication-preview-hash.v1',
+            currentPreviewHash: 'ab'.repeat(32),
+            nextAction: 'reload-publication-preview-and-retry',
+          },
+        }
+      : {}),
+    ...(definition.code === 'PLAN_MONTH_ALREADY_PUBLISHED'
+      ? {
+          conflict: {
+            publicationId: '11111111-1111-4111-8111-111111111111',
+            publicationRevision: '1',
+            nextAction: 'open-published-plan',
+          },
+        }
+      : {}),
+    ...(definition.code === 'PLAN_PUBLICATION_BLOCKED'
+      ? {
+          blockers: [
+            {
+              planGoalId: null,
+              pointer: '/targetMonth',
+              code: 'incompatible',
+              detail: 'Target month is not current or next.',
+            },
+          ],
         }
       : {}),
   }

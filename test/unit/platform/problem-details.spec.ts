@@ -1,7 +1,7 @@
 import { context, trace, type Span } from '@opentelemetry/api'
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks'
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base'
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, type ArgumentsHost } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { Test } from '@nestjs/testing'
 
@@ -22,6 +22,7 @@ import { HttpContextModule } from '@/platform/http/context/http-context.module'
 import { resolveRequestId } from '@/platform/http/context/request-id'
 import { canonicalizeJson } from '@/platform/http/docs/openapi-normalizer'
 import { HttpProblemRegistry } from '@/platform/http/errors/http-problem.registry'
+import { ProblemExceptionFilter } from '@/platform/http/errors/problem-exception.filter'
 import { CORE_HTTP_PROBLEM_CONTRIBUTION } from '@/platform/http/errors/http-problem.mapper'
 import { RequestValidationError } from '@/platform/http/errors/request-validation.error'
 import { mapValidationErrors } from '@/platform/http/errors/validation-error.mapper'
@@ -39,6 +40,8 @@ import { ObservabilityRuntime } from '@/platform/observability/observability.run
 import { SanitizingSpanExporter } from '@/platform/observability/sanitizing-span.exporter'
 import { SystemProductClock } from '@/platform/time/system-product-clock'
 import { FakeProductClock } from '@/platform/time/fake-product-clock'
+import { PLANNING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/planning/composition/planning-http-problem.contribution'
+import { PlanPublicationBlockedError } from '@/modules/planning/application/planning-errors'
 
 interface Deferred<T> {
   readonly promise: Promise<T>
@@ -235,6 +238,83 @@ describe('S03 HTTP problem contracts', () => {
         { pointer: '/email', code: 'invalid_format', detail: 'Invalid.' },
       ],
     })
+  })
+
+  it('preserves the exact sorted publication blockers through the finite registry mapping', () => {
+    // Dropping the mapping-only blockers field must fail this assertion.
+    const blockers = [
+      {
+        planGoalId: null,
+        pointer: '/goals',
+        code: 'incompatible' as const,
+        detail: 'Publication materialization exceeds 10000 rows.',
+      },
+    ]
+    const registry = new HttpProblemRegistry([
+      CORE_HTTP_PROBLEM_CONTRIBUTION,
+      PLANNING_HTTP_PROBLEM_CONTRIBUTION,
+    ])
+
+    const mapped = registry.map(new PlanPublicationBlockedError(blockers))
+    expect(mapped.definition).toMatchObject({
+      code: 'PLAN_PUBLICATION_BLOCKED',
+      status: 409,
+    })
+    expect(mapped.blockers).toEqual(blockers)
+    expect(mapped.unexpected).toBe(false)
+  })
+
+  it('writes publication blockers into the exact application/problem+json document', () => {
+    // Omitting mapped blockers in the global filter must fail the real reply body.
+    const blockers = [
+      {
+        planGoalId: null,
+        pointer: '/targetMonth',
+        code: 'incompatible' as const,
+        detail: 'Target month is not current or next.',
+      },
+    ]
+    const reply = jest.fn()
+    const setHeader = jest.fn()
+    const response = {}
+    const requestContext = new RequestContext()
+    const filter = new ProblemExceptionFilter(
+      {
+        httpAdapter: {
+          isHeadersSent: () => false,
+          setHeader,
+          reply,
+        },
+      } as never,
+      requestContext,
+      { write: jest.fn() },
+      new HttpProblemRegistry([
+        CORE_HTTP_PROBLEM_CONTRIBUTION,
+        PLANNING_HTTP_PROBLEM_CONTRIBUTION,
+      ]),
+    )
+    const host = {
+      switchToHttp: () => ({ getResponse: () => response }),
+    } as ArgumentsHost
+
+    requestContext.run('123e4567-e89b-42d3-a456-426614174000', () =>
+      filter.catch(new PlanPublicationBlockedError(blockers), host),
+    )
+
+    expect(reply).toHaveBeenCalledWith(
+      response,
+      {
+        type: 'https://planner.invalid/problems/plan-publication-blocked',
+        title: 'Plan publication blocked',
+        status: 409,
+        detail: 'The current plan draft contains publication blockers.',
+        instance: 'urn:request:123e4567-e89b-42d3-a456-426614174000',
+        code: 'PLAN_PUBLICATION_BLOCKED',
+        requestId: '123e4567-e89b-42d3-a456-426614174000',
+        blockers,
+      },
+      409,
+    )
   })
 
   it('accepts exactly canonical UUID or uppercase ULID correlation values', () => {

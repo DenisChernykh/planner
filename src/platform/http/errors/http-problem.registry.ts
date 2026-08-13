@@ -63,6 +63,9 @@ export class HttpProblemRegistry {
           ...(mapped.conflict === undefined
             ? {}
             : { conflict: mapped.conflict }),
+          ...(mapped.blockers === undefined
+            ? {}
+            : { blockers: mapped.blockers }),
           unexpected: false,
         }
       }

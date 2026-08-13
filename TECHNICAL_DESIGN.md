@@ -649,9 +649,13 @@ catalog actions без metadata duplication или arbitrary JSON.
   order и optional display-only `sourceProvenance`;
 - `plan_publications` — append-only publication revisions с immutable month
   focus;
-- `plan_goal_snapshots` — immutable calculation-relevant configuration;
-- `fixed_expectations` — ожидаемые даты/checkpoints/items;
-- `flexible_periods` — weekly/monthly period identity и сохранённый target.
+- `plan_goal_snapshots` — immutable calculation-relevant configuration,
+  provenance и exact successful P04 calendar;
+- `fixed_expectations` — ожидаемые даты/checkpoints/items с
+  `UNIQUE NULLS NOT DISTINCT` stable key;
+- `flexible_periods` — weekly/monthly/weekly-task period identity и сохранённый
+  exact P04 target;
+- `planning_publication_changes` — immutable typed history detail публикации.
 
 Одна plan month может иметь несколько publication revisions, но не более одной
 active publication. Cancel до начала месяца помечает revision cancelled; он не
@@ -771,6 +775,37 @@ parent draft `before/+1/after`, completed receipt aggregate/result и финал
 effect. Поэтому старая, обратная или несмежная revision pair, ложный previous
 order и receipt другого plan month/revision не могут закоммититься.
 
+P07 создаётся ровно migration `20260811151000_plan_publication`. Она добавляет
+`plan_months.active_publication_id` с deferred same-month pointer FK и пять
+tables: `plan_publications`, `plan_goal_snapshots`, `fixed_expectations`,
+`flexible_periods`, `planning_publication_changes`. Publication revision
+positive/consecutive и unique внутри month; publication, snapshots, calendars и
+typed detail запрещают ordinary UPDATE/DELETE. Same-space composite FKs
+связывают month, publishing member, source root/revision/catalog
+version/effective series и owner. Snapshot order dense, active source set
+полон и не превышает 200. Fixed stable key использует `UNIQUE NULLS NOT
+DISTINCT`; flexible stable period и ordinal keys unique, quota arrays
+sorted/unique/in-bounds и согласованы с exact P04 JSON.
+
+Deferred commit invariants требуют: draft month имеет `NULL` pointer,
+published/grace/closed — same-month pointer; publication содержит ровно current
+active draft roots и полный materialized calendar; `month_published` имеет
+ровно один typed detail, completed receipt с publication result ref и exact
+month before/+1/after effect. P07 исправляет P03 all-month action unique index,
+не меняя принятую миграцию: draft actions сохраняют отдельную partial
+последовательность draft revision, `month_published` — отдельную lifecycle
+последовательность.
+
+Один preview/publication имеет deterministic hard cap
+`MAX_PUBLICATION_MATERIALIZED_ROWS = 10_000`. В cap входят все будущие
+`plan_goal_snapshots` + развёрнутые `fixed_expectations` + все
+`flexible_periods`; header/history/receipt не входят. P06 считает его только из
+уже полученных successful P04 calendars и locked component-expansion rule. При
+превышении P06 до вычисления hash добавляет один plan-level blocker
+`{planGoalId:null,pointer:'/goals',code:'incompatible',detail:'Publication
+materialization exceeds 10000 rows.'}`. P07 пересчитывает тот же blocked preview
+под lock и не пишет ни одной строки.
+
 ### 7.4. Goal scope
 
 - `personal` требует `owner_member_id`;
@@ -804,6 +839,17 @@ Flexible period имеет устойчивый ключ:
 При поздней публикации expectations до `activeLocalDate` не создаются.
 `not_applicable` для этих дней выводится системно из publication metadata и не
 может редактироваться пользователем.
+
+P07 разворачивает fixed calendar в компоненты однозначно. Без checkpoints
+scalar и `any_of` создают одно expectation `goal` с `NULL component_id` на
+каждую P04 fixed date; checklist создаёт по одному `checklist_item` на stable
+item ID без дополнительного parent expectation. При наличии checkpoints
+создаётся по одному `checkpoint` на stable checkpoint ID/date; вложенные
+checklist/any-of значения остаются частью будущего checkpoint fact и не
+создают второе измерение expectation. Quota и `weekly_planned_task` создают
+periods, а не fixed expectations. Все quota periods из P04 сохраняются,
+включая preactivation period с target `0`; полностью preactivation
+weekly-task period отсутствует и его `not_applicable` остаётся derived.
 
 ### 7.6. Facts и revisions
 
@@ -902,20 +948,42 @@ Source publication и исходный month остаются immutable. Unique
 Owner команды — application layer модуля `planning`. Одна PostgreSQL transaction
 выполняет:
 
-1. Idempotency lookup.
-2. Проверку actor, lifecycle и draft expected revision.
-3. Полную product validation.
-4. Проверку обязательного непустого month focus.
-5. Создание append-only publication revision с immutable focus.
-6. Создание immutable plan goal snapshots вместе с `sourceProvenance`.
-7. Детерминированную генерацию fixed expectations и flexible periods.
-8. Сохранение prorated period targets и formula version.
-9. Расчёт publication snapshot hash, включающего focus и goal snapshots.
-10. Установку `active_publication_id` и нового month revision.
-11. Action history и completed command receipt.
+1. Durable executor берёт receipt advisory lock и делает lookup. Exact replay
+   возвращает сохранённый publication ref до clock, membership, draft read и
+   writes; fingerprint conflict предшествует lifecycle/CAS.
+2. Executor читает `clock.now()` один раз. `occurredAt` является publication
+   instant, а `Asia/Yekaterinburg` local date выводится из него без второго
+   обращения к clock.
+3. Transaction разрешает trusted member, затем вместе блокирует
+   `plan_months` и `plan_drafts` через `FOR UPDATE`. Missing/foreign concealed,
+   status обязан быть `draft`, active pointer — `NULL`, draft revision — exact
+   caller-confirmed revision.
+4. Под удерживаемым lock одним internally consistent read получает current
+   roots/revisions/catalog metadata/order/config/provenance.
+5. Ровно один раз перестраивает принятый P06 projector с frozen local date и
+   до первой записи сравнивает draft revision, preview schema/hash versions и
+   hash. Blockers дают отдельный publication-blocked conflict.
+6. Из уже построенного preview, без второго P04 и без P05/facts, создаёт
+   append-only publication revision, immutable goal snapshots с exact P04
+   calendars, fixed expectations и flexible periods.
+7. Устанавливает `active_publication_id`, переводит month `draft -> published`
+   и увеличивает только lifecycle revision на один; draft revision не меняется.
+8. Создаёт finite `month_published` action и typed publication detail.
+9. Executor проверяет `planning.plan-publication.v1` result ref, записывает
+   completed receipt с тем же timestamp, после чего deferred constraints
+   проверяют pointer, completeness, history/effect/linkage и выполняется один
+   commit.
 
 Ни один участвующий модуль не коммитится отдельно. Published month без полного
 набора expectations/periods невозможен.
+
+Publication snapshot hash — это подтверждённый и заново вычисленный P06
+`planner.publication-preview-hash.v1`; отдельного P07 hash algorithm нет,
+generated IDs/timestamps не добавляются в preimage. Different command IDs
+сериализуются month/draft lock: winner публикует, loser получает
+already-published/non-editable conflict без второй revision. Edit-first делает
+preview stale, publish-first блокирует edit. Любая ошибка materialization,
+history, receipt или deferred validation откатывает все строки.
 
 ### 9.3. Cancel и republish
 
@@ -1913,9 +1981,10 @@ Public response — exact recursively frozen detached
 focus, ordered full draft goals, calculated targets, aggregate blockers и
 exact `formulaVersions` для calendar/evaluation/score-coverage. Owner остаётся
 scope plus `ownerMemberId`; actor и profile names в preview отсутствуют.
-Blockers сортируются: plan-level первым, затем display order,
-`planGoalId`, pointer, code. Они имеют finite P03/P04/window details и
-nullable `planGoalId`.
+Blockers сортируются: plan-level первым; затем goal-level по display order и
+`planGoalId`; внутри одинаковой plan/goal позиции — по pointer, code и detail.
+Это задаёт deterministic порядок и для нескольких blockers с обоими null
+`planGoalId`. Они имеют finite P03/P04/window details и nullable `planGoalId`.
 
 `previewHashVersion` равен `planner.publication-preview-hash.v1`.
 `previewHash` — lowercase SHA-256 от `canonicalJsonStringify` всего exact
@@ -1926,6 +1995,77 @@ independent и возвращается даже при blockers. P07 внутр
 transaction повторно строит exact projector после locked read, отклоняет
 blockers и проверяет revision/hash/version; смена local date делает
 старый preview stale.
+
+После успешной projection P06 считает exact materialized row count: один
+snapshot на goal, один flexible row на P04 period либо число fixed dates,
+умноженное на locked число coverage components. Если сумма больше
+`MAX_PUBLICATION_MATERIALIZED_ROWS = 10_000`, aggregate blockers получает один
+стабильный `/goals` incompatible blocker до hash; per-goal blockers не
+подменяются. Ровно `10_000` строк допустимы.
+
+### 11.4. P07 atomic-publication boundary
+
+`PublishMonth` принимает exact payload `{ planMonthId, previewSchemaVersion,
+previewHashVersion, previewHash }`, command type
+`planning.publish-month.v1`, mandatory positive draft `expectedRevision` и
+возвращает только `DurableCommandResultRef<'planning.plan-publication.v1'>`.
+Command ID и все IDs — canonical lowercase UUID; version соответствует
+`^[a-z0-9][a-z0-9.-]{0,99}$`, hash — lowercase hex-64. Exact command snapshot
+выполняется до первого `await`. Syntactically valid неизвестная version
+доходит до transaction и становится `PUBLICATION_PREVIEW_CONFLICT`, а не
+transport validation error.
+
+Публичный frozen/detached `planner.published-snapshot.v1` содержит publication,
+month/space/source revisions, confirmed preview schema и snapshot hash/version,
+activation, copied focus, ordered goal snapshots с generated IDs/source
+identities/metadata/config/provenance, ordered calculated targets с exact P04
+calendars и все три formula versions. Все revisions снаружи — positive decimal
+strings, даты — canonical local dates; Prisma rows, `bigint` и `Date` controller
+не возвращает.
+
+`GetPublishedSnapshotQuery({ trustedUserId, publicationId })` ровно один раз
+разрешает пользователя и одним bounded snapshot read возвращает frozen
+snapshot либо `null`; missing и foreign-space неразличимы.
+`GetActiveMonthQuery({ trustedUserId })` ровно один раз разрешает пользователя,
+один раз читает product local date и одним bounded read возвращает publication
+только для current local month со status `published`, valid active pointer и
+`activeLocalDate <= today`. Scheduled future, draft, grace, closed, absent и
+будущая cancellation marker дают `null`; query ничего не активирует записью.
+
+HTTP P07 фиксирован:
+
+- authenticated session + Origin/CSRF `POST
+  /planning/drafts/{planMonthId}/publish`, body ровно `{ commandId,
+  expectedRevision, previewSchemaVersion, previewHashVersion, previewHash }`,
+  success/replay `201` с string-serialized publication ref;
+- session-only `GET /planning/publications/{publicationId}`;
+- session-only `GET /planning/months/active`.
+
+POST документирует `201,400,401,403,404,409,413,415,422,503`; GET endpoints —
+`200,401,403,404,422,503`. Module-owned Problems:
+`PUBLICATION_PREVIEW_CONFLICT` с current revision/schema/hash versions/hash и
+`reload-publication-preview-and-retry`, `PLAN_PUBLICATION_BLOCKED` с exact
+sorted P06 blockers, `PLAN_MONTH_ALREADY_PUBLISHED` с publication ID/revision и
+`open-published-plan`, `PLAN_PUBLICATION_NOT_FOUND` и
+`ACTIVE_PLAN_MONTH_NOT_FOUND`. Existing command/auth/draft/dependency problems
+сохраняют precedence и shape.
+
+PostgreSQL не реализует второй P04 calculator. Единственный semantic
+`GoalConfigV1 -> EligibleCalendar` projector выполняется приложением после
+month/draft lock и входит целиком в подтверждённый P06 hash. DB boundary
+проверяет exact formula/schema versions, source config/revision/metadata,
+calendar exact-key shape, target month/activation/time zone, соответствие
+calendar family source repetition, month-bounded child dates, exact
+calendar-to-materialized-child equality/completeness и связь с confirmed hash,
+history, pointer и receipt. Согласованный malicious direct-SQL пакет с другими,
+но type-correct P04 period targets лежит вне trusted application boundary;
+дублировать calendar formulas в PL/pgSQL запрещено как divergent calculator.
+Persistence materializes три child-набора set-based bounded inserts, а не
+одним statement/await на строку. Deferred completeness запускается один раз от
+publication header; immediate snapshot/child guards требуют, чтобы month всё
+ещё был `draft` с `NULL` active pointer, поэтому append после publication
+невозможен. Runtime transaction timeout остаётся `5_000 ms`; cap не служит
+основанием его повышать.
 
 ## 12. Reporting
 
@@ -2326,8 +2466,9 @@ Metrics не содержат member names или raw Telegram IDs.
 | --- | --- |
 | `AC-01`, `AC-01b` | OIDC contract + allowlist integration + E2E session |
 | `AC-02`, `AC-23` | copy-month transaction integration + E2E no-facts copy |
-| `AC-03` | draft validation unit/integration + publish rejection E2E |
-| `AC-04…AC-08`, `AC-13…AC-21` | formula/type unit fixtures + typed persistence integration |
+| `AC-03` | draft validation + preview unit/integration + atomic publish stale/blocker zero-write E2E |
+| `AC-04`, `AC-05` | P04 formula fixtures + real-PG publication materialization/late-activation E2E |
+| `AC-06…AC-08`, `AC-13…AC-21` | formula/type unit fixtures + typed persistence integration |
 | `AC-09` | atomic CloseDay integration + web/Telegram replay E2E |
 | `AC-10` | reminder relevance/suppression integration + transport contract |
 | `AC-11` | grace/reopen/reclose integration + report revision E2E |

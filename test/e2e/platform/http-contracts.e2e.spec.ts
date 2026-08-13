@@ -462,6 +462,9 @@ describe('S03 HTTP contracts', () => {
       '/planning/drafts/{planMonthId}/goals/reorder',
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/remove',
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/update',
+      '/planning/drafts/{planMonthId}/publish',
+      '/planning/months/active',
+      '/planning/publications/{publicationId}',
     ])
     expect(document.paths['/auth/issue']).toBeUndefined()
     expect(Object.keys(document.paths['/auth/me'] ?? {})).toEqual(['get'])
@@ -611,6 +614,7 @@ describe('S03 HTTP contracts', () => {
       ]),
     )
     const exactBaseProblemCodes = [
+      'ACTIVE_PLAN_MONTH_NOT_FOUND',
       'AUTHENTICATION_REQUIRED',
       'AUTHORIZATION_DENIED',
       'COMMAND_FINGERPRINT_CONFLICT',
@@ -628,6 +632,7 @@ describe('S03 HTTP contracts', () => {
       'PLANNING_AUTHORIZATION_DENIED',
       'PLAN_DRAFT_NOT_EDITABLE',
       'PLAN_DRAFT_NOT_FOUND',
+      'PLAN_PUBLICATION_NOT_FOUND',
       'RATE_LIMIT_EXCEEDED',
       'UNSUPPORTED_MEDIA_TYPE',
       'VALIDATION_FAILED',
@@ -1259,6 +1264,32 @@ describe('S03 HTTP contracts', () => {
       activeLocalDate: dateSchema,
       timeZone: { enum: ['Asia/Yekaterinburg'], type: 'string' },
     }
+    const quotaPeriodProperties = {
+      ordinal: { maximum: 6, minimum: 1, type: 'integer' },
+      periodStart: dateSchema,
+      periodEnd: dateSchema,
+      activeDates: { items: dateSchema, maxItems: 31, type: 'array' },
+      eligibleDates: { items: dateSchema, maxItems: 31, type: 'array' },
+      periodTarget: { maximum: 31, minimum: 0, type: 'integer' },
+    }
+    const quotaPeriodRequired = [
+      'cadence',
+      'ordinal',
+      'periodStart',
+      'periodEnd',
+      'periodDays',
+      'activeDates',
+      'eligibleDates',
+      'periodTarget',
+    ]
+    const quotaCalendarRequired = [
+      'targetMonth',
+      'activeLocalDate',
+      'timeZone',
+      'kind',
+      'cadence',
+      'periods',
+    ]
     expect(schemas['PublicationPreviewGoalBlockerV1']).toEqual({
       additionalProperties: false,
       properties: {
@@ -1305,6 +1336,7 @@ describe('S03 HTTP contracts', () => {
             'due date is outside target month',
             'week ordinal is not present in target month',
             'Target month is not current or next.',
+            'Publication materialization exceeds 10000 rows.',
           ],
           type: 'string',
         },
@@ -1349,51 +1381,68 @@ describe('S03 HTTP contracts', () => {
       ],
       type: 'object',
     })
-    expect(schemas['QuotaCalendarPeriodV1']).toEqual({
+    expect(schemas['WeeklyQuotaCalendarPeriodV1']).toEqual({
       additionalProperties: false,
       properties: {
-        cadence: { enum: ['weekly', 'monthly'], type: 'string' },
-        ordinal: { maximum: 6, minimum: 1, type: 'integer' },
-        periodStart: dateSchema,
-        periodEnd: dateSchema,
-        periodDays: { maximum: 31, minimum: 1, type: 'integer' },
-        activeDates: { items: dateSchema, maxItems: 31, type: 'array' },
-        eligibleDates: { items: dateSchema, maxItems: 31, type: 'array' },
-        periodTarget: { maximum: 31, minimum: 0, type: 'integer' },
+        cadence: { enum: ['weekly'], type: 'string' },
+        ...quotaPeriodProperties,
+        periodDays: { enum: [7], type: 'integer' },
       },
-      required: [
-        'cadence',
-        'ordinal',
-        'periodStart',
-        'periodEnd',
-        'periodDays',
-        'activeDates',
-        'eligibleDates',
-        'periodTarget',
-      ],
+      required: quotaPeriodRequired,
       type: 'object',
     })
-    expect(schemas['QuotaEligibleCalendarV1']).toEqual({
+    expect(schemas['MonthlyQuotaCalendarPeriodV1']).toEqual({
+      additionalProperties: false,
+      properties: {
+        cadence: { enum: ['monthly'], type: 'string' },
+        ...quotaPeriodProperties,
+        ordinal: { enum: [1], type: 'integer' },
+        periodDays: { maximum: 31, minimum: 28, type: 'integer' },
+      },
+      required: quotaPeriodRequired,
+      type: 'object',
+    })
+    expect(schemas['WeeklyQuotaEligibleCalendarV1']).toEqual({
       additionalProperties: false,
       properties: {
         ...calendarContextProperties,
         kind: { enum: ['quota'], type: 'string' },
-        cadence: { enum: ['weekly', 'monthly'], type: 'string' },
+        cadence: { enum: ['weekly'], type: 'string' },
         periods: {
-          items: { $ref: '#/components/schemas/QuotaCalendarPeriodV1' },
+          items: {
+            $ref: '#/components/schemas/WeeklyQuotaCalendarPeriodV1',
+          },
           maxItems: 6,
+          minItems: 4,
           type: 'array',
         },
       },
-      required: [
-        'targetMonth',
-        'activeLocalDate',
-        'timeZone',
-        'kind',
-        'cadence',
-        'periods',
-      ],
+      required: quotaCalendarRequired,
       type: 'object',
+    })
+    expect(schemas['MonthlyQuotaEligibleCalendarV1']).toEqual({
+      additionalProperties: false,
+      properties: {
+        ...calendarContextProperties,
+        kind: { enum: ['quota'], type: 'string' },
+        cadence: { enum: ['monthly'], type: 'string' },
+        periods: {
+          items: {
+            $ref: '#/components/schemas/MonthlyQuotaCalendarPeriodV1',
+          },
+          maxItems: 1,
+          minItems: 1,
+          type: 'array',
+        },
+      },
+      required: quotaCalendarRequired,
+      type: 'object',
+    })
+    expect(schemas['QuotaEligibleCalendarV1']).toEqual({
+      oneOf: [
+        { $ref: '#/components/schemas/WeeklyQuotaEligibleCalendarV1' },
+        { $ref: '#/components/schemas/MonthlyQuotaEligibleCalendarV1' },
+      ],
     })
     expect(schemas['WeeklyPlannedTaskPeriodV1']).toEqual({
       additionalProperties: false,
@@ -1894,6 +1943,142 @@ describe('S03 HTTP contracts', () => {
         },
       },
     })
+
+    const publish =
+      document.paths['/planning/drafts/{planMonthId}/publish']?.post
+    const published =
+      document.paths['/planning/publications/{publicationId}']?.get
+    const active = document.paths['/planning/months/active']?.get
+    expect(publish?.security).toEqual([{ sessionCookie: [], csrfToken: [] }])
+    expect(published?.security).toEqual([{ sessionCookie: [] }])
+    expect(active?.security).toEqual([{ sessionCookie: [] }])
+    expect(Object.keys(publish?.responses ?? {}).sort()).toEqual([
+      '201',
+      '400',
+      '401',
+      '403',
+      '404',
+      '409',
+      '413',
+      '415',
+      '422',
+      '503',
+    ])
+    for (const operation of [published, active]) {
+      expect(Object.keys(operation?.responses ?? {}).sort()).toEqual([
+        '200',
+        '401',
+        '403',
+        '404',
+        '422',
+        '503',
+      ])
+    }
+    expect(parameter(publish, 'planMonthId')).toEqual({
+      in: 'path',
+      name: 'planMonthId',
+      required: true,
+      schema: uuidSchema,
+    })
+    expect(parameter(published, 'publicationId')).toEqual({
+      in: 'path',
+      name: 'publicationId',
+      required: true,
+      schema: uuidSchema,
+    })
+    expect(publish?.requestBody).toEqual(
+      exactRequestBody({
+        additionalProperties: false,
+        properties: {
+          commandId: uuidSchema,
+          expectedRevision: revisionSchema,
+          previewSchemaVersion: {
+            pattern: '^[a-z0-9][a-z0-9.-]{0,99}$',
+            type: 'string',
+          },
+          previewHashVersion: {
+            pattern: '^[a-z0-9][a-z0-9.-]{0,99}$',
+            type: 'string',
+          },
+          previewHash: { pattern: '^[0-9a-f]{64}$', type: 'string' },
+        },
+        required: [
+          'commandId',
+          'expectedRevision',
+          'previewSchemaVersion',
+          'previewHashVersion',
+          'previewHash',
+        ],
+        type: 'object',
+      }),
+    )
+    expect(
+      Object.keys(
+        publish?.responses?.['409']?.content?.['application/problem+json']
+          ?.examples ?? {},
+      ).sort(),
+    ).toEqual([
+      'COMMAND_FINGERPRINT_CONFLICT',
+      'PLAN_DRAFT_NOT_EDITABLE',
+      'PLAN_MONTH_ALREADY_PUBLISHED',
+      'PLAN_PUBLICATION_BLOCKED',
+      'PUBLICATION_PREVIEW_CONFLICT',
+    ])
+    expect(
+      publish?.responses?.['409']?.content?.['application/problem+json']
+        ?.examples?.['DRAFT_REVISION_CONFLICT'],
+    ).toBeUndefined()
+    exact404(publish, ['PLAN_DRAFT_NOT_FOUND'])
+    exact404(published, ['PLAN_PUBLICATION_NOT_FOUND'])
+    exact404(active, ['ACTIVE_PLAN_MONTH_NOT_FOUND'])
+    expect(
+      publish?.responses?.['201']?.content?.['application/json']?.schema,
+    ).toEqual({
+      $ref: '#/components/schemas/PlanPublicationResultResponseV1',
+    })
+    for (const operation of [published, active]) {
+      expect(
+        operation?.responses?.['200']?.content?.['application/json']?.schema,
+      ).toEqual({
+        $ref: '#/components/schemas/PublishedSnapshotResponseV1',
+      })
+    }
+    expect(schemas['PublishedSnapshotResponseV1']).toMatchObject({
+      additionalProperties: false,
+      properties: {
+        schemaVersion: {
+          enum: ['planner.published-snapshot.v1'],
+          type: 'string',
+        },
+        sourcePreviewSchemaVersion: {
+          enum: ['planner.publication-preview.v1'],
+          type: 'string',
+        },
+        publicationSnapshotHashVersion: {
+          enum: ['planner.publication-preview-hash.v1'],
+          type: 'string',
+        },
+        activation: {
+          $ref: '#/components/schemas/PublishedActivationV1',
+        },
+      },
+    })
+    expect(schemas['PublishedActivationV1']).toMatchObject({
+      additionalProperties: false,
+      properties: { mode: { enum: ['immediate', 'scheduled'] } },
+      required: ['mode', 'activeLocalDate', 'latePublication'],
+    })
+    expect(schemas['PublishedGoalSnapshotV1']?.properties?.['config']).toEqual({
+      $ref: '#/components/schemas/PublishedGoalConfigV1',
+    })
+    const publicationBlockerDetail = schemas['PublicationBlockerResponseDto']
+      ?.properties?.['detail'] as { enum?: unknown }
+    expect(publicationBlockerDetail.enum).toEqual(
+      expect.arrayContaining([
+        'Publication materialization exceeds 10000 rows.',
+        'Target month is not current or next.',
+      ]),
+    )
   })
 
   it('validates representative fixed, quota, weekly-task and blocked publication previews against OpenAPI', async () => {
@@ -1985,6 +2170,31 @@ describe('S03 HTTP contracts', () => {
       activeLocalDate: '2026-08-01',
       timeZone: 'Asia/Yekaterinburg',
     }
+    const augustDates = (startDay: number, endDay: number): string[] =>
+      Array.from(
+        { length: endDay - startDay + 1 },
+        (_, offset) => `2026-08-${String(startDay + offset).padStart(2, '0')}`,
+      )
+    const weeklyQuotaPeriods = [
+      [1, 1, 2],
+      [2, 3, 9],
+      [3, 10, 16],
+      [4, 17, 23],
+      [5, 24, 30],
+      [6, 31, 31],
+    ].map(([ordinal, startDay, endDay]) => {
+      const periodDates = augustDates(startDay!, endDay!)
+      return {
+        cadence: 'weekly',
+        ordinal,
+        periodStart: periodDates[0],
+        periodEnd: periodDates.at(-1),
+        periodDays: 7,
+        activeDates: periodDates,
+        eligibleDates: periodDates,
+        periodTarget: 1,
+      }
+    })
     const payloads = [
       {
         ...base,
@@ -2003,18 +2213,7 @@ describe('S03 HTTP contracts', () => {
             ...context,
             kind: 'quota',
             cadence: 'weekly',
-            periods: [
-              {
-                cadence: 'weekly',
-                ordinal: 1,
-                periodStart: '2026-08-01',
-                periodEnd: '2026-08-02',
-                periodDays: 7,
-                activeDates: ['2026-08-01', '2026-08-02'],
-                eligibleDates: ['2026-08-01', '2026-08-02'],
-                periodTarget: 1,
-              },
-            ],
+            periods: weeklyQuotaPeriods,
           }),
         ],
       },
@@ -2075,6 +2274,245 @@ describe('S03 HTTP contracts', () => {
         ...payloads[0],
         goals: base.goals.map((goal) => ({ ...goal, blockers: [blocker] })),
       }
+      expect(validator.validateResponse('200', invalid)).toMatchObject({
+        message: 'The response was not valid.',
+      })
+    }
+  })
+
+  it('validates the finite published response and rejects preview-only or nullable draft states', async () => {
+    const document = JSON.parse(
+      await readFile('docs/api/openapi.json', 'utf8'),
+    ) as {
+      paths: Record<
+        string,
+        {
+          get?: {
+            responses?: Record<
+              string,
+              { content?: Record<string, { schema?: unknown }> }
+            >
+          }
+        }
+      >
+      components?: unknown
+    }
+    const schema =
+      document.paths['/planning/publications/{publicationId}']?.get
+        ?.responses?.['200']?.content?.['application/json']?.schema
+    const validator = new OpenAPIResponseValidator({
+      responses: { '200': { schema: schema as never } },
+      components: document.components as never,
+      customFormats: { date: () => true },
+    })
+    const planGoalSnapshotId = '44444444-4444-4444-8444-444444444444'
+    const sourcePlanGoalId = '55555555-5555-4555-8555-555555555555'
+    const published = {
+      schemaVersion: 'planner.published-snapshot.v1',
+      publicationId: '11111111-1111-4111-8111-111111111111',
+      publicationRevision: '1',
+      planMonthId: '22222222-2222-4222-8222-222222222222',
+      spaceId: '33333333-3333-4333-8333-333333333333',
+      targetMonth: '2026-08',
+      sourcePlanMonthRevision: '1',
+      sourceDraftRevision: '2',
+      sourcePreviewSchemaVersion: 'planner.publication-preview.v1',
+      publicationSnapshotHashVersion: 'planner.publication-preview-hash.v1',
+      publicationSnapshotHash: 'a'.repeat(64),
+      activation: {
+        mode: 'immediate',
+        activeLocalDate: '2026-08-01',
+        latePublication: false,
+      },
+      focus: 'Finite published response',
+      goalSnapshots: [
+        {
+          planGoalSnapshotId,
+          sourcePlanGoalId,
+          sourceGoalDefinitionId: '66666666-6666-4666-8666-666666666666',
+          sourceGoalDefinitionVersionId: '77777777-7777-4777-8777-777777777777',
+          sourceGoalSeriesId: '88888888-8888-4888-8888-888888888888',
+          title: 'Published goal',
+          why: 'Exact response validation',
+          category: 'Contract',
+          displayOrder: 0,
+          configRevision: '1',
+          config: {
+            schemaVersion: 1,
+            scope: { kind: 'shared' },
+            repetition: { kind: 'daily' },
+            measurement: { kind: 'boolean' },
+            checkpoints: null,
+          },
+          sourceProvenance: null,
+        },
+      ],
+      calculatedTargets: [
+        {
+          planGoalSnapshotId,
+          sourcePlanGoalId,
+          formulaVersion: 'planner.calendar-targets.v1',
+          calendar: {
+            targetMonth: '2026-08',
+            activeLocalDate: '2026-08-01',
+            timeZone: 'Asia/Yekaterinburg',
+            kind: 'fixed',
+            expectationDates: ['2026-08-01'],
+          },
+        },
+      ],
+      formulaVersions: {
+        calendarTargets: 'planner.calendar-targets.v1',
+        goalEvaluation: 'planner.goal-evaluation.v1',
+        scoreCoverage: 'planner.score-coverage.v1',
+      },
+    }
+    const withConfig = (config: object): object => ({
+      ...published,
+      goalSnapshots: published.goalSnapshots.map((goal) => ({
+        ...goal,
+        config,
+      })),
+    })
+    const targetedQuantity = (target: string): object =>
+      withConfig({
+        ...published.goalSnapshots[0]!.config,
+        measurement: {
+          kind: 'quantity',
+          mode: 'targeted',
+          unit: 'times',
+          precision: 3,
+          aggregation: 'add',
+          target,
+        },
+      })
+    const anyOfTarget = (target: string): object =>
+      withConfig({
+        ...published.goalSnapshots[0]!.config,
+        measurement: {
+          kind: 'any_of',
+          variants: [
+            {
+              variantId: '99999999-9999-4999-8999-999999999999',
+              label: 'Exact target variant',
+              unit: 'times',
+              precision: 3,
+              target,
+            },
+          ],
+        },
+      })
+    const checkpointTarget = (target: string): object =>
+      withConfig({
+        ...published.goalSnapshots[0]!.config,
+        measurement: {
+          kind: 'quantity',
+          mode: 'targeted',
+          unit: 'times',
+          precision: 3,
+          aggregation: 'add',
+          target: '1',
+        },
+        checkpoints: {
+          aggregation: 'all',
+          items: [
+            {
+              checkpointId: '99999999-9999-4999-8999-999999999999',
+              name: 'Exact checkpoint target',
+              deadline: '12:00',
+              satisfaction: { kind: 'quantity', target },
+            },
+          ],
+        },
+      })
+
+    const publishedSchemas = (
+      document.components as {
+        schemas: Record<
+          string,
+          { properties?: Record<string, Record<string, unknown>> }
+        >
+      }
+    ).schemas
+    const positiveDecimalPattern =
+      '^(?:[1-9][0-9]*(?:\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*)$'
+    for (const schemaName of [
+      'PublishedTargetedQuantityMeasurementV1',
+      'PublishedAnyOfVariantV1',
+      'PublishedQuantityCheckpointSatisfactionV1',
+    ]) {
+      expect(publishedSchemas[schemaName]?.properties?.['target']).toEqual({
+        type: 'string',
+        pattern: positiveDecimalPattern,
+      })
+    }
+    expect(validator.validateResponse('200', published)).toBeUndefined()
+    for (const positive of [
+      targetedQuantity('0.01'),
+      anyOfTarget('0.01'),
+      checkpointTarget('0.01'),
+    ]) {
+      expect(validator.validateResponse('200', positive)).toBeUndefined()
+    }
+
+    const invalidPayloads: readonly object[] = [
+      { ...published, extra: true },
+      Object.fromEntries(
+        Object.entries(published).filter(
+          ([key]) => key !== 'sourcePreviewSchemaVersion',
+        ),
+      ),
+      {
+        ...published,
+        activation: { ...published.activation, mode: 'blocked' },
+      },
+      { ...published, sourcePreviewSchemaVersion: 'planner.preview.future.v9' },
+      {
+        ...published,
+        publicationSnapshotHashVersion: 'planner.hash.future.v9',
+      },
+      {
+        ...published,
+        goalSnapshots: published.goalSnapshots.map((goal) => ({
+          ...goal,
+          config: {
+            ...goal.config,
+            repetition: { kind: 'weekly', n: null },
+          },
+        })),
+      },
+      ...['0', '0.000'].flatMap((target) => [
+        targetedQuantity(target),
+        anyOfTarget(target),
+        checkpointTarget(target),
+      ]),
+      {
+        ...published,
+        calculatedTargets: published.calculatedTargets.map((target) => ({
+          ...target,
+          calendar: {
+            targetMonth: '2026-08',
+            activeLocalDate: '2026-08-01',
+            timeZone: 'Asia/Yekaterinburg',
+            kind: 'quota',
+            cadence: 'monthly',
+            periods: [
+              {
+                cadence: 'weekly',
+                ordinal: 1,
+                periodStart: '2026-08-01',
+                periodEnd: '2026-08-31',
+                periodDays: 31,
+                activeDates: ['2026-08-01'],
+                eligibleDates: ['2026-08-01'],
+                periodTarget: 1,
+              },
+            ],
+          },
+        })),
+      },
+    ]
+    for (const invalid of invalidPayloads) {
       expect(validator.validateResponse('200', invalid)).toMatchObject({
         message: 'The response was not valid.',
       })

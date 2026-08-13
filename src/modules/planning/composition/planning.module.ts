@@ -17,12 +17,19 @@ import { PLANNING_APPLICATION } from '../application/planning-application'
 import {
   PlanningController,
   PlanningDraftController,
+  PlanningMonthController,
+  PlanningPublicationController,
 } from '../presentation/planning.controller'
 import { createPlanningApplication } from './create-planning-application'
 
 @Module({
   imports: [DatabaseModule, WorkspaceModule],
-  controllers: [PlanningController, PlanningDraftController],
+  controllers: [
+    PlanningController,
+    PlanningDraftController,
+    PlanningPublicationController,
+    PlanningMonthController,
+  ],
   providers: [
     {
       provide: PLANNING_APPLICATION,

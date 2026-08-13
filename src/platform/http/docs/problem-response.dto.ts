@@ -109,6 +109,86 @@ export class DraftConflictProblemResponseDto extends ProblemResponseDto {
   public readonly conflict!: DraftProblemConflictResponseDto
 }
 
+export class PublicationPreviewConflictResponseDto {
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$' })
+  public readonly currentDraftRevision!: string
+  @ApiProperty({ type: String })
+  public readonly currentPreviewSchemaVersion!: string
+  @ApiProperty({ type: String })
+  public readonly currentPreviewHashVersion!: string
+  @ApiProperty({ type: String, pattern: '^[0-9a-f]{64}$' })
+  public readonly currentPreviewHash!: string
+  @ApiProperty({ enum: ['reload-publication-preview-and-retry'] })
+  public readonly nextAction!: 'reload-publication-preview-and-retry'
+}
+
+export class PublicationPreviewConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['PUBLICATION_PREVIEW_CONFLICT'],
+    example: 'PUBLICATION_PREVIEW_CONFLICT',
+  })
+  declare public readonly code: 'PUBLICATION_PREVIEW_CONFLICT'
+  @ApiProperty({ type: () => PublicationPreviewConflictResponseDto })
+  public readonly conflict!: PublicationPreviewConflictResponseDto
+}
+
+export class AlreadyPublishedConflictResponseDto {
+  @ApiProperty({ type: String, format: 'uuid' })
+  public readonly publicationId!: string
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$' })
+  public readonly publicationRevision!: string
+  @ApiProperty({ enum: ['open-published-plan'] })
+  public readonly nextAction!: 'open-published-plan'
+}
+
+export class PlanMonthAlreadyPublishedProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['PLAN_MONTH_ALREADY_PUBLISHED'],
+    example: 'PLAN_MONTH_ALREADY_PUBLISHED',
+  })
+  declare public readonly code: 'PLAN_MONTH_ALREADY_PUBLISHED'
+  @ApiProperty({ type: () => AlreadyPublishedConflictResponseDto })
+  public readonly conflict!: AlreadyPublishedConflictResponseDto
+}
+
+export class PublicationBlockerResponseDto {
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  public readonly planGoalId!: string | null
+  @ApiProperty({ type: String })
+  public readonly pointer!: string
+  @ApiProperty({ enum: ['required', 'empty_collection', 'incompatible'] })
+  public readonly code!: 'required' | 'empty_collection' | 'incompatible'
+  @ApiProperty({
+    enum: [
+      'Required value is missing.',
+      'At least one item is required.',
+      'Values are incompatible.',
+      'due date is outside target month',
+      'week ordinal is not present in target month',
+      'Target month is not current or next.',
+      'Publication materialization exceeds 10000 rows.',
+    ],
+  })
+  public readonly detail!:
+    | 'Required value is missing.'
+    | 'At least one item is required.'
+    | 'Values are incompatible.'
+    | 'due date is outside target month'
+    | 'week ordinal is not present in target month'
+    | 'Target month is not current or next.'
+    | 'Publication materialization exceeds 10000 rows.'
+}
+
+export class PlanPublicationBlockedProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['PLAN_PUBLICATION_BLOCKED'],
+    example: 'PLAN_PUBLICATION_BLOCKED',
+  })
+  declare public readonly code: 'PLAN_PUBLICATION_BLOCKED'
+  @ApiProperty({ type: () => [PublicationBlockerResponseDto] })
+  public readonly blockers!: readonly PublicationBlockerResponseDto[]
+}
+
 export class ValidationProblemResponseDto extends ProblemResponseDto {
   @ApiProperty({ type: () => [ProblemFieldErrorResponseDto] })
   public readonly errors!: readonly ProblemFieldErrorResponseDto[]

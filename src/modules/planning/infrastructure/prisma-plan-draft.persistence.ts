@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
+import { Prisma } from '@/generated/prisma/client'
 import type { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 
 import type {
@@ -124,7 +125,7 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
     input: UpdateFocusPersistenceInput,
   ): Promise<PlanningDraftRef> {
     return this.database.withClient(async (client) => {
-      const before = await this.findDraftById(client, input.planMonthId)
+      const before = await this.findDraftById(client, input.planMonthId, true)
       if (before === null || before.space_id !== input.spaceId) {
         throw new PlanDraftNotFoundError()
       }
@@ -246,6 +247,7 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
   private async findDraftById(
     client: Parameters<Parameters<PrismaClientProvider['withClient']>[0]>[0],
     planMonthId: string,
+    lock = false,
   ): Promise<DraftRow | null> {
     const rows = await client.$queryRaw<DraftRow[]>`
       SELECT month.id::text AS plan_month_id,
@@ -258,6 +260,7 @@ export class PrismaPlanDraftPersistence implements PlanDraftPersistencePort {
         FROM plan_months AS month
         JOIN plan_drafts AS draft ON draft.plan_month_id = month.id
        WHERE month.id = ${planMonthId}::uuid
+       ${lock ? Prisma.sql`FOR UPDATE OF month, draft` : Prisma.empty}
     `
     return rows[0] ?? null
   }

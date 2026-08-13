@@ -41,6 +41,8 @@ import {
 import {
   GoalDefinitionNotFoundError,
   PlanDraftNotFoundError,
+  ActivePlanMonthNotFoundError,
+  PlanPublicationNotFoundError,
   PlanningAuthorizationDeniedError,
   PlanningDependencyUnavailableError,
 } from '../application/planning-errors'
@@ -54,6 +56,11 @@ import {
   GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM,
   PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
   PLAN_DRAFT_NOT_FOUND_PROBLEM,
+  ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM,
+  PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
+  PLAN_PUBLICATION_BLOCKED_PROBLEM,
+  PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
+  PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
   PLANNING_AUTHORIZATION_DENIED_PROBLEM,
 } from './planning-problem.definitions'
 import {
@@ -95,6 +102,13 @@ import {
   toPublicationPreviewResponse,
   type PublicationPreviewResponse,
 } from './publication-preview.response'
+import { PublicationPathDto, PublishMonthRequestDto } from './publication.dto'
+import {
+  toPlanPublicationResultResponse,
+  toPublishedSnapshotResponse,
+  type PlanPublicationResultResponse,
+  type PublishedSnapshotResponse,
+} from './publication.response'
 
 const uuidSchema = {
   type: 'string' as const,
@@ -180,6 +194,30 @@ const draftEditorResponseSchema = {
 }
 const publicationPreviewResponseSchema = {
   $ref: '#/components/schemas/PublicationPreviewResponseV1',
+}
+const publishBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    expectedRevision: revisionSchema,
+    previewSchemaVersion: {
+      type: 'string' as const,
+      pattern: '^[a-z0-9][a-z0-9.-]{0,99}$',
+    },
+    previewHashVersion: {
+      type: 'string' as const,
+      pattern: '^[a-z0-9][a-z0-9.-]{0,99}$',
+    },
+    previewHash: { type: 'string' as const, pattern: '^[0-9a-f]{64}$' },
+  },
+  required: [
+    'commandId',
+    'expectedRevision',
+    'previewSchemaVersion',
+    'previewHashVersion',
+    'previewHash',
+  ],
 }
 const metadataProperties = {
   title: {
@@ -276,6 +314,14 @@ const draftRemoveProblems = [
 const draftReorderProblems = [
   ...draftMutationBaseProblems,
   DRAFT_GOAL_NOT_FOUND_PROBLEM,
+]
+const publicationProblems = [
+  ...mutationProblems,
+  PLAN_DRAFT_NOT_FOUND_PROBLEM,
+  PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
+  PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
+  PLAN_PUBLICATION_BLOCKED_PROBLEM,
+  PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
 ]
 
 @ApiTags('planning')
@@ -548,6 +594,38 @@ export class PlanningDraftController {
     return toPublicationPreviewResponse(value)
   }
 
+  @Post(':planMonthId/publish')
+  @ApiOperation({
+    summary: 'Atomically publish the confirmed monthly plan snapshot.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiCreatedResponse({
+    description: 'Immutable publication aggregate reference.',
+    schema: { $ref: '#/components/schemas/PlanPublicationResultResponseV1' },
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiBody({ required: true, schema: publishBodySchema })
+  @ApiProblemResponses(...publicationProblems)
+  public async publish(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PlanMonthPathDto,
+    @Body() body: PublishMonthRequestDto,
+  ): Promise<PlanPublicationResultResponse> {
+    return toPlanPublicationResultResponse(
+      await this.planning.publishMonth.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: {
+          planMonthId: path.planMonthId,
+          previewSchemaVersion: body.previewSchemaVersion,
+          previewHashVersion: body.previewHashVersion,
+          previewHash: body.previewHash,
+        },
+      }),
+    )
+  }
+
   @Post(':planMonthId/goals')
   @ApiOperation({
     summary: 'Attach a typed goal to the draft.',
@@ -688,6 +766,61 @@ export class PlanningDraftController {
         throw new PlanningAuthorizationDeniedError()
       throw new PlanningDependencyUnavailableError({ cause: error })
     }
+  }
+}
+
+@ApiTags('planning')
+@ApiSecurity('sessionCookie')
+@Controller('planning/publications')
+export class PlanningPublicationController {
+  public constructor(
+    @Inject(PLANNING_APPLICATION)
+    private readonly planning: PlanningApplication,
+  ) {}
+
+  @Get(':publicationId')
+  @ApiOperation({ summary: 'Read one immutable published plan snapshot.' })
+  @ApiOkResponse({
+    schema: { $ref: '#/components/schemas/PublishedSnapshotResponseV1' },
+  })
+  @ApiParam({ name: 'publicationId', required: true, schema: uuidSchema })
+  @ApiProblemResponses(...readProblems, PLAN_PUBLICATION_NOT_FOUND_PROBLEM)
+  public async get(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PublicationPathDto,
+  ): Promise<PublishedSnapshotResponse> {
+    const value = await this.planning.getPublishedSnapshot.execute({
+      trustedUserId: principal.userId,
+      publicationId: path.publicationId,
+    })
+    if (value === null) throw new PlanPublicationNotFoundError()
+    return toPublishedSnapshotResponse(value)
+  }
+}
+
+@ApiTags('planning')
+@ApiSecurity('sessionCookie')
+@Controller('planning/months')
+export class PlanningMonthController {
+  public constructor(
+    @Inject(PLANNING_APPLICATION)
+    private readonly planning: PlanningApplication,
+  ) {}
+
+  @Get('active')
+  @ApiOperation({ summary: 'Read the active published plan for today.' })
+  @ApiOkResponse({
+    schema: { $ref: '#/components/schemas/PublishedSnapshotResponseV1' },
+  })
+  @ApiProblemResponses(...readProblems, ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM)
+  public async active(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<PublishedSnapshotResponse> {
+    const value = await this.planning.getActiveMonth.execute({
+      trustedUserId: principal.userId,
+    })
+    if (value === null) throw new ActivePlanMonthNotFoundError()
+    return toPublishedSnapshotResponse(value)
   }
 }
 

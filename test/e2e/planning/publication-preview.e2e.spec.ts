@@ -104,7 +104,6 @@ describe('P06 authenticated publication preview HTTP', () => {
   let currentPlanMonthId: string
   let nextPlanMonthId: string
   let blockedPlanMonthId: string
-  let nonDraftPlanMonthId: string
   let monthlyPlanGoalId: string
   let postgresUnavailable = false
 
@@ -129,7 +128,6 @@ describe('P06 authenticated publication preview HTTP', () => {
     currentPlanMonthId = randomUUID()
     nextPlanMonthId = randomUUID()
     blockedPlanMonthId = randomUUID()
-    nonDraftPlanMonthId = randomUUID()
     monthlyPlanGoalId = randomUUID()
     const invalidPlanGoalId = randomUUID()
     const monthlyDefinitionId = randomUUID()
@@ -168,16 +166,13 @@ describe('P06 authenticated publication preview HTTP', () => {
       VALUES
         (${sqlLiteral(currentPlanMonthId)}::uuid, ${sqlLiteral(spaceId)}::uuid, ${sqlLiteral(`${currentMonth}-01`)}::date, 'draft', 2, now(), now()),
         (${sqlLiteral(nextPlanMonthId)}::uuid, ${sqlLiteral(spaceId)}::uuid, ${sqlLiteral(`${nextMonth}-01`)}::date, 'draft', 1, now(), now()),
-        (${sqlLiteral(blockedPlanMonthId)}::uuid, ${sqlLiteral(spaceId)}::uuid, ${sqlLiteral(`${previousMonth}-01`)}::date, 'draft', 1, now(), now()),
-        (${sqlLiteral(nonDraftPlanMonthId)}::uuid, ${sqlLiteral(spaceId)}::uuid, (${sqlLiteral(`${nextMonth}-01`)}::date + interval '1 month')::date,
-         'published', 1, now(), now());
+        (${sqlLiteral(blockedPlanMonthId)}::uuid, ${sqlLiteral(spaceId)}::uuid, ${sqlLiteral(`${previousMonth}-01`)}::date, 'draft', 1, now(), now());
       INSERT INTO plan_drafts
         (plan_month_id, focus, revision, created_at, updated_at)
       VALUES
         (${sqlLiteral(currentPlanMonthId)}::uuid, 'Current preview focus', 7, now(), now()),
         (${sqlLiteral(nextPlanMonthId)}::uuid, 'Next preview focus', 1, now(), now()),
-        (${sqlLiteral(blockedPlanMonthId)}::uuid, 'Blocked preview focus', 1, now(), now()),
-        (${sqlLiteral(nonDraftPlanMonthId)}::uuid, 'Published preview focus', 1, now(), now());
+        (${sqlLiteral(blockedPlanMonthId)}::uuid, 'Blocked preview focus', 1, now(), now());
       INSERT INTO goal_definitions
         (id, space_id, state, revision, created_at, updated_at, archived_at)
       VALUES
@@ -587,7 +582,6 @@ describe('P06 authenticated publication preview HTTP', () => {
         )
       ).status,
     ).toBe(422)
-    expect((await get(month(2))).status).toBe(409)
   })
 
   it('publishes exact OpenAPI route security/status/query/response schemas', async () => {

@@ -95,20 +95,25 @@ function deployMigrations(
   }
 }
 
-async function p02MigrationConfig(): Promise<{
+async function migrationConfigThrough(
+  lastMigration:
+    '20260811140000_goal_catalog' | '20260811150000_typed_draft_goals',
+): Promise<{
   readonly configPath: string
   cleanup(): Promise<void>
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'planner-p03-upgrade-'))
   const migrations = join(directory, 'migrations')
-  for (const name of [
+  const names = [
     '20260811090000_planner_foundation',
     '20260811100000_local_user_session',
     '20260811110000_pair_workspace',
     '20260811120000_telegram_external_identity',
     '20260811130000_plan_draft_kernel',
     '20260811140000_goal_catalog',
-  ]) {
+    '20260811150000_typed_draft_goals',
+  ]
+  for (const name of names.slice(0, names.indexOf(lastMigration) + 1)) {
     await cp(
       resolve(process.cwd(), 'prisma', 'migrations', name),
       join(migrations, name),
@@ -328,7 +333,10 @@ describe('P03 typed draft goals with real PostgreSQL', () => {
     const url = new URL(container.getConnectionUri())
     url.pathname = `/${databaseName}`
     const databaseUrl = url.toString()
-    const accepted = await p02MigrationConfig()
+    const accepted = await migrationConfigThrough('20260811140000_goal_catalog')
+    const current = await migrationConfigThrough(
+      '20260811150000_typed_draft_goals',
+    )
     const upgrade = new Pool({ connectionString: databaseUrl })
     let upgradeProvider: PrismaClientProvider | undefined
     try {
@@ -388,7 +396,7 @@ describe('P03 typed draft goals with real PostgreSQL', () => {
           )
           .then(({ rows }) => rows)
       const before = await snapshot()
-      const p03 = deployMigrations(databaseUrl)
+      const p03 = deployMigrations(databaseUrl, current.configPath)
       expect(p03).toMatchObject({ exitCode: 0 })
       await expect(snapshot()).resolves.toEqual(before)
 
@@ -447,6 +455,7 @@ describe('P03 typed draft goals with real PostgreSQL', () => {
         .catch(() => undefined)
       await upgrade.end()
       await accepted.cleanup()
+      await current.cleanup()
     }
   })
 
