@@ -434,6 +434,24 @@ export type PublishMonthApplicationCommand =
 // commandType: planning.publish-month.v1
 // mandatory expectedRevision: positive P03 draft revision
 // result: DurableCommandResultRef<'planning.plan-publication.v1'>
+
+export type RecordFactValueV1 =
+  | { readonly kind: "boolean"; readonly result: "done" | "not_done" }
+  | { readonly kind: "quantity"; readonly value: string };
+
+export type RecordFactPayload = {
+  readonly publicationId: PublicationId;
+  readonly planGoalSnapshotId: string;
+  readonly localDate: string;
+  readonly value: RecordFactValueV1;
+};
+
+export type RecordFactApplicationCommand = ApplicationCommand<RecordFactPayload>;
+
+// commandType: tracking.record-fact.v1
+// result: DurableCommandResultRef<'tracking.fact-record.v1'>
+// expectedRevision: absent for create/add; positive current fact revision for
+// Boolean/latest update; add rejects expectedRevision.
 ```
 
 External JSON представляет `bigint` как lossless decimal string. Internal
@@ -1643,18 +1661,18 @@ append-only revisions/tombstones, tracking receipts, action groups и CAS.
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811160000_tracking_record_kernel/migration.sql`
 - Test: `test/integration/tracking/boolean-quantity.integration.spec.ts`
-- Test: `test/e2e/tracking/record-command.e2e-spec.ts`
+- Test: `test/e2e/tracking/record-command.e2e.spec.ts`
 
 **Produces:** `RecordFactCommand`, `GetFactStateQuery`; reuses P01 command
 contract without importing planning internals.
 
-- [ ] Написать RED cases: water 400+800, steps 2000→7000, Boolean replay,
+- [x] Написать RED cases: water 400+800, steps 2000→7000, Boolean replay,
   concurrent add, same-key/different-payload и shared single effect.
-- [ ] Реализовать contribution identity for add и single logical value with
+- [x] Реализовать contribution identity for add и single logical value with
   revisions for latest/Boolean.
-- [ ] Сохранять effect, receipt and action history атомарно.
-- [ ] Запустить integration/E2E и `pnpm check:quick`.
-- [ ] Commit: `feat: record boolean and quantity facts`.
+- [x] Сохранять effect, receipt and action history атомарно.
+- [x] Запустить integration/E2E и `pnpm check:quick`.
+- [x] Commit: `feat: record boolean and quantity facts`.
 
 ### T02 — Time, rating and checkpoints
 

@@ -20,13 +20,15 @@ model User {
 }
 
 model Space {
-  id              String           @id @default(uuid()) @db.Uuid
-  singletonKey    Int              @unique @default(1) @map("singleton_key") @db.SmallInt
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  memberships     Membership[]
-  planMonths      PlanMonth[]
-  goalDefinitions GoalDefinition[]
-  seedConsumptions PlanningSeedConsumption[]
+  id                  String                    @id @default(uuid()) @db.Uuid
+  singletonKey        Int                       @unique @default(1) @map("singleton_key") @db.SmallInt
+  createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  memberships         Membership[]
+  planMonths          PlanMonth[]
+  goalDefinitions     GoalDefinition[]
+  seedConsumptions    PlanningSeedConsumption[]
+  trackingFactRecords TrackingFactRecord[]
+  trackingActions     TrackingActionGroup[]
 
   @@map("spaces")
 }
@@ -38,8 +40,8 @@ model Membership {
   slot      Int      @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  space                   Space                    @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  user                    User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  space                   Space                     @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user                    User                      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   allowlist               TelegramAccessAllowlist?
   planningActions         PlanningActionGroup[]
   ownedDraftGoalRevisions PlanDraftGoalRevision[]
@@ -47,6 +49,9 @@ model Membership {
   ownedGoalSnapshots      PlanGoalSnapshot[]
   denisSeedBindings       PlanningSeedConsumption[] @relation("SeedDenisMember")
   tanyaSeedBindings       PlanningSeedConsumption[] @relation("SeedTanyaMember")
+  createdFactRecords      TrackingFactRecord[]      @relation("FactRecordCreator")
+  recordedFactRevisions   TrackingFactRevision[]    @relation("FactRevisionActor")
+  trackingActions         TrackingActionGroup[]
 
   @@unique([spaceId, slot])
   @@unique([spaceId, id])
@@ -95,13 +100,15 @@ model PlanMonth {
   /// plan_publications(plan_month_id,id), which Prisma cannot model exactly.
   activePublicationId String?  @map("active_publication_id") @db.Uuid
 
-  space             Space                 @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  space             Space                    @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   draft             PlanDraft?
   actions           PlanningActionGroup[]
   draftGoals        PlanDraftGoal[]
   publications      PlanPublication[]
-  activePublication PlanPublication?      @relation("ActivePlanPublication", fields: [id, activePublicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_months_active_publication_fkey")
+  activePublication PlanPublication?         @relation("ActivePlanPublication", fields: [id, activePublicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_months_active_publication_fkey")
   seedConsumption   PlanningSeedConsumption?
+  factRecords       TrackingFactRecord[]
+  trackingActions   TrackingActionGroup[]
 
   @@unique([spaceId, monthStart])
   @@unique([spaceId, id])
@@ -132,6 +139,7 @@ model CommandReceipt {
   completedAt       DateTime @map("completed_at") @db.Timestamptz(3)
 
   planningActions PlanningActionGroup[]
+  trackingActions TrackingActionGroup[]
 
   @@id([actorScope, commandType, commandId])
   @@map("command_receipts")
@@ -357,6 +365,8 @@ model PlanPublication {
   goalSnapshots   PlanGoalSnapshot[]
   changes         PlanningPublicationChange[]
   copiedDrafts    PlanningMonthCopyChange[]
+  factRecords     TrackingFactRecord[]
+  trackingActions TrackingActionGroup[]
 
   @@unique([planMonthId, publicationRevision], map: "plan_publications_month_revision_key")
   @@unique([planMonthId, id], map: "plan_publications_month_id_key")
@@ -393,6 +403,8 @@ model PlanGoalSnapshot {
   owner                   Membership?           @relation(fields: [spaceId, ownerMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict, map: "plan_goal_snapshots_owner_fkey")
   fixedExpectations       FixedExpectation[]
   flexiblePeriods         FlexiblePeriod[]
+  factRecords             TrackingFactRecord[]
+  trackingActions         TrackingActionGroup[]
 
   @@unique([publicationId, sourcePlanGoalId], map: "plan_goal_snapshots_publication_source_key")
   @@unique([publicationId, displayOrder], map: "plan_goal_snapshots_publication_order_key")
@@ -408,7 +420,8 @@ model FixedExpectation {
   componentKind      String   @map("component_kind") @db.VarChar(24)
   componentId        String?  @map("component_id") @db.Uuid
 
-  planGoalSnapshot PlanGoalSnapshot @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict, map: "fixed_expectations_publication_snapshot_fkey")
+  planGoalSnapshot PlanGoalSnapshot     @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict, map: "fixed_expectations_publication_snapshot_fkey")
+  factRecords      TrackingFactRecord[]
 
   /// The null-safe stable key is physical PostgreSQL `UNIQUE NULLS NOT DISTINCT`
   /// in migration 20260811151000 and intentionally has no Prisma @@unique model.
@@ -428,7 +441,8 @@ model FlexiblePeriod {
   eligibleDates      DateTime[] @map("eligible_dates") @db.Date
   periodTarget       Int        @map("period_target")
 
-  planGoalSnapshot PlanGoalSnapshot @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict, map: "flexible_periods_publication_snapshot_fkey")
+  planGoalSnapshot PlanGoalSnapshot     @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict, map: "flexible_periods_publication_snapshot_fkey")
+  factRecords      TrackingFactRecord[]
 
   @@unique([publicationId, planGoalSnapshotId, periodKind, periodStart, periodEnd], map: "flexible_periods_stable_key")
   @@unique([publicationId, planGoalSnapshotId, periodKind, ordinal], map: "flexible_periods_ordinal_key")
@@ -488,4 +502,101 @@ model PlanningSeedConsumption {
   @@unique([spaceId, seedId])
   @@unique([spaceId, planMonthId])
   @@map("planning_seed_consumptions")
+}
+
+model TrackingFactRecord {
+  id                 String   @id @db.Uuid
+  spaceId            String   @map("space_id") @db.Uuid
+  planMonthId        String   @map("plan_month_id") @db.Uuid
+  publicationId      String   @map("publication_id") @db.Uuid
+  planGoalSnapshotId String   @map("plan_goal_snapshot_id") @db.Uuid
+  localDate          DateTime @map("local_date") @db.Date
+  factKind           String   @map("fact_kind") @db.VarChar(24)
+  fixedExpectationId String?  @map("fixed_expectation_id") @db.Uuid
+  flexiblePeriodId   String?  @map("flexible_period_id") @db.Uuid
+  contributionId     String?  @unique @map("contribution_id") @db.Uuid
+  currentRevisionId  String?  @map("current_revision_id") @db.Uuid
+  createdByMemberId  String   @map("created_by_member_id") @db.Uuid
+  createdAt          DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime @map("updated_at") @db.Timestamptz(3)
+
+  space            Space                  @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  planMonth        PlanMonth              @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  publication      PlanPublication        @relation(fields: [planMonthId, publicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict)
+  planGoalSnapshot PlanGoalSnapshot       @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict)
+  fixedExpectation FixedExpectation?      @relation(fields: [fixedExpectationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  flexiblePeriod   FlexiblePeriod?        @relation(fields: [flexiblePeriodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy        Membership             @relation("FactRecordCreator", fields: [spaceId, createdByMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  revisions        TrackingFactRevision[] @relation("FactRecordRevisions")
+  currentRevision  TrackingFactRevision?  @relation("CurrentFactRevision", fields: [id, currentRevisionId], references: [factRecordId, id], onDelete: Restrict, onUpdate: Restrict)
+  changes          TrackingFactChange[]
+
+  @@unique([id, spaceId])
+  @@unique([id, currentRevisionId])
+  @@index([publicationId, planGoalSnapshotId, localDate])
+  @@map("tracking_fact_records")
+}
+
+model TrackingFactRevision {
+  id                 String   @id @db.Uuid
+  factRecordId       String   @map("fact_record_id") @db.Uuid
+  revisionNumber     BigInt   @map("revision_number") @db.BigInt
+  revisionKind       String   @map("revision_kind") @db.VarChar(16)
+  booleanResult      String?  @map("boolean_result") @db.VarChar(16)
+  quantityValue      String?  @map("quantity_value") @db.Text
+  recordedByMemberId String   @map("recorded_by_member_id") @db.Uuid
+  createdAt          DateTime @map("created_at") @db.Timestamptz(3)
+
+  factRecord    TrackingFactRecord   @relation("FactRecordRevisions", fields: [factRecordId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentFor    TrackingFactRecord?  @relation("CurrentFactRevision")
+  recordedBy    Membership           @relation("FactRevisionActor", fields: [recordedByMemberId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  beforeChanges TrackingFactChange[] @relation("FactChangeBeforeRevision")
+  afterChanges  TrackingFactChange[] @relation("FactChangeAfterRevision")
+
+  @@unique([factRecordId, revisionNumber])
+  @@unique([factRecordId, id])
+  @@map("tracking_fact_revisions")
+}
+
+model TrackingActionGroup {
+  id                  String   @id @db.Uuid
+  actionKind          String   @map("action_kind") @db.VarChar(32)
+  actorKind           String   @map("actor_kind") @db.VarChar(16)
+  actorScope          String   @map("actor_scope") @db.VarChar(64)
+  memberId            String   @map("member_id") @db.Uuid
+  spaceId             String   @map("space_id") @db.Uuid
+  planMonthId         String   @map("plan_month_id") @db.Uuid
+  publicationId       String   @map("publication_id") @db.Uuid
+  planGoalSnapshotId  String   @map("plan_goal_snapshot_id") @db.Uuid
+  commandType         String   @map("command_type") @db.VarChar(128)
+  commandId           String   @map("command_id") @db.Uuid
+  beforeFactsRevision BigInt   @map("before_facts_revision") @db.BigInt
+  afterFactsRevision  BigInt   @map("after_facts_revision") @db.BigInt
+  occurredAt          DateTime @map("occurred_at") @db.Timestamptz(3)
+
+  member           Membership          @relation(fields: [spaceId, memberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  space            Space               @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  planMonth        PlanMonth           @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  publication      PlanPublication     @relation(fields: [planMonthId, publicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict)
+  planGoalSnapshot PlanGoalSnapshot    @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict)
+  commandReceipt   CommandReceipt      @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
+  factChange       TrackingFactChange?
+
+  @@unique([actorScope, commandType, commandId])
+  @@unique([planMonthId, afterFactsRevision], map: "tracking_action_groups_month_facts_revision_key")
+  @@map("tracking_action_groups")
+}
+
+model TrackingFactChange {
+  actionId         String  @id @map("action_id") @db.Uuid
+  factRecordId     String  @map("fact_record_id") @db.Uuid
+  beforeRevisionId String? @map("before_revision_id") @db.Uuid
+  afterRevisionId  String  @unique(map: "tracking_fact_changes_after_revision_key") @map("after_revision_id") @db.Uuid
+
+  action         TrackingActionGroup   @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  factRecord     TrackingFactRecord    @relation(fields: [factRecordId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  beforeRevision TrackingFactRevision? @relation("FactChangeBeforeRevision", fields: [factRecordId, beforeRevisionId], references: [factRecordId, id], onDelete: Restrict, onUpdate: Restrict)
+  afterRevision  TrackingFactRevision  @relation("FactChangeAfterRevision", fields: [factRecordId, afterRevisionId], references: [factRecordId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("tracking_fact_changes")
 }

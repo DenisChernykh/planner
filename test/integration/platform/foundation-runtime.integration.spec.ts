@@ -66,7 +66,7 @@ describe('Planner foundation database runtime', () => {
     await container?.stop()
   })
 
-  it('deploys the exact accepted migration and production-table inventory through P11', async () => {
+  it('deploys the exact accepted migration and production-table inventory through T01', async () => {
     const migration = deployMigrations(container.getConnectionUri())
 
     expect(migration).toMatchObject({ exitCode: 0 })
@@ -85,6 +85,7 @@ describe('Planner foundation database runtime', () => {
       { migration_name: '20260811152000_cancel_republish' },
       { migration_name: '20260811153000_copy_month' },
       { migration_name: '20260811155000_seed_consumption' },
+      { migration_name: '20260811160000_tracking_record_kernel' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name
@@ -117,6 +118,10 @@ describe('Planner foundation database runtime', () => {
       { table_name: 'spaces' },
       { table_name: 'telegram_access_allowlist' },
       { table_name: 'telegram_external_identities' },
+      { table_name: 'tracking_action_groups' },
+      { table_name: 'tracking_fact_changes' },
+      { table_name: 'tracking_fact_records' },
+      { table_name: 'tracking_fact_revisions' },
       { table_name: 'users' },
     ])
   })

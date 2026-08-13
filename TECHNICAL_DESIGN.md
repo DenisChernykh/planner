@@ -883,6 +883,48 @@ payload, но не как неограниченный контейнер фак
 `done/not_done` сохраняются только там, где это предусмотрено продуктовым
 сценарием или атомарным close-day.
 
+#### 7.6.1. T01 Boolean/quantity record kernel
+
+Application command `tracking.record-fact.v1` принимает exact payload
+`{ publicationId, planGoalSnapshotId, localDate, value }`, где `value` имеет
+вид `{kind:'boolean',result:'done'|'not_done'}` либо
+`{kind:'quantity',value:canonicalDecimal}`. Result —
+`tracking.fact-record.v1`; actor берётся только из trusted context. HTTP,
+Telegram и presentation DTO в T01 не добавляются.
+
+Target всегда относится к active publication конкретного месяца и immutable
+goal snapshot. Локальная дата обязана быть не позже injected current local
+date, не раньше `activeLocalDate` и соответствовать physical fixed expectation
+либо eligible date ненулевого flexible period. Scalar T01 отклоняет checkpoint,
+weekly planned task и другой measurement kind. Personal fact изменяет только
+owner; shared snapshot имеет один logical stream, доступный обоим участникам.
+
+Для Boolean и quantity `latest` отсутствие `expectedRevision` означает create;
+повторная запись требует positive current fact revision и создаёт следующую
+append-only revision. Конкурентный create одного logical stream даёт одному
+command success, второму finite stale conflict. Quantity `add` запрещает
+`expectedRevision`: каждый новый command создаёт отдельный opaque contribution
+record revision `1`, поэтому конкурентные независимые вклады не конфликтуют.
+Exact command replay выполняется до clock, membership и target lookup.
+Для нового effect durable executor создаёт единственный `occurredAt`; его
+локальная дата в `Asia/Yekaterinburg` одновременно задаёт future-date policy и
+проверяемую audit boundary, поэтому отдельного чтения часов после replay нет.
+
+Migration `20260811160000_tracking_record_kernel` добавляет typed
+`tracking_fact_records`, append-only `tracking_fact_revisions`, module-owned
+`tracking_action_groups` и `tracking_fact_changes`. Одна durable PostgreSQL
+transaction блокирует month, создаёт/версионирует fact, переводит current
+pointer, увеличивает `plan_months.facts_revision` ровно один раз, добавляет
+history и completed receipt. Deferred constraints связывают active publication,
+calendar unit, scope/owner, measurement/precision, revision chain,
+`factsRevision`, action и receipt; history/revisions immutable, physical delete
+record запрещён. Unique `(plan_month_id, after_facts_revision)` не позволяет
+двум completed effects разделить один revision increment. Upgrade preflight под
+lock отклоняет legacy T01 command/result receipts и необъяснимый ненулевой
+`facts_revision`, потому что безопасного backfill до typed kernel нет. Tombstone
+discriminator зарезервирован в revision schema для T05, но T01 command создаёт
+только `recorded` revisions.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:
@@ -2532,6 +2574,8 @@ Metrics не содержат member names или raw Telegram IDs.
 - command receipt + effect transaction;
 - concurrent web/Telegram CAS;
 - add contributions и latest revisions;
+- T01 Boolean/quantity replay, CAS, concurrent add/shared effect, failpoint
+  rollback и direct-SQL effect constraints;
 - close-day preview race;
 - `CloseWeek` preserves a user result and closes unresolved weekly planned tasks;
 - CloseMonth/correction race;

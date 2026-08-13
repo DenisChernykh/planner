@@ -21,6 +21,10 @@ import {
   PrismaPublicationPersistence,
   type PublicationWritePhase,
 } from '@/modules/planning/infrastructure/prisma-publication.persistence'
+import {
+  createTrackingApplication,
+  type TrackingApplication,
+} from '@/modules/tracking'
 import { PrismaWorkspaceMemberResolver } from '@/modules/workspace/infrastructure/prisma-workspace-member.resolver'
 import { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 import { PrismaCommandReceiptAdapter } from '@/platform/database/prisma-command-receipt.adapter'
@@ -120,6 +124,7 @@ describe('P08 cancel and republish in real PostgreSQL', () => {
   let pool: Pool
   let provider: PrismaClientProvider
   let application: PlanningApplication
+  let tracking: TrackingApplication
   let clock: FakeProductClock
   let transaction: PrismaTransactionAdapter
   let transactionContext: PrismaTransactionContext
@@ -155,6 +160,12 @@ describe('P08 cancel and republish in real PostgreSQL', () => {
     )
     members = new PrismaWorkspaceMemberResolver(provider)
     application = createPlanningApplication({
+      database: provider,
+      transaction,
+      workspaceMembers: members,
+      clock,
+    })
+    tracking = createTrackingApplication({
       database: provider,
       transaction,
       workspaceMembers: members,
@@ -465,11 +476,23 @@ describe('P08 cancel and republish in real PostgreSQL', () => {
         publicationCommand(selected),
       )
       if (item.facts) {
-        await pool.query(
-          `UPDATE plan_months SET facts_revision = facts_revision + 1
-            WHERE id = $1::uuid`,
-          [selected.planMonthId],
+        const snapshot = await pool.query<{ readonly id: string }>(
+          `SELECT id::text
+             FROM plan_goal_snapshots
+            WHERE publication_id = $1::uuid`,
+          [published.aggregateId],
         )
+        clock.set(new Date('2031-04-30T19:00:00.000Z'))
+        await tracking.recordFact.execute({
+          commandId: randomUUID(),
+          trustedActor: actor(),
+          payload: {
+            publicationId: published.aggregateId,
+            planGoalSnapshotId: snapshot.rows[0]!.id,
+            localDate: '2031-05-01',
+            value: { kind: 'boolean', result: 'done' },
+          },
+        })
       }
       clock.set(new Date(item.cancelAt))
       const before = await state(selected.planMonthId)
