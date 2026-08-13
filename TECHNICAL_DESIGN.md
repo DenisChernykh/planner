@@ -643,7 +643,8 @@ catalog actions без metadata duplication или arbitrary JSON.
 - `plan_months` с UUID PK, `space_id` FK RESTRICT, canonical month как первый
   день в `month_start DATE`, unique `(space_id, month_start)`, finite lifecycle
   status `draft|published|grace|closed`, lifecycle revision `BIGINT >= 1` и
-  explicit timestamps;
+  explicit timestamps; начиная с P08 отдельный `facts_revision BIGINT >= 0`
+  изменяется только tracking-командами и не смешивается с lifecycle revision;
 - `plan_drafts` с mandatory editable month focus и optimistic revision;
 - `plan_draft_goals` с editable configuration, analytical-series reference,
   order и optional display-only `sourceProvenance`;
@@ -655,7 +656,10 @@ catalog actions без metadata duplication или arbitrary JSON.
   `UNIQUE NULLS NOT DISTINCT` stable key;
 - `flexible_periods` — weekly/monthly/weekly-task period identity и сохранённый
   exact P04 target;
-- `planning_publication_changes` — immutable typed history detail публикации.
+- `planning_publication_changes` — immutable typed history detail
+  `published|cancelled`; publish хранит confirmed preview и переход
+  `NULL -> publication`, cancel — переход `publication -> NULL` без изменения
+  publication row.
 
 Одна plan month может иметь несколько publication revisions, но не более одной
 active publication. Cancel до начала месяца помечает revision cancelled; он не
@@ -989,14 +993,24 @@ history, receipt или deferred validation откатывает все стро
 
 Cancel разрешён только до начала месяца и при отсутствии facts. Transaction:
 
-- проверяет active publication и revision;
-- помечает publication cancelled;
+- exact replay `planning.cancel-publication.v1` возвращает сохранённый
+  `planning.plan-month.v1` ref до clock, membership и aggregate read;
+- одним clock read выводит local date по `Asia/Yekaterinburg`, разрешает
+  member, блокирует month и exact publication, проверяет active pointer,
+  lifecycle revision, `localDate < monthStart` и `factsRevision = 0`;
+- добавляет immutable cancellation marker/history; саму publication row не
+  обновляет;
 - очищает active pointer;
-- возвращает plan month в draft;
+- возвращает plan month в draft и увеличивает lifecycle revision один раз;
 - не меняет и не удаляет snapshot rows.
 
-Republish создаёт следующую publication revision и новый набор expectations.
-Records всегда ссылаются на конкретную publication revision.
+`planning.republish-month.v1` принимает тот же revision-bound confirmed preview,
+что P07 publish, но разрешён только после cancellation marker. Он использует тот
+же projector/materialization builder и создаёт следующую consecutive
+publication revision с новым набором snapshots/expectations/periods. Обычный
+`planning.publish-month.v1` после cancel отклоняется: initial publish и
+republish являются разными durable intents. Records всегда ссылаются на
+конкретную publication revision.
 
 ### 9.4. `CloseDay`
 
@@ -2066,6 +2080,24 @@ publication header; immediate snapshot/child guards требуют, чтобы m
 ещё был `draft` с `NULL` active pointer, поэтому append после publication
 невозможен. Runtime transaction timeout остаётся `5_000 ms`; cap не служит
 основанием его повышать.
+
+### 11.5. P08 cancel/republish boundary
+
+`CancelPublication` принимает exact payload `{ planMonthId, publicationId }`,
+command type `planning.cancel-publication.v1`, mandatory positive lifecycle
+`expectedRevision` и возвращает
+`DurableCommandResultRef<'planning.plan-month.v1'>`. Missing и foreign
+publication неразличимы. Finite conflicts различают stale lifecycle revision,
+неактивную publication, начавшийся месяц и ненулевой `factsRevision`.
+
+`RepublishMonth` принимает exact P07 publish payload и mandatory positive draft
+revision, использует command type `planning.republish-month.v1` и result kind
+`planning.plan-publication.v1`. Initial publish требует отсутствия publication
+history; republish требует cancellation marker у latest revision. P08 migration
+`20260811152000_cancel_republish` добавляет `facts_revision`, typed cancellation
+history и deferred linkage month effect -> action -> change -> receipt. Старые
+publication/snapshot/calendar rows остаются immutable и доступны по exact ID;
+active query определяется только текущим month pointer.
 
 ## 12. Reporting
 

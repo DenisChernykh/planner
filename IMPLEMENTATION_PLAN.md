@@ -1515,14 +1515,23 @@ creates a new append-only publication revision and expectations.
 
 - Create: `src/modules/planning/application/cancel-publication.command.ts`
 - Create: `src/modules/planning/application/republish-month.command.ts`
+- Modify: `src/modules/planning/application/publication-persistence.port.ts`
+- Modify: `src/modules/planning/infrastructure/prisma-publication.persistence.ts`
+- Modify: `prisma/schema.prisma`
+- Create: `prisma/migrations/20260811152000_cancel_republish/migration.sql`
 - Test: `test/integration/planning/cancel-republish.integration.spec.ts`
 
-- [ ] Написать RED cases started month, existing facts, replay, stale revision
+**Produces:** exact `planning.cancel-publication.v1` returning
+`planning.plan-month.v1`, exact `planning.republish-month.v1` returning
+`planning.plan-publication.v1`, append-only cancellation marker and
+`plan_months.facts_revision` guard reused by T01.
+
+- [x] Написать RED cases started month, existing facts, replay, stale revision
   and republish failure rollback.
-- [ ] Реализовать cancel active pointer without changing/deleting snapshots.
-- [ ] Реализовать republish through the same P07 builder with next revision.
-- [ ] Запустить focused integration and `pnpm check:quick`.
-- [ ] Commit: `feat: cancel and republish future plans`.
+- [x] Реализовать cancel active pointer without changing/deleting snapshots.
+- [x] Реализовать republish through the same P07 builder with next revision.
+- [x] Запустить focused integration and `pnpm check:quick`.
+- [x] Commit: `feat: cancel and republish future plans`.
 
 ### P09 — Copy month without facts
 

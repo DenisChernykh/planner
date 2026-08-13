@@ -3,6 +3,8 @@ import { CommandValidationError } from '@/shared/application/application-command
 
 import { isCanonicalPlanningUuid } from '../domain/planning-values'
 import type {
+  CancelPublicationApplicationCommand,
+  CancelPublicationPayload,
   GetActiveMonthInput,
   GetPublishedSnapshotInput,
   PublishMonthApplicationCommand,
@@ -74,6 +76,14 @@ function payload(value: unknown): PublishMonthPayload {
   })
 }
 
+function cancellationPayload(value: unknown): CancelPublicationPayload {
+  const input = exact(value, ['planMonthId', 'publicationId'])
+  return Object.freeze({
+    planMonthId: uuid(input['planMonthId']),
+    publicationId: uuid(input['publicationId']),
+  })
+}
+
 export function snapshotPublishMonthCommand(
   value: unknown,
 ): PublishMonthApplicationCommand {
@@ -105,6 +115,39 @@ export function canonicalPublishMonthPayload(
   value: PublishMonthPayload,
 ): CanonicalJsonObject {
   return payload(value)
+}
+
+export function snapshotCancelPublicationCommand(
+  value: unknown,
+): CancelPublicationApplicationCommand {
+  const input = exact(value, [
+    'commandId',
+    'trustedActor',
+    'expectedRevision',
+    'payload',
+  ])
+  const actor = exact(input['trustedActor'], ['kind', 'id'])
+  const expectedRevision = input['expectedRevision']
+  if (
+    actor['kind'] !== 'member' ||
+    !isCanonicalPlanningUuid(actor['id']) ||
+    typeof expectedRevision !== 'bigint' ||
+    expectedRevision <= 0n
+  ) {
+    throw new CommandValidationError()
+  }
+  return Object.freeze({
+    commandId: uuid(input['commandId']),
+    trustedActor: Object.freeze({ kind: 'member', id: actor['id'] }),
+    expectedRevision,
+    payload: cancellationPayload(input['payload']),
+  })
+}
+
+export function canonicalCancelPublicationPayload(
+  value: CancelPublicationPayload,
+): CanonicalJsonObject {
+  return cancellationPayload(value)
 }
 
 export function snapshotGetPublishedSnapshotInput(

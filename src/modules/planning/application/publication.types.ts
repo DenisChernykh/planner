@@ -10,6 +10,14 @@ export type PublishMonthPayload = {
 export type PublishMonthApplicationCommand =
   ApplicationCommand<PublishMonthPayload>
 
+export type CancelPublicationPayload = {
+  readonly planMonthId: string
+  readonly publicationId: string
+}
+
+export type CancelPublicationApplicationCommand =
+  ApplicationCommand<CancelPublicationPayload>
+
 export type GetPublishedSnapshotInput = {
   readonly trustedUserId: string
   readonly publicationId: string

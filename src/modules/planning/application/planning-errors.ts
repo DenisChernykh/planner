@@ -130,6 +130,39 @@ export class PlanPublicationNotFoundError extends Error {
   }
 }
 
+export class PlanMonthRevisionConflictError extends Error {
+  public constructor(
+    public readonly expectedRevision: bigint,
+    public readonly currentRevision: bigint,
+  ) {
+    super('Plan month revision conflicts with the expected revision')
+    this.name = 'PlanMonthRevisionConflictError'
+  }
+}
+
+export type PlanPublicationCancellationConflictReason =
+  'not_active' | 'month_started' | 'facts_exist'
+
+export class PlanPublicationCancellationConflictError extends Error {
+  public constructor(
+    public readonly reason: PlanPublicationCancellationConflictReason,
+    public readonly currentRevision: bigint,
+  ) {
+    super(`Plan publication cannot be cancelled: ${reason}`)
+    this.name = 'PlanPublicationCancellationConflictError'
+  }
+}
+
+export class PlanPublicationModeConflictError extends Error {
+  public constructor(
+    public readonly requiredMode: 'publish' | 'republish',
+    public readonly latestPublicationRevision: bigint | null,
+  ) {
+    super(`Plan month requires ${requiredMode}`)
+    this.name = 'PlanPublicationModeConflictError'
+  }
+}
+
 export class ActivePlanMonthNotFoundError extends Error {
   public constructor() {
     super('Active plan month was not found')

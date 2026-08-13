@@ -1266,12 +1266,15 @@ describe('P07 atomic publication in real PostgreSQL', () => {
     await expectUnpublished(fixture.planMonthId)
   }
 
-  it('deploys the exact P07 migration and five-table inventory after P03', async () => {
+  it('retains the exact P07 five-table inventory after the P08 extension', async () => {
     const migrations = await pool.query<{ migration_name: string }>(
       `SELECT migration_name FROM _prisma_migrations ORDER BY migration_name`,
     )
-    expect(migrations.rows.at(-1)).toEqual({
+    expect(migrations.rows).toContainEqual({
       migration_name: '20260811151000_plan_publication',
+    })
+    expect(migrations.rows.at(-1)).toEqual({
+      migration_name: '20260811152000_cancel_republish',
     })
     const tables = await pool.query<{ table_name: string }>(`
       SELECT table_name FROM information_schema.tables
@@ -1316,7 +1319,9 @@ describe('P07 atomic publication in real PostgreSQL', () => {
              'planning_publication_changes'
            )
            OR (class.relname = 'plan_months'
-               AND attribute.attname = 'active_publication_id')
+               AND attribute.attname IN (
+                 'active_publication_id', 'facts_revision'
+               ))
          )
        GROUP BY class.relname
        ORDER BY class.relname
@@ -1339,7 +1344,8 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       },
       {
         table_name: 'plan_months',
-        signature: 'active_publication_id:uuid:false:∅',
+        signature:
+          'active_publication_id:uuid:false:∅,facts_revision:bigint:true:0',
       },
       {
         table_name: 'plan_publications',
@@ -1349,7 +1355,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       {
         table_name: 'planning_publication_changes',
         signature:
-          'action_id:uuid:true:∅,publication_id:uuid:true:∅,confirmed_draft_revision:bigint:true:∅,confirmed_preview_schema_version:character varying(100):true:∅,confirmed_preview_hash_version:character varying(100):true:∅,confirmed_preview_hash:character(64):true:∅,before_active_publication_id:uuid:false:∅,after_active_publication_id:uuid:true:∅',
+          'action_id:uuid:true:∅,publication_id:uuid:true:∅,confirmed_draft_revision:bigint:false:∅,confirmed_preview_schema_version:character varying(100):false:∅,confirmed_preview_hash_version:character varying(100):false:∅,confirmed_preview_hash:character(64):false:∅,before_active_publication_id:uuid:false:∅,after_active_publication_id:uuid:false:∅,change_kind:character varying(16):true:∅',
       },
     ])
     const physical = await pool.query<{
@@ -1491,7 +1497,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       'planning_action_groups_draft_after_revision_key',
       'planning_action_groups_lifecycle_after_revision_key',
       'planning_publication_changes_pkey',
-      'planning_publication_changes_publication_key',
+      'planning_publication_changes_publication_kind_key',
     ])
     expect(
       p07Indexes.rows.find(
@@ -1506,7 +1512,9 @@ describe('P07 atomic publication in real PostgreSQL', () => {
         ({ name }) =>
           name === 'planning_action_groups_lifecycle_after_revision_key',
       )?.definition,
-    ).toMatch(/WHERE .*action_kind.*month_published/u)
+    ).toMatch(
+      /WHERE .*action_kind.*month_published.*month_publication_cancelled/u,
+    )
     const partialPredicates = await pool.query<{
       name: string
       columns: string[]
@@ -1548,7 +1556,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       {
         name: 'planning_action_groups_lifecycle_after_revision_key',
         columns: ['plan_month_id', 'after_revision'],
-        values: ['month_published'],
+        values: ['month_published', 'month_publication_cancelled'],
       },
     ])
     const checks = await pool.query<{ name: string; definition: string }>(`
@@ -1595,8 +1603,8 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       'planning_action_groups_action_kind_check',
       'planning_action_groups_target_check',
       'planning_publication_changes_hash_check',
-      'planning_publication_changes_pointer_check',
       'planning_publication_changes_revision_check',
+      'planning_publication_changes_shape_check',
       'planning_publication_changes_version_check',
     ])
     const checkDefinitions = Object.fromEntries(
@@ -1617,12 +1625,12 @@ describe('P07 atomic publication in real PostgreSQL', () => {
         /weekly.*period_days.*7.*monthly.*28.*31.*weekly_planned_task.*period_days IS NULL.*period_target.*1/u,
       flexible_periods_dates_check:
         /p07_date_array_is_sorted_unique.*active_dates.*eligible_dates.*p07_dates_inside/u,
-      planning_publication_changes_pointer_check:
-        /before_active_publication_id IS NULL.*after_active_publication_id.*publication_id/u,
+      planning_publication_changes_shape_check:
+        /change_kind.*published.*before_active_publication_id IS NULL.*cancelled.*before_active_publication_id.*publication_id.*after_active_publication_id IS NULL/u,
       planning_action_groups_action_kind_check:
-        /draft_created.*goal_definition_created.*draft_goal_added.*month_published/u,
+        /draft_created.*goal_definition_created.*draft_goal_added.*month_published.*month_publication_cancelled/u,
       planning_action_groups_target_check:
-        /month_published.*plan_month_id IS NOT NULL.*goal_definition_id IS NULL.*goal_definition_copied/u,
+        /month_published.*month_publication_cancelled.*plan_month_id IS NOT NULL.*goal_definition_id IS NULL.*goal_definition_copied/u,
     }
     for (const [name, pattern] of Object.entries(expectedCheckPatterns)) {
       expect(checkDefinitions[name]).toMatch(pattern)
@@ -1639,6 +1647,8 @@ describe('P07 atomic publication in real PostgreSQL', () => {
            )
            OR trigger_name LIKE '%p07%'
            OR trigger_name LIKE '%publication%'
+           OR trigger_name LIKE '%p08%'
+           OR trigger_name = 'plan_months_lifecycle_effect_consistent'
          )
        ORDER BY trigger_name
     `)
@@ -1650,7 +1660,8 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       'flexible_periods_validate',
       'plan_goal_snapshots_reject_update_delete',
       'plan_goal_snapshots_validate',
-      'plan_months_guard_p07_lifecycle_update',
+      'plan_months_guard_p08_lifecycle_update',
+      'plan_months_lifecycle_effect_consistent',
       'plan_months_require_publication_pointer',
       'plan_publications_guard_revision',
       'plan_publications_reject_update_delete',
@@ -1673,6 +1684,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
          AND trigger_row.tgname = ANY(ARRAY[
            'command_receipts_publication_effect_consistent',
            'plan_months_require_publication_pointer',
+           'plan_months_lifecycle_effect_consistent',
            'plan_publications_require_complete_children',
            'plan_publications_require_month_pointer',
            'planning_publication_action_requires_detail',
@@ -1685,7 +1697,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
         ({ deferrable, deferred }) => deferrable && deferred,
       ),
     ).toBe(true)
-    expect(deferredTriggers.rows).toHaveLength(6)
+    expect(deferredTriggers.rows).toHaveLength(7)
     const exactConstraints = await pool.query<PgConstraintInventory>(`
       SELECT class.relname table_name, constraint_row.conname name,
              CASE constraint_row.contype
@@ -1716,7 +1728,19 @@ describe('P07 atomic publication in real PostgreSQL', () => {
          )
        ORDER BY class.relname, constraint_row.conname
     `)
-    expect(exactConstraints.rows).toEqual(EXPECTED_P07_CONSTRAINTS)
+    const p08ChangedConstraintTables = new Set([
+      'planning_action_groups',
+      'planning_publication_changes',
+    ])
+    expect(
+      exactConstraints.rows.filter(
+        ({ table_name }) => !p08ChangedConstraintTables.has(table_name),
+      ),
+    ).toEqual(
+      EXPECTED_P07_CONSTRAINTS.filter(
+        ({ table_name }) => !p08ChangedConstraintTables.has(table_name),
+      ),
+    )
 
     const exactIndexes = await pool.query<PgIndexInventory>(`
       SELECT table_class.relname table_name, index_class.relname name,
@@ -1746,7 +1770,17 @@ describe('P07 atomic publication in real PostgreSQL', () => {
              )
        ORDER BY table_class.relname, index_class.relname
     `)
-    expect(exactIndexes.rows).toEqual(EXPECTED_P07_INDEXES)
+    const p08ChangedIndexes = new Set([
+      'planning_action_groups_lifecycle_after_revision_key',
+      'planning_publication_changes_publication_key',
+      'planning_publication_changes_publication_kind_key',
+      'planning_publication_changes_pkey',
+    ])
+    expect(
+      exactIndexes.rows.filter(({ name }) => !p08ChangedIndexes.has(name)),
+    ).toEqual(
+      EXPECTED_P07_INDEXES.filter(({ name }) => !p08ChangedIndexes.has(name)),
+    )
 
     const exactTriggers = await pool.query<PgTriggerInventory>(
       `SELECT class.relname table_name, trigger_row.tgname name,
@@ -1763,7 +1797,22 @@ describe('P07 atomic publication in real PostgreSQL', () => {
         ORDER BY class.relname, trigger_row.tgname`,
       [EXPECTED_P07_TRIGGERS.map(({ name }) => name)],
     )
-    expect(exactTriggers.rows).toEqual(EXPECTED_P07_TRIGGERS)
+    const p08ReplacedTriggers = new Set([
+      'command_receipts_publication_effect_consistent',
+      'plan_months_guard_p07_lifecycle_update',
+      'plan_months_require_publication_pointer',
+      'plan_publications_require_month_pointer',
+      'planning_publication_action_requires_detail',
+      'planning_publication_changes_effect_consistent',
+      'planning_publication_changes_validate',
+    ])
+    expect(
+      exactTriggers.rows.filter(({ name }) => !p08ReplacedTriggers.has(name)),
+    ).toEqual(
+      EXPECTED_P07_TRIGGERS.filter(
+        ({ name }) => !p08ReplacedTriggers.has(name),
+      ),
+    )
 
     const preservedP03Triggers = await pool.query<{ name: string }>(`
       SELECT tgname name FROM pg_trigger
@@ -2608,7 +2657,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       `,
         [row.publication_id],
       ),
-    ).rejects.toMatchObject({ code: '55000' })
+    ).rejects.toMatchObject({ code: '23514' })
     await expect(
       pool.query(
         `
@@ -2643,18 +2692,21 @@ describe('P07 atomic publication in real PostgreSQL', () => {
     }
     await application.publishMonth.execute(publishCommand(fixture))
 
-    for (const mutation of [
-      `month_start = DATE '2027-11-01'`,
-      `created_at = created_at + INTERVAL '1 second'`,
-      `revision = revision + 7, updated_at = updated_at + INTERVAL '1 second'`,
-    ]) {
+    for (const [mutation, code] of [
+      [`month_start = DATE '2027-11-01'`, '55000'],
+      [`created_at = created_at + INTERVAL '1 second'`, '55000'],
+      [
+        `revision = revision + 7, updated_at = updated_at + INTERVAL '1 second'`,
+        '23514',
+      ],
+    ] as const) {
       await pool.query('BEGIN')
       try {
         await expect(
           pool.query(`UPDATE plan_months SET ${mutation} WHERE id = $1::uuid`, [
             fixture.planMonthId,
           ]),
-        ).rejects.toMatchObject({ code: '55000' })
+        ).rejects.toMatchObject({ code })
       } finally {
         await pool.query('ROLLBACK')
       }
@@ -2968,12 +3020,12 @@ describe('P07 atomic publication in real PostgreSQL', () => {
          '${commandId}'::uuid, 1, 2,
          '2027-05-31T23:00:00+05:00'::timestamptz);
       INSERT INTO planning_publication_changes
-        (action_id, publication_id, confirmed_draft_revision,
+        (action_id, publication_id, change_kind, confirmed_draft_revision,
          confirmed_preview_schema_version, confirmed_preview_hash_version,
          confirmed_preview_hash, before_active_publication_id,
          after_active_publication_id)
       VALUES
-        ('${actionId}'::uuid, '${publicationId}'::uuid, 1,
+        ('${actionId}'::uuid, '${publicationId}'::uuid, 'published', 1,
          'planner.publication-preview.v1',
          'planner.publication-preview-hash.v1', repeat('e', 64), NULL,
          '${publicationId}'::uuid)

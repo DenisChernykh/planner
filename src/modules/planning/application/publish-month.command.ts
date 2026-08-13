@@ -25,6 +25,7 @@ import {
   PlanDraftNotEditableError,
   PlanDraftNotFoundError,
   PlanMonthAlreadyPublishedError,
+  PlanPublicationModeConflictError,
   PlanPublicationBlockedError,
   PlanningAuthorizationDeniedError,
   PlanningDependencyUnavailableError,
@@ -61,6 +62,7 @@ function publicError(error: unknown): boolean {
     error instanceof PublicationPreviewConflictError ||
     error instanceof PlanPublicationBlockedError ||
     error instanceof PlanMonthAlreadyPublishedError ||
+    error instanceof PlanPublicationModeConflictError ||
     error instanceof PlanningDependencyUnavailableError
   )
 }
@@ -87,6 +89,7 @@ export class PublishMonthCommand {
             actor: snapshot.trustedActor,
             actorScope: actorScope(snapshot.trustedActor),
             commandType: 'planning.publish-month.v1',
+            publicationMode: 'publish',
             commandId: snapshot.commandId,
             occurredAt,
             localDate: localDate(occurredAt),

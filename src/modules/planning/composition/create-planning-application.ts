@@ -31,6 +31,8 @@ import { UpdateMonthFocusCommand } from '../application/update-month-focus.comma
 import { PublishMonthCommand } from '../application/publish-month.command'
 import { GetPublishedSnapshotQuery } from '../application/get-published-snapshot.query'
 import { GetActiveMonthQuery } from '../application/get-active-month.query'
+import { CancelPublicationCommand } from '../application/cancel-publication.command'
+import { RepublishMonthCommand } from '../application/republish-month.command'
 import { PrismaPlanDraftPersistence } from '../infrastructure/prisma-plan-draft.persistence'
 import { PrismaDraftGoalPersistence } from '../infrastructure/prisma-draft-goal.persistence'
 import { PrismaGoalCatalogPersistence } from '../infrastructure/prisma-goal-catalog.persistence'
@@ -73,6 +75,16 @@ export function createPlanningApplication(dependencies: {
       dependencies.clock,
     ),
     publishMonth: new PublishMonthCommand(
+      executor,
+      dependencies.workspaceMembers,
+      publications,
+    ),
+    cancelPublication: new CancelPublicationCommand(
+      executor,
+      dependencies.workspaceMembers,
+      publications,
+    ),
+    republishMonth: new RepublishMonthCommand(
       executor,
       dependencies.workspaceMembers,
       publications,

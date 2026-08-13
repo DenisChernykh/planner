@@ -8,13 +8,19 @@ import type {
   DraftGoalView,
 } from '../application/draft-goal.types'
 import {
+  PlanMonthRevisionConflictError,
   PlanDraftNotEditableError,
   PlanDraftNotFoundError,
   PlanMonthAlreadyPublishedError,
+  PlanPublicationCancellationConflictError,
   PlanPublicationBlockedError,
+  PlanPublicationModeConflictError,
+  PlanPublicationNotFoundError,
   PublicationPreviewConflictError,
 } from '../application/planning-errors'
 import type {
+  CancelPublicationPersistenceInput,
+  PlanMonthRef,
   PublicationPersistencePort,
   PublicationRef,
   PublishMonthPersistenceInput,
@@ -64,6 +70,23 @@ type LockedDraftRow = {
   readonly plan_month_revision: bigint
   readonly draft_revision: bigint
   readonly goals: unknown
+}
+
+type LatestPublicationRow = {
+  readonly publication_revision: bigint
+  readonly cancelled: boolean
+}
+
+type LockedPublicationLifecycleRow = {
+  readonly plan_month_id: string
+  readonly space_id: string
+  readonly month_start: string
+  readonly status: string
+  readonly plan_month_revision: bigint
+  readonly facts_revision: bigint
+  readonly active_publication_id: string | null
+  readonly publication_id: string
+  readonly publication_revision: bigint
 }
 
 type StoredPublicationRow = {
@@ -278,6 +301,25 @@ export class PrismaPublicationPersistence implements PublicationPersistencePort 
         }
         throw new PlanDraftNotEditableError()
       }
+      const latestPublication = await this.findLatestPublication(
+        client,
+        input.planMonthId,
+      )
+      if (input.publicationMode === 'publish' && latestPublication !== null) {
+        throw new PlanPublicationModeConflictError(
+          'republish',
+          latestPublication.publication_revision,
+        )
+      }
+      if (
+        input.publicationMode === 'republish' &&
+        (latestPublication === null || !latestPublication.cancelled)
+      ) {
+        throw new PlanPublicationModeConflictError(
+          latestPublication === null ? 'publish' : 'republish',
+          latestPublication?.publication_revision ?? null,
+        )
+      }
       const parsed = lockedGoals(draft.goals)
       const editor: DraftEditorView = {
         planMonthId: draft.plan_month_id,
@@ -467,18 +509,109 @@ export class PrismaPublicationPersistence implements PublicationPersistencePort 
       `
       await client.$executeRaw`
         INSERT INTO planning_publication_changes
-          (action_id, publication_id, confirmed_draft_revision,
+          (action_id, publication_id, change_kind, confirmed_draft_revision,
            confirmed_preview_schema_version, confirmed_preview_hash_version,
            confirmed_preview_hash, before_active_publication_id,
            after_active_publication_id)
         VALUES
-          (${actionId}::uuid, ${publicationId}::uuid,
+          (${actionId}::uuid, ${publicationId}::uuid, 'published',
            ${draft.draft_revision}, ${preview.schemaVersion},
            ${preview.previewHashVersion}, ${preview.previewHash}, NULL,
            ${publicationId}::uuid)
       `
       await this.afterWritePhase('history')
       return { publicationId, publicationRevision }
+    })
+  }
+
+  public cancel(
+    input: CancelPublicationPersistenceInput,
+  ): Promise<PlanMonthRef> {
+    return this.database.withClient(async (client) => {
+      const rows = await client.$queryRaw<LockedPublicationLifecycleRow[]>`
+        SELECT month.id::text plan_month_id, month.space_id::text space_id,
+               month.month_start::text month_start, month.status,
+               month.revision plan_month_revision,
+               month.facts_revision,
+               month.active_publication_id::text,
+               publication.id::text publication_id,
+               publication.publication_revision
+          FROM plan_months month
+          JOIN plan_publications publication
+            ON publication.plan_month_id = month.id
+           AND publication.id = ${input.publicationId}::uuid
+         WHERE month.id = ${input.planMonthId}::uuid
+         FOR UPDATE OF month, publication
+      `
+      const lifecycle = rows[0]
+      if (lifecycle === undefined || lifecycle.space_id !== input.spaceId) {
+        throw new PlanPublicationNotFoundError()
+      }
+      if (lifecycle.plan_month_revision !== input.expectedPlanMonthRevision) {
+        throw new PlanMonthRevisionConflictError(
+          input.expectedPlanMonthRevision,
+          lifecycle.plan_month_revision,
+        )
+      }
+      if (
+        lifecycle.status !== 'published' ||
+        lifecycle.active_publication_id !== input.publicationId
+      ) {
+        throw new PlanPublicationCancellationConflictError(
+          'not_active',
+          lifecycle.plan_month_revision,
+        )
+      }
+      if (input.localDate >= lifecycle.month_start) {
+        throw new PlanPublicationCancellationConflictError(
+          'month_started',
+          lifecycle.plan_month_revision,
+        )
+      }
+      if (lifecycle.facts_revision !== 0n) {
+        throw new PlanPublicationCancellationConflictError(
+          'facts_exist',
+          lifecycle.plan_month_revision,
+        )
+      }
+
+      const nextPlanMonthRevision = lifecycle.plan_month_revision + 1n
+      await client.$executeRaw`
+        UPDATE plan_months
+           SET status = 'draft', revision = ${nextPlanMonthRevision},
+               active_publication_id = NULL, updated_at = ${input.occurredAt}
+         WHERE id = ${input.planMonthId}::uuid
+      `
+      await this.afterWritePhase('month_pointer')
+
+      const actionId = randomUUID()
+      await client.$executeRaw`
+        INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+        VALUES
+          (${actionId}::uuid, 'month_publication_cancelled', 'member',
+           ${input.actorScope}, ${input.memberId}::uuid, NULL,
+           ${input.planMonthId}::uuid, NULL, ${input.commandType},
+           ${input.commandId}::uuid, ${lifecycle.plan_month_revision},
+           ${nextPlanMonthRevision}, ${input.occurredAt})
+      `
+      await client.$executeRaw`
+        INSERT INTO planning_publication_changes
+          (action_id, publication_id, change_kind,
+           before_active_publication_id, after_active_publication_id)
+        VALUES
+          (${actionId}::uuid, ${input.publicationId}::uuid, 'cancelled',
+           ${input.publicationId}::uuid, NULL)
+      `
+      await this.afterWritePhase('history')
+
+      return {
+        planMonthId: lifecycle.plan_month_id,
+        planMonthRevision: nextPlanMonthRevision,
+      }
     })
   }
 
@@ -511,6 +644,24 @@ export class PrismaPublicationPersistence implements PublicationPersistencePort 
         `
       return rows[0] === undefined ? null : publishedSnapshot(rows[0])
     })
+  }
+
+  private findLatestPublication(
+    client: Client,
+    planMonthId: string,
+  ): Promise<LatestPublicationRow | null> {
+    return client.$queryRaw<LatestPublicationRow[]>`
+      SELECT publication.publication_revision,
+             EXISTS (
+               SELECT 1 FROM planning_publication_changes change
+                WHERE change.publication_id = publication.id
+                  AND change.change_kind = 'cancelled'
+             ) cancelled
+        FROM plan_publications publication
+       WHERE publication.plan_month_id = ${planMonthId}::uuid
+       ORDER BY publication.publication_revision DESC
+       LIMIT 1
+    `.then((rows) => rows[0] ?? null)
   }
 
   private lockDraft(

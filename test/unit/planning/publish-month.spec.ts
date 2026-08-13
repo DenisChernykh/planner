@@ -94,6 +94,7 @@ describe('P07 publish-month command boundary', () => {
         actor: { kind: 'member', id: memberId },
         actorScope: `member:${memberId}`,
         commandType: 'planning.publish-month.v1',
+        publicationMode: 'publish',
         commandId: '66666666-6666-4666-8666-666666666666',
         occurredAt: new Date('2026-08-14T19:00:00.000Z'),
         localDate: '2026-08-15',
@@ -279,6 +280,7 @@ function publicationQueries(
 ): PublicationPersistencePort {
   return {
     publish: () => Promise.reject(new Error('unexpected publish')),
+    cancel: () => Promise.reject(new Error('unexpected cancel')),
     findPublished: () => Promise.reject(new Error('unexpected findPublished')),
     findActive: () => Promise.reject(new Error('unexpected findActive')),
     ...overrides,
