@@ -114,6 +114,10 @@ export function telegramConfirmation(
             actionIntentId,
           ),
         }),
+        Object.freeze({
+          text: 'Изменить',
+          callback_data: encodeTelegramIntentCallback('select', actionIntentId),
+        }),
       ]),
       ...menu.inline_keyboard,
     ]),

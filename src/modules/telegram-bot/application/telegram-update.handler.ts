@@ -31,13 +31,13 @@ const stale = 'Кнопка устарела. Открываю актуальн�
 
 type ActionIntentOperations = Pick<
   TelegramActionIntentService,
-  'offerTodayActions' | 'select' | 'acceptQuantity' | 'confirm'
+  'offerTodayActions' | 'select' | 'acceptValue' | 'confirm'
 >
 
 const disabledActionIntents: ActionIntentOperations = {
   offerTodayActions: () => Promise.resolve(Object.freeze([])),
   select: () => Promise.resolve({ kind: 'not_found' }),
-  acceptQuantity: () => Promise.resolve(null),
+  acceptValue: () => Promise.resolve(null),
   confirm: () => Promise.resolve({ kind: 'not_found' }),
 }
 
@@ -187,14 +187,14 @@ export class TelegramUpdateHandler {
       })
     }
     if (update.kind === 'private_message') {
-      const quantity = await this.actionIntents.acceptQuantity(
+      const value = await this.actionIntents.acceptValue(
         principal.member,
         update.text,
       )
-      if (quantity !== null) {
+      if (value !== null) {
         return Object.freeze({
           updateId: update.updateId,
-          attempts: this.intentAttempts(update.chatId, quantity),
+          attempts: this.intentAttempts(update.chatId, value),
         })
       }
     }
@@ -234,6 +234,14 @@ export class TelegramUpdateHandler {
           return `${outcome.title}\n\nВведите неотрицательное число.`
         case 'invalid_quantity':
           return `${outcome.title}\n\nЗначение некорректно. Введите число с допустимой точностью.`
+        case 'awaiting_scalar':
+          return outcome.inputKind === 'actual_time'
+            ? `${outcome.title}\n\nВведите время в формате ЧЧ:ММ.`
+            : `${outcome.title}\n\nВведите целую оценку.`
+        case 'invalid_scalar':
+          return outcome.inputKind === 'actual_time'
+            ? `${outcome.title}\n\nВремя некорректно. Используйте формат ЧЧ:ММ.`
+            : `${outcome.title}\n\nОценка должна быть целым безопасным числом.`
         case 'preview': {
           const value =
             outcome.value.kind === 'boolean'

@@ -1,24 +1,35 @@
 import { createHash, randomUUID } from 'node:crypto'
 
 import type {
-  TrackingApplication,
   TrackingDayGoalV1,
   TrackingFactReadV1,
+  TrackingFixedExpectationV1,
   TrackingGoalReadV1,
   TrackingTodayReadModelV1,
+  TrackingApplication,
 } from '@/modules/tracking'
 import type { MemberContext } from '@/modules/workspace'
-import type { DatabaseTransactionPort } from '@/shared/application/database-transaction.port'
+import {
+  DatabaseTransactionRollbackOnlyError,
+  type DatabaseTransactionPort,
+} from '@/shared/application/database-transaction.port'
 import type { ProductClock } from '@/shared/application/product-clock'
 
 import {
   basicFactErrorOutcome,
-  commandForIntent,
+  executeBasicFactIntent,
   fingerprintForIntent,
+  intentValue,
 } from './basic-fact-command.mapper'
+import {
+  executeScalarFactIntent,
+  scalarFingerprintForIntent,
+  scalarIntentValue,
+} from './scalar-fact-command.mapper'
 import type {
   StoredTelegramActionIntent,
   TelegramActionButton,
+  TelegramActionIntentKind,
   TelegramActionIntentOffer,
   TelegramActionIntentPersistencePort,
   TelegramIntentOutcome,
@@ -26,6 +37,8 @@ import type {
 
 const intentTtlMs = 15 * 60 * 1_000
 const canonicalDecimal = /^(?:0|[1-9][0-9]*)(?:\.([0-9]+))?$/u
+const canonicalTime = /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/u
+const canonicalInteger = /^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$/u
 
 function goalFacts(day: TrackingDayGoalV1): readonly TrackingFactReadV1[] {
   return [
@@ -40,35 +53,43 @@ function semanticKey(input: {
   readonly goalId: string
   readonly localDate: string
   readonly factsRevision: bigint
-  readonly kind: 'boolean' | 'quantity'
+  readonly kind: TelegramActionIntentKind
+  readonly checkpointId: string | null
   readonly booleanResult: 'done' | 'not_done' | null
 }): string {
+  const preimage = {
+    booleanResult: input.booleanResult,
+    factsRevision: input.factsRevision.toString(10),
+    goalId: input.goalId,
+    kind: input.kind,
+    localDate: input.localDate,
+    memberId: input.member.memberId,
+    publicationId: input.publicationId,
+    spaceId: input.member.spaceId,
+  }
   return createHash('sha256')
     .update(
-      JSON.stringify({
-        booleanResult: input.booleanResult,
-        factsRevision: input.factsRevision.toString(10),
-        goalId: input.goalId,
-        kind: input.kind,
-        localDate: input.localDate,
-        memberId: input.member.memberId,
-        publicationId: input.publicationId,
-        spaceId: input.member.spaceId,
-      }),
+      JSON.stringify(
+        input.kind === 'boolean' || input.kind === 'quantity'
+          ? preimage
+          : { ...preimage, checkpointId: input.checkpointId },
+      ),
       'utf8',
     )
     .digest('hex')
 }
 
+function fingerprint(
+  member: MemberContext,
+  intent: StoredTelegramActionIntent,
+): string | null {
+  return intent.intentKind === 'boolean' || intent.intentKind === 'quantity'
+    ? fingerprintForIntent(member, intent)
+    : scalarFingerprintForIntent(member, intent)
+}
+
 function preview(intent: StoredTelegramActionIntent): TelegramIntentOutcome {
-  const value =
-    intent.intentKind === 'boolean'
-      ? intent.booleanResult === null
-        ? null
-        : { kind: 'boolean' as const, result: intent.booleanResult }
-      : intent.quantityValue === null
-        ? null
-        : { kind: 'quantity' as const, value: intent.quantityValue }
+  const value = intentValue(intent) ?? scalarIntentValue(intent)
   return value === null
     ? { kind: 'stale' }
     : {
@@ -86,7 +107,9 @@ function offerInput(
   member: MemberContext,
   model: Extract<TrackingTodayReadModelV1, { readonly state: 'published' }>,
   goal: TrackingGoalReadV1,
-  kind: 'boolean' | 'quantity',
+  localDate: string,
+  kind: TelegramActionIntentKind,
+  checkpointId: string | null,
   booleanResult: 'done' | 'not_done' | null,
   now: Date,
 ): TelegramActionIntentOffer {
@@ -97,22 +120,24 @@ function offerInput(
       member,
       publicationId: model.publicationId,
       goalId: goal.planGoalSnapshotId,
-      localDate: model.queryLocalDate,
+      localDate,
       factsRevision: model.factsRevision,
       kind,
+      checkpointId,
       booleanResult,
     }),
     spaceId: member.spaceId,
     memberId: member.memberId,
     publicationId: model.publicationId,
     planGoalSnapshotId: goal.planGoalSnapshotId,
-    localDate: model.queryLocalDate,
+    localDate,
     sourceFactsRevision: model.factsRevision,
     intentKind: kind,
+    checkpointId,
     booleanResult,
     expiresAt: new Date(now.getTime() + intentTtlMs),
   } as const
-  if (kind === 'quantity') {
+  if (booleanResult === null) {
     return { ...base, state: 'offered', commandFingerprint: null }
   }
   const candidate: StoredTelegramActionIntent = {
@@ -123,6 +148,8 @@ function offerInput(
     monthStatus: model.monthStatus,
     state: 'ready',
     quantityValue: null,
+    actualTimeValue: null,
+    ratingValue: null,
     commandFingerprint: null,
     title: goal.title,
     unit: null,
@@ -133,8 +160,49 @@ function offerInput(
   return {
     ...base,
     state: 'ready',
-    commandFingerprint: fingerprintForIntent(member, candidate),
+    commandFingerprint: fingerprint(member, candidate),
   }
+}
+
+function inputKind(
+  intent: StoredTelegramActionIntent,
+): 'quantity' | 'actual_time' | 'rating' | null {
+  if (intent.intentKind === 'quantity') return 'quantity'
+  if (
+    intent.intentKind === 'actual_time' ||
+    intent.intentKind === 'checkpoint_actual_time'
+  ) {
+    return 'actual_time'
+  }
+  if (
+    intent.intentKind === 'rating' ||
+    intent.intentKind === 'checkpoint_rating'
+  ) {
+    return 'rating'
+  }
+  return null
+}
+
+function awaiting(intent: StoredTelegramActionIntent): TelegramIntentOutcome {
+  const kind = inputKind(intent)
+  if (kind === 'quantity') {
+    return { kind: 'awaiting_quantity', title: intent.title }
+  }
+  return kind === null
+    ? { kind: 'stale' }
+    : { kind: 'awaiting_scalar', title: intent.title, inputKind: kind }
+}
+
+function hasRecord(expectation: TrackingFixedExpectationV1): boolean {
+  return expectation.facts.length > 0
+}
+
+function finiteOutcome(error: unknown): TelegramIntentOutcome | null {
+  const direct = basicFactErrorOutcome(error)
+  if (direct !== null) return direct
+  return error instanceof DatabaseTransactionRollbackOnlyError
+    ? basicFactErrorOutcome(error.cause)
+    : null
 }
 
 export class TelegramActionIntentService {
@@ -166,40 +234,137 @@ export class TelegramActionIntentService {
       if (
         day === undefined ||
         !day.writable ||
-        goal.viewerAccess === 'partner_read_only' ||
-        goal.config.checkpoints !== null
+        goal.viewerAccess === 'partner_read_only'
       ) {
         continue
       }
       const measurement = goal.config.measurement
       const facts = goalFacts(day)
-      if (measurement.kind === 'boolean') {
-        if (facts.some((fact) => fact.factKind === 'boolean')) continue
-        for (const result of ['done', 'not_done'] as const) {
+      if (goal.config.checkpoints === null) {
+        if (measurement.kind === 'boolean') {
+          if (facts.some((fact) => fact.factKind === 'boolean')) continue
+          for (const result of ['done', 'not_done'] as const) {
+            const intent = await this.intents.offer(
+              offerInput(
+                member,
+                model,
+                goal,
+                model.day.localDate,
+                'boolean',
+                null,
+                result,
+                now,
+              ),
+              now,
+            )
+            buttons.push({
+              text: `${result === 'done' ? '✓' : '✕'} ${goal.title}`,
+              actionIntentId: intent.actionIntentId,
+            })
+          }
+        } else if (measurement.kind === 'quantity') {
+          if (
+            measurement.aggregation === 'latest' &&
+            facts.some((fact) => fact.factKind === 'quantity_latest')
+          ) {
+            continue
+          }
           const intent = await this.intents.offer(
-            offerInput(member, model, goal, 'boolean', result, now),
+            offerInput(
+              member,
+              model,
+              goal,
+              model.day.localDate,
+              'quantity',
+              null,
+              null,
+              now,
+            ),
             now,
           )
           buttons.push({
-            text: `${result === 'done' ? '✓' : '✕'} ${goal.title}`,
+            text: `Ввести ${goal.title}`,
+            actionIntentId: intent.actionIntentId,
+          })
+        } else if (
+          (measurement.kind === 'actual_time' ||
+            measurement.kind === 'rating') &&
+          day.fixedExpectations.some(
+            (value) => value.componentKind === 'goal' && !hasRecord(value),
+          )
+        ) {
+          const intent = await this.intents.offer(
+            offerInput(
+              member,
+              model,
+              goal,
+              model.day.localDate,
+              measurement.kind,
+              null,
+              null,
+              now,
+            ),
+            now,
+          )
+          buttons.push({
+            text: `Ввести ${goal.title}`,
             actionIntentId: intent.actionIntentId,
           })
         }
-      } else if (measurement.kind === 'quantity') {
+        continue
+      }
+
+      const checkpoints = new Map(
+        goal.config.checkpoints.items.map((value) => [
+          value.checkpointId,
+          value,
+        ]),
+      )
+      for (const expectation of day.fixedExpectations) {
         if (
-          measurement.aggregation === 'latest' &&
-          facts.some((fact) => fact.factKind === 'quantity_latest')
+          expectation.componentKind !== 'checkpoint' ||
+          expectation.componentId === null ||
+          hasRecord(expectation)
         ) {
           continue
         }
-        const intent = await this.intents.offer(
-          offerInput(member, model, goal, 'quantity', null, now),
-          now,
-        )
-        buttons.push({
-          text: `Ввести ${goal.title}`,
-          actionIntentId: intent.actionIntentId,
-        })
+        const checkpoint = checkpoints.get(expectation.componentId)
+        if (checkpoint === undefined) continue
+        const satisfaction = checkpoint.satisfaction
+        const kind = `checkpoint_${satisfaction.kind}` as const
+        if (
+          kind !== 'checkpoint_boolean' &&
+          kind !== 'checkpoint_actual_time' &&
+          kind !== 'checkpoint_rating'
+        ) {
+          continue
+        }
+        const results =
+          kind === 'checkpoint_boolean'
+            ? (['done', 'not_done'] as const)
+            : ([null] as const)
+        for (const result of results) {
+          const intent = await this.intents.offer(
+            offerInput(
+              member,
+              model,
+              goal,
+              model.day.localDate,
+              kind,
+              expectation.componentId,
+              result,
+              now,
+            ),
+            now,
+          )
+          buttons.push({
+            text:
+              result === null
+                ? `Ввести ${goal.title} · ${checkpoint.name}`
+                : `${result === 'done' ? '✓' : '✕'} ${goal.title} · ${checkpoint.name}`,
+            actionIntentId: intent.actionIntentId,
+          })
+        }
       }
     }
     return Object.freeze(buttons)
@@ -229,21 +394,106 @@ export class TelegramActionIntentService {
           await this.intents.markExpired(actionIntentId, now)
           return { kind: 'expired' }
         }
-        if (current.intentKind === 'boolean') return preview(current)
-        if (current.state === 'ready') return preview(current)
-        if (current.state === 'awaiting_value') {
-          return { kind: 'awaiting_quantity', title: current.title }
+        if (
+          current.intentKind === 'boolean' ||
+          current.intentKind === 'checkpoint_boolean'
+        ) {
+          return preview(current)
         }
-        if (current.state !== 'offered') return { kind: 'stale' }
-        const selected = await this.intents.selectQuantity({
+        if (current.state === 'awaiting_value') return awaiting(current)
+        if (current.state !== 'offered' && current.state !== 'ready') {
+          return { kind: 'stale' }
+        }
+        const selected = await this.intents.selectValue({
           actionIntentId,
           spaceId: member.spaceId,
           memberId: member.memberId,
           now,
         })
-        return selected === null
-          ? { kind: 'not_found' }
-          : { kind: 'awaiting_quantity', title: selected.title }
+        return selected === null ? { kind: 'not_found' } : awaiting(selected)
+      }),
+    )
+  }
+
+  public acceptValue(
+    member: MemberContext,
+    rawValue: string,
+  ): Promise<TelegramIntentOutcome | null> {
+    return this.safeNullable(async () =>
+      this.transaction.run(async () => {
+        const now = this.clock.now()
+        const intent = await this.intents.findAwaitingValue({
+          spaceId: member.spaceId,
+          memberId: member.memberId,
+          now,
+        })
+        if (intent === null) return null
+        const value = rawValue.trim()
+        const kind = inputKind(intent)
+        let quantityValue: string | null = null
+        let actualTimeValue: string | null = null
+        let ratingValue: bigint | null = null
+        if (kind === 'quantity') {
+          const match = canonicalDecimal.exec(value)
+          if (
+            match === null ||
+            intent.precision === null ||
+            (match[1]?.length ?? 0) > intent.precision
+          ) {
+            return { kind: 'invalid_quantity', title: intent.title }
+          }
+          quantityValue = value
+        } else if (kind === 'actual_time') {
+          if (!canonicalTime.test(value)) {
+            return {
+              kind: 'invalid_scalar',
+              title: intent.title,
+              inputKind: kind,
+            }
+          }
+          actualTimeValue = value
+        } else if (kind === 'rating') {
+          if (!canonicalInteger.test(value)) {
+            return {
+              kind: 'invalid_scalar',
+              title: intent.title,
+              inputKind: kind,
+            }
+          }
+          ratingValue = BigInt(value)
+          if (
+            ratingValue < BigInt(Number.MIN_SAFE_INTEGER) ||
+            ratingValue > BigInt(Number.MAX_SAFE_INTEGER)
+          ) {
+            return {
+              kind: 'invalid_scalar',
+              title: intent.title,
+              inputKind: kind,
+            }
+          }
+        } else {
+          return { kind: 'stale' }
+        }
+        const candidate: StoredTelegramActionIntent = {
+          ...intent,
+          quantityValue,
+          actualTimeValue,
+          ratingValue,
+          state: 'ready',
+        }
+        const commandFingerprint = fingerprint(member, candidate)
+        if (commandFingerprint === null) return { kind: 'stale' }
+        const ready = await this.intents.setValue({
+          actionIntentId: intent.actionIntentId,
+          spaceId: member.spaceId,
+          memberId: member.memberId,
+          quantityValue,
+          actualTimeValue,
+          ratingValue,
+          commandFingerprint,
+          now,
+        })
+        return ready === null ? { kind: 'stale' } : preview(ready)
       }),
     )
   }
@@ -252,42 +502,7 @@ export class TelegramActionIntentService {
     member: MemberContext,
     rawValue: string,
   ): Promise<TelegramIntentOutcome | null> {
-    return this.safeNullable(async () =>
-      this.transaction.run(async () => {
-        const now = this.clock.now()
-        const intent = await this.intents.findAwaitingQuantity({
-          spaceId: member.spaceId,
-          memberId: member.memberId,
-          now,
-        })
-        if (intent === null) return null
-        const value = rawValue.trim()
-        const match = canonicalDecimal.exec(value)
-        if (
-          match === null ||
-          intent.precision === null ||
-          (match[1]?.length ?? 0) > intent.precision
-        ) {
-          return { kind: 'invalid_quantity', title: intent.title }
-        }
-        const candidate = {
-          ...intent,
-          quantityValue: value,
-          state: 'ready' as const,
-        }
-        const fingerprint = fingerprintForIntent(member, candidate)
-        if (fingerprint === null) return { kind: 'stale' }
-        const ready = await this.intents.setQuantityValue({
-          actionIntentId: intent.actionIntentId,
-          spaceId: member.spaceId,
-          memberId: member.memberId,
-          value,
-          commandFingerprint: fingerprint,
-          now,
-        })
-        return ready === null ? { kind: 'stale' } : preview(ready)
-      }),
-    )
+    return this.acceptValue(member, rawValue)
   }
 
   public confirm(
@@ -322,24 +537,20 @@ export class TelegramActionIntentService {
         ) {
           return { kind: 'stale' }
         }
-        const command = commandForIntent(member, intent)
-        if (
-          command === null ||
-          intent.commandFingerprint === null ||
-          fingerprintForIntent(member, intent) !== intent.commandFingerprint
-        ) {
-          return { kind: 'stale' }
-        }
-        const result = await this.tracking.recordFact.execute(command)
+        const outcome =
+          intent.intentKind === 'boolean' || intent.intentKind === 'quantity'
+            ? await executeBasicFactIntent(this.tracking, member, intent)
+            : await executeScalarFactIntent(this.tracking, member, intent)
+        if (outcome.kind !== 'completed') return outcome
         await this.intents.markCompleted({
           actionIntentId,
-          result,
+          result: outcome.result,
           completedAt: now,
         })
         return {
           kind: 'completed',
           title: intent.title,
-          result,
+          result: outcome.result,
         }
       }),
     )
@@ -351,7 +562,7 @@ export class TelegramActionIntentService {
     try {
       return await operation()
     } catch (error: unknown) {
-      return basicFactErrorOutcome(error) ?? { kind: 'dependency_unavailable' }
+      return finiteOutcome(error) ?? { kind: 'dependency_unavailable' }
     }
   }
 
@@ -361,7 +572,7 @@ export class TelegramActionIntentService {
     try {
       return await operation()
     } catch (error: unknown) {
-      return basicFactErrorOutcome(error) ?? { kind: 'dependency_unavailable' }
+      return finiteOutcome(error) ?? { kind: 'dependency_unavailable' }
     }
   }
 }

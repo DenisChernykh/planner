@@ -18,7 +18,12 @@ export * from './record-time.command'
 export * from './record-text.command'
 export * from './record-weekly-task-result.command'
 export * from './tracking-application'
-export { canonicalRecordFactPayload } from './tracking-command.validation'
+export {
+  canonicalRecordCheckpointPayload,
+  canonicalRecordFactPayload,
+  canonicalRecordRatingPayload,
+  canonicalRecordTimePayload,
+} from './tracking-command.validation'
 export * from './tracking-errors'
 export * from './tracking-read-persistence.port'
 export * from './tracking-read.query'

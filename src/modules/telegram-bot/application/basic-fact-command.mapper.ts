@@ -8,6 +8,7 @@ import {
   TrackingAuthorizationDeniedError,
   TrackingDependencyUnavailableError,
   type RecordFactPayload,
+  type RecordFactValueV1,
 } from '@/modules/tracking'
 import type { MemberContext } from '@/modules/workspace'
 import type {
@@ -33,12 +34,13 @@ const definition: CommandDefinition<
 
 export function intentValue(
   intent: StoredTelegramActionIntent,
-): TelegramActionIntentValue | null {
+): Extract<TelegramActionIntentValue, RecordFactValueV1> | null {
   if (intent.intentKind === 'boolean') {
     return intent.booleanResult === null
       ? null
       : { kind: 'boolean', result: intent.booleanResult }
   }
+  if (intent.intentKind !== 'quantity') return null
   return intent.quantityValue === null
     ? null
     : { kind: 'quantity', value: intent.quantityValue }

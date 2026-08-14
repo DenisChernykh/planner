@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
+import { readFileSync, readdirSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import {
   PostgreSqlContainer,
@@ -29,6 +31,9 @@ const secondUserId = '22222222-2222-4222-8222-222222222222'
 const spaceId = '33333333-3333-4333-8333-333333333333'
 const firstMemberId = '44444444-4444-4444-8444-444444444444'
 const secondMemberId = '55555555-5555-4555-8555-555555555555'
+const G02_ACTION_INTENT_MIGRATION = '20260811200000_telegram_action_intents'
+const G03_ACTION_INTENT_MIGRATION =
+  '20260811201000_telegram_scalar_action_intents'
 
 function deployMigrations(databaseUrl: string): void {
   const result = spawnSync(
@@ -42,6 +47,390 @@ function deployMigrations(databaseUrl: string): void {
   )
   if (result.status !== 0) throw new Error(`${result.stdout}${result.stderr}`)
 }
+
+function readMigration(directory: string): string {
+  return readFileSync(
+    resolve(process.cwd(), 'prisma', 'migrations', directory, 'migration.sql'),
+    'utf8',
+  )
+}
+
+async function deployMigrationsThrough(
+  pool: Pool,
+  lastDirectory: string,
+): Promise<void> {
+  const migrationDirectories = readdirSync(
+    resolve(process.cwd(), 'prisma', 'migrations'),
+    { withFileTypes: true },
+  )
+    .filter((entry) => entry.isDirectory() && entry.name <= lastDirectory)
+    .map((entry) => entry.name)
+    .sort()
+
+  for (const directory of migrationDirectories) {
+    await pool.query(readMigration(directory))
+  }
+}
+
+describe('G03 populated G02 action-intent migration', () => {
+  let postgres: StartedPostgreSqlContainer
+  let pool: Pool
+  let provider: PrismaClientProvider
+
+  beforeAll(async () => {
+    postgres = await new PostgreSqlContainer(POSTGRES_IMAGE)
+      .withDatabase('planner_g03_migration_integration')
+      .withUsername('planner')
+      .withPassword('planner-test-only')
+      .start()
+    pool = new Pool({ connectionString: postgres.getConnectionUri() })
+    await deployMigrationsThrough(pool, G02_ACTION_INTENT_MIGRATION)
+
+    const runtimeConfig = {
+      database: {
+        url: postgres.getConnectionUri(),
+        poolMax: 12,
+        connectionTimeoutMs: 2_000,
+        idleTimeoutMs: 5_000,
+        healthTimeoutMs: 500,
+        transactionMaxWaitMs: 5_000,
+        transactionTimeoutMs: 20_000,
+      },
+    }
+    const context = new PrismaTransactionContext()
+    provider = new PrismaClientProvider(runtimeConfig, context)
+    await provider.connect(AbortSignal.timeout(2_000))
+    const transaction = new PrismaTransactionAdapter(
+      provider,
+      context,
+      runtimeConfig,
+    )
+    const members = new PrismaWorkspaceMemberResolver(provider)
+    const clock = new FakeProductClock(new Date('2026-04-10T07:00:00.000Z'))
+    const planning = createPlanningApplication({
+      database: provider,
+      transaction,
+      workspaceMembers: members,
+      clock,
+    })
+
+    await pool.query(`
+      INSERT INTO users (id) VALUES ('${firstUserId}'::uuid);
+      INSERT INTO spaces (id, singleton_key)
+      VALUES ('${spaceId}'::uuid, 1);
+      INSERT INTO memberships (id, space_id, user_id, slot)
+      VALUES (
+        '${firstMemberId}'::uuid,
+        '${spaceId}'::uuid,
+        '${firstUserId}'::uuid,
+        1
+      );
+    `)
+    const actor = { kind: 'member' as const, id: firstMemberId }
+    const draft = await planning.createEmptyDraft.execute({
+      commandId: randomUUID(),
+      trustedActor: actor,
+      payload: { targetMonth: '2026-04', focus: 'G03 migration fixture' },
+    })
+    const definition = await planning.createGoalDefinition.execute({
+      commandId: randomUUID(),
+      trustedActor: actor,
+      payload: {
+        title: 'Legacy quantity',
+        why: 'G03 migration fixture',
+        category: 'G03',
+      },
+    })
+    await planning.addDraftGoal.execute({
+      commandId: randomUUID(),
+      trustedActor: actor,
+      expectedRevision: 1n,
+      payload: {
+        planMonthId: draft.aggregateId,
+        goalDefinitionId: definition.aggregateId,
+        config: {
+          schemaVersion: 1,
+          scope: { kind: 'personal', ownerMemberId: firstMemberId },
+          repetition: { kind: 'daily' },
+          measurement: {
+            kind: 'quantity',
+            mode: 'targeted',
+            unit: 'ml',
+            precision: 0,
+            aggregation: 'latest',
+            target: '1000',
+          },
+          checkpoints: null,
+        },
+        sourceProvenance: null,
+      },
+    })
+    const preview = await planning.buildPublicationPreview.execute({
+      trustedUserId: firstUserId,
+      targetMonth: '2026-04',
+    })
+    if (preview === null) throw new Error('migration preview missing')
+    const publication = await planning.publishMonth.execute({
+      commandId: randomUUID(),
+      trustedActor: actor,
+      expectedRevision: BigInt(preview.draftRevision),
+      payload: {
+        planMonthId: draft.aggregateId,
+        previewSchemaVersion: preview.schemaVersion,
+        previewHashVersion: preview.previewHashVersion,
+        previewHash: preview.previewHash,
+      },
+    })
+    const snapshot = await pool.query<{ readonly id: string }>(
+      `SELECT id::text FROM plan_goal_snapshots
+        WHERE publication_id = $1::uuid`,
+      [publication.aggregateId],
+    )
+    const planGoalSnapshotId = snapshot.rows[0]?.id
+    if (planGoalSnapshotId === undefined) {
+      throw new Error('migration snapshot missing')
+    }
+
+    const legacyRows = [
+      {
+        kind: 'quantity',
+        state: 'offered',
+        booleanResult: null,
+        quantityValue: null,
+        fingerprint: null,
+        completed: false,
+      },
+      {
+        kind: 'quantity',
+        state: 'awaiting_value',
+        booleanResult: null,
+        quantityValue: null,
+        fingerprint: null,
+        completed: false,
+      },
+      {
+        kind: 'quantity',
+        state: 'ready',
+        booleanResult: null,
+        quantityValue: '7000',
+        fingerprint: '3'.repeat(64),
+        completed: false,
+      },
+      {
+        kind: 'boolean',
+        state: 'ready',
+        booleanResult: 'done',
+        quantityValue: null,
+        fingerprint: '4'.repeat(64),
+        completed: false,
+      },
+      {
+        kind: 'boolean',
+        state: 'completed',
+        booleanResult: 'not_done',
+        quantityValue: null,
+        fingerprint: '5'.repeat(64),
+        completed: true,
+      },
+      {
+        kind: 'quantity',
+        state: 'expired',
+        booleanResult: null,
+        quantityValue: null,
+        fingerprint: null,
+        completed: false,
+      },
+      {
+        kind: 'quantity',
+        state: 'expired',
+        booleanResult: null,
+        quantityValue: '12.5',
+        fingerprint: '7'.repeat(64),
+        completed: false,
+      },
+    ] as const
+
+    for (const [index, row] of legacyRows.entries()) {
+      const intentId = randomUUID()
+      await pool.query(
+        `INSERT INTO telegram_action_intents (
+           id, semantic_key, command_id, space_id, member_id,
+           publication_id, plan_goal_snapshot_id, local_date,
+           source_facts_revision, intent_kind, state, boolean_result,
+           quantity_value, command_fingerprint, result_kind,
+           result_aggregate_id, result_aggregate_revision, expires_at,
+           completed_at, created_at, updated_at
+         ) VALUES (
+           $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+           $5::uuid, $6::uuid, DATE '2026-04-10',
+           $7::bigint, $8, $9, $10, $11, $12,
+           $13, $14::uuid, $15::bigint,
+           TIMESTAMPTZ '2026-04-10 08:00:00+00',
+           $16::timestamptz,
+           TIMESTAMPTZ '2026-04-10 07:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:01:00+00'
+         )`,
+        [
+          intentId,
+          String(index + 1).repeat(64),
+          spaceId,
+          firstMemberId,
+          publication.aggregateId,
+          planGoalSnapshotId,
+          index === 4 ? '9223372036854775806' : String(index),
+          row.kind,
+          row.state,
+          row.booleanResult,
+          row.quantityValue,
+          row.fingerprint,
+          row.completed ? 'tracking.fact-record.v1' : null,
+          row.completed ? randomUUID() : null,
+          row.completed ? '9223372036854775806' : null,
+          row.completed ? '2026-04-10 07:01:00+00' : null,
+        ],
+      )
+    }
+  }, 120_000)
+
+  afterAll(async () => {
+    await provider?.close(AbortSignal.timeout(2_000)).catch(() => undefined)
+    await pool?.end()
+    await postgres?.stop()
+  })
+
+  it('upgrades every valid G02 row shape atomically and enforces G03 guards', async () => {
+    const migrationSql = readMigration(G03_ACTION_INTENT_MIGRATION)
+    const before = await pool.query<{
+      readonly semantic_key: string
+      readonly source_facts_revision: string
+      readonly state: string
+    }>(
+      `SELECT btrim(semantic_key) semantic_key,
+              source_facts_revision::text,
+              state
+         FROM telegram_action_intents
+        ORDER BY semantic_key`,
+    )
+
+    const rollbackClient = await pool.connect()
+    try {
+      await rollbackClient.query('BEGIN')
+      await rollbackClient.query(migrationSql)
+      await expect(rollbackClient.query('SELECT 1 / 0')).rejects.toThrow()
+      await rollbackClient.query('ROLLBACK')
+    } finally {
+      rollbackClient.release()
+    }
+    const rolledBackColumn = await pool.query<{ readonly exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'telegram_action_intents'
+            AND column_name = 'checkpoint_id'
+       ) exists`,
+    )
+    expect(rolledBackColumn.rows[0]?.exists).toBe(false)
+    await expect(
+      pool.query(
+        `UPDATE telegram_action_intents
+            SET state = 'awaiting_value', quantity_value = NULL,
+                command_fingerprint = NULL, updated_at = updated_at
+          WHERE semantic_key = $1`,
+        ['3'.repeat(64)],
+      ),
+    ).rejects.toThrow(/transition is invalid/)
+
+    const migrationClient = await pool.connect()
+    try {
+      await migrationClient.query('BEGIN')
+      await migrationClient.query(migrationSql)
+      await migrationClient.query('COMMIT')
+    } catch (error) {
+      await migrationClient.query('ROLLBACK')
+      throw error
+    } finally {
+      migrationClient.release()
+    }
+
+    const after = await pool.query<{
+      readonly actual_time_value: string | null
+      readonly checkpoint_id: string | null
+      readonly rating_value: string | null
+      readonly result_aggregate_revision: string | null
+      readonly semantic_key: string
+      readonly source_facts_revision: string
+      readonly state: string
+    }>(
+      `SELECT actual_time_value::text, checkpoint_id::text,
+              rating_value::text, result_aggregate_revision::text,
+              btrim(semantic_key) semantic_key,
+              source_facts_revision::text, state
+         FROM telegram_action_intents
+        ORDER BY semantic_key`,
+    )
+    expect(
+      after.rows.map(({ semantic_key, source_facts_revision, state }) => ({
+        semantic_key,
+        source_facts_revision,
+        state,
+      })),
+    ).toEqual(before.rows)
+    expect(
+      after.rows.every(
+        (row) =>
+          row.actual_time_value === null &&
+          row.checkpoint_id === null &&
+          row.rating_value === null,
+      ),
+    ).toBe(true)
+    expect(after.rows[4]).toMatchObject({
+      result_aggregate_revision: '9223372036854775806',
+      source_facts_revision: '9223372036854775806',
+    })
+
+    await expect(
+      pool.query(
+        `UPDATE telegram_action_intents
+            SET state = 'ready', quantity_value = '1000',
+                command_fingerprint = $2, updated_at = updated_at
+          WHERE semantic_key = $1`,
+        ['2'.repeat(64), 'b'.repeat(64)],
+      ),
+    ).resolves.toMatchObject({ rowCount: 1 })
+    await expect(
+      pool.query(
+        `UPDATE telegram_action_intents
+            SET state = 'awaiting_value', quantity_value = NULL,
+                command_fingerprint = NULL, updated_at = updated_at
+          WHERE semantic_key = $1`,
+        ['3'.repeat(64)],
+      ),
+    ).resolves.toMatchObject({ rowCount: 1 })
+    await expect(
+      pool.query(
+        `UPDATE telegram_action_intents
+            SET state = 'ready', quantity_value = '7100',
+                command_fingerprint = $2, updated_at = updated_at
+          WHERE semantic_key = $1`,
+        ['3'.repeat(64), 'a'.repeat(64)],
+      ),
+    ).resolves.toMatchObject({ rowCount: 1 })
+    await expect(
+      pool.query(
+        `UPDATE telegram_action_intents
+            SET source_facts_revision = source_facts_revision + 1
+          WHERE semantic_key = $1`,
+        ['4'.repeat(64)],
+      ),
+    ).rejects.toThrow(/identity is immutable/)
+    await expect(
+      pool.query(
+        'DELETE FROM telegram_action_intents WHERE semantic_key = $1',
+        ['6'.repeat(64)],
+      ),
+    ).rejects.toThrow(/cannot be deleted/)
+  }, 120_000)
+})
 
 describe('G02 semantic Telegram action intents', () => {
   let postgres: StartedPostgreSqlContainer
@@ -239,9 +628,11 @@ describe('G02 semantic Telegram action intents', () => {
     const firstRender = await service.offerTodayActions(member, today)
     const secondRender = await service.offerTodayActions(member, today)
     expect(secondRender).toEqual(firstRender)
-    expect(firstRender.some((button) => button.text.includes('Routine'))).toBe(
-      false,
-    )
+    expect(
+      firstRender.filter((button) =>
+        button.text.includes('Routine checkpoint'),
+      ),
+    ).toHaveLength(2)
 
     const vitamin = firstRender.find((button) => button.text === '✓ Vitamin')
     if (vitamin === undefined) throw new Error('Vitamin action missing')

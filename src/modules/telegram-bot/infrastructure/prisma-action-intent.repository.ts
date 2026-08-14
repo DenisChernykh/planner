@@ -20,10 +20,13 @@ type IntentRow = {
   readonly current_facts_revision: bigint
   readonly active_publication_id: string | null
   readonly month_status: 'draft' | 'published' | 'grace' | 'closed'
-  readonly intent_kind: 'boolean' | 'quantity'
+  readonly intent_kind: StoredTelegramActionIntent['intentKind']
   readonly state: StoredTelegramActionIntent['state']
+  readonly checkpoint_id: string | null
   readonly boolean_result: 'done' | 'not_done' | null
   readonly quantity_value: string | null
+  readonly actual_time_value: string | null
+  readonly rating_value: bigint | null
   readonly command_fingerprint: string | null
   readonly expires_at: Date
   readonly title: string
@@ -41,14 +44,52 @@ function object(value: unknown): Record<string, unknown> | null {
 
 function presentation(
   row: IntentRow,
-): Pick<StoredTelegramActionIntent, 'unit' | 'precision' | 'aggregation'> {
+): Pick<
+  StoredTelegramActionIntent,
+  'title' | 'unit' | 'precision' | 'aggregation'
+> {
   const config = object(row.config)
   const measurement = object(config?.['measurement'])
-  if (row.intent_kind === 'boolean') {
-    if (measurement?.['kind'] !== 'boolean') {
+  const checkpoints = object(config?.['checkpoints'])
+  const items = Array.isArray(checkpoints?.['items'])
+    ? checkpoints['items']
+    : []
+  const checkpoint =
+    row.checkpoint_id === null
+      ? null
+      : (items
+          .map((value) => object(value))
+          .find((value) => value?.['checkpointId'] === row.checkpoint_id) ??
+        null)
+  const effective =
+    checkpoint === null ? measurement : object(checkpoint['satisfaction'])
+  const title =
+    checkpoint === null || typeof checkpoint['name'] !== 'string'
+      ? row.title
+      : `${row.title} · ${checkpoint['name']}`
+  if (
+    row.intent_kind === 'boolean' ||
+    row.intent_kind === 'checkpoint_boolean'
+  ) {
+    if (effective?.['kind'] !== 'boolean') {
       throw new Error('Telegram Boolean intent target is invalid')
     }
-    return { unit: null, precision: null, aggregation: null }
+    return { title, unit: null, precision: null, aggregation: null }
+  }
+  if (
+    row.intent_kind === 'actual_time' ||
+    row.intent_kind === 'checkpoint_actual_time'
+  ) {
+    if (effective?.['kind'] !== 'actual_time') {
+      throw new Error('Telegram actual-time intent target is invalid')
+    }
+    return { title, unit: null, precision: null, aggregation: null }
+  }
+  if (row.intent_kind === 'rating' || row.intent_kind === 'checkpoint_rating') {
+    if (effective?.['kind'] !== 'rating') {
+      throw new Error('Telegram rating intent target is invalid')
+    }
+    return { title, unit: null, precision: null, aggregation: null }
   }
   const precision = measurement?.['precision']
   const aggregation = measurement?.['aggregation']
@@ -62,6 +103,7 @@ function presentation(
     throw new Error('Telegram quantity intent target is invalid')
   }
   return {
+    title,
     unit,
     precision: precision as 0 | 1 | 2 | 3,
     aggregation,
@@ -98,11 +140,13 @@ function stored(row: IntentRow): StoredTelegramActionIntent {
     monthStatus: row.month_status,
     intentKind: row.intent_kind,
     state: row.state,
+    checkpointId: row.checkpoint_id,
     booleanResult: row.boolean_result,
     quantityValue: row.quantity_value,
+    actualTimeValue: row.actual_time_value?.slice(0, 5) ?? null,
+    ratingValue: row.rating_value,
     commandFingerprint: row.command_fingerprint,
     expiresAt: row.expires_at,
-    title: row.title,
     ...presentation(row),
     result,
   })
@@ -116,8 +160,10 @@ const selectIntent = `
          month.facts_revision current_facts_revision,
          month.active_publication_id,
          month.status month_status,
-         intent.intent_kind, intent.state, intent.boolean_result,
-         intent.quantity_value, intent.command_fingerprint,
+         intent.intent_kind, intent.state, intent.checkpoint_id,
+         intent.boolean_result, intent.quantity_value,
+         intent.actual_time_value::text, intent.rating_value,
+         intent.command_fingerprint,
          intent.expires_at, snapshot.title, snapshot.config,
          intent.result_kind, intent.result_aggregate_id,
          intent.result_aggregate_revision
@@ -152,12 +198,13 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         `INSERT INTO telegram_action_intents
            (id, semantic_key, command_id, space_id, member_id,
             publication_id, plan_goal_snapshot_id, local_date,
-            source_facts_revision, intent_kind, state, boolean_result,
+            source_facts_revision, intent_kind, state, checkpoint_id,
+            boolean_result,
             command_fingerprint, expires_at, created_at, updated_at)
          VALUES
            ($1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
-            $5::uuid, $6::uuid, $7::date, $8, $9, $10, $11,
-            $12, $13, $14, $14)
+            $5::uuid, $6::uuid, $7::date, $8, $9, $10, $11::uuid, $12,
+            $13, $14, $15, $15)
          ON CONFLICT (semantic_key)
            WHERE state IN ('offered', 'awaiting_value', 'ready')
          DO NOTHING`,
@@ -171,6 +218,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         input.sourceFactsRevision,
         input.intentKind,
         input.state,
+        input.checkpointId,
         input.booleanResult,
         input.commandFingerprint,
         input.expiresAt,
@@ -209,7 +257,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
     })
   }
 
-  public selectQuantity(input: {
+  public selectValue(input: {
     readonly actionIntentId: string
     readonly spaceId: string
     readonly memberId: string
@@ -238,10 +286,16 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
       )
       await client.$executeRawUnsafe(
         `UPDATE telegram_action_intents
-            SET state = 'awaiting_value', updated_at = $4
+            SET state = 'awaiting_value', quantity_value = NULL,
+                actual_time_value = NULL, rating_value = NULL,
+                command_fingerprint = NULL, updated_at = $4
           WHERE id = $1::uuid AND space_id = $2::uuid
-            AND member_id = $3::uuid AND intent_kind = 'quantity'
-            AND state = 'offered' AND expires_at > $4`,
+            AND member_id = $3::uuid
+            AND intent_kind IN (
+              'quantity', 'actual_time', 'rating',
+              'checkpoint_actual_time', 'checkpoint_rating'
+            )
+            AND state IN ('offered', 'ready') AND expires_at > $4`,
         input.actionIntentId,
         input.spaceId,
         input.memberId,
@@ -260,7 +314,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
     })
   }
 
-  public findAwaitingQuantity(input: {
+  public findAwaitingValue(input: {
     readonly spaceId: string
     readonly memberId: string
     readonly now: Date
@@ -290,11 +344,13 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
     })
   }
 
-  public setQuantityValue(input: {
+  public setValue(input: {
     readonly actionIntentId: string
     readonly spaceId: string
     readonly memberId: string
-    readonly value: string
+    readonly quantityValue: string | null
+    readonly actualTimeValue: string | null
+    readonly ratingValue: bigint | null
     readonly commandFingerprint: string
     readonly now: Date
   }): Promise<StoredTelegramActionIntent | null> {
@@ -302,14 +358,17 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
       await client.$executeRawUnsafe(
         `UPDATE telegram_action_intents
             SET state = 'ready', quantity_value = $4,
-                command_fingerprint = $5, updated_at = $6
+                actual_time_value = $5::time,
+                rating_value = $6, command_fingerprint = $7, updated_at = $8
           WHERE id = $1::uuid AND space_id = $2::uuid
             AND member_id = $3::uuid AND state = 'awaiting_value'
-            AND expires_at > $6`,
+            AND expires_at > $8`,
         input.actionIntentId,
         input.spaceId,
         input.memberId,
-        input.value,
+        input.quantityValue,
+        input.actualTimeValue,
+        input.ratingValue,
         input.commandFingerprint,
         input.now,
       )

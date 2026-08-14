@@ -2818,6 +2818,30 @@ stale/expiry checks. Поэтому разные callback query IDs не соз�
 Boolean/`latest` остаются будущей G05 correction, `add` создаёт новый
 contribution; time/rating/checkpoints/composites остаются G03/G04.
 
+G03 расширяет тот же `telegram_action_intents` contract top-level
+`actual_time|rating` и checkpoint-вариантами `boolean|actual_time|rating`.
+Intent сохраняет выбранную `expectationDate`, optional stable `checkpointId`,
+typed `TIME(0)|BIGINT` value и bigint revisions без промежуточного unsafe
+`number`. Input kinds используют `offered → awaiting_value → ready`; до
+Confirm пользователь может тем же opaque `pl1:s:<actionIntentId>` вернуть
+`ready → awaiting_value`, заменить значение и пересчитать canonical T02
+fingerprint. Boolean checkpoint сразу создаётся `ready`. TTL, active semantic
+key, member/publication binding, completed replay и `pl1:c` contract G02 не
+меняются.
+
+Telegram adapter принимает только transport grammar: canonical `HH:mm` и
+signed safe-integer rating. Диапазон rating, совместимость physical goal или
+checkpoint и progress semantics остаются в существующих T02 commands.
+`scalar-fact-command.mapper` выводит trusted actor из resolved member,
+использует `actionIntentId` как command ID и вызывает соответственно
+`tracking.record-time.v1`, `tracking.record-rating.v1` либо
+`tracking.record-checkpoint.v1`. Confirm не выводит expectation date из текущих
+часов: intent, созданный до полуночи, сохраняет выбранную дату после полуночи.
+Любая внешняя fact correction между preview и Confirm меняет
+`factsRevision`, поэтому старый intent возвращает stale без записи. Existing и
+tombstoned scalar records не предлагаются повторно до G05; flexible scalar и
+composite mappings остаются вне G03.
+
 ### 14.2. Pilot и v1
 
 Pilot bot предоставляет Today, ввод/исправление, close day, progress и

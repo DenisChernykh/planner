@@ -107,10 +107,13 @@ model TelegramActionIntent {
   planGoalSnapshotId      String    @map("plan_goal_snapshot_id") @db.Uuid
   localDate               DateTime  @map("local_date") @db.Date
   sourceFactsRevision     BigInt    @map("source_facts_revision") @db.BigInt
-  intentKind              String    @map("intent_kind") @db.VarChar(16)
+  intentKind              String    @map("intent_kind") @db.VarChar(32)
   state                   String    @db.VarChar(24)
+  checkpointId            String?   @map("checkpoint_id") @db.Uuid
   booleanResult           String?   @map("boolean_result") @db.VarChar(16)
   quantityValue           String?   @map("quantity_value") @db.Text
+  actualTimeValue         DateTime? @map("actual_time_value") @db.Time(0)
+  ratingValue             BigInt?   @map("rating_value") @db.BigInt
   commandFingerprint      String?   @map("command_fingerprint") @db.Char(64)
   resultKind              String?   @map("result_kind") @db.VarChar(128)
   resultAggregateId       String?   @map("result_aggregate_id") @db.Uuid

@@ -2000,14 +2000,14 @@ confirmation and existing T02 commands.
 **Files:**
 
 - Create: `src/modules/telegram-bot/application/scalar-fact-command.mapper.ts`
-- Test: `test/e2e/telegram/scalar-fact-actions.e2e-spec.ts`
+- Test: `test/e2e/telegram/scalar-fact-actions.e2e.spec.ts`
 
-- [ ] Написать RED table journey time/rating/checkpoint including validation,
+- [x] Написать RED table journey time/rating/checkpoint including validation,
   selected expectation date and correction-before-confirm.
-- [ ] Реализовать thin mapping без копий goal validators/evaluators.
-- [ ] Проверить versioned opaque callback and decimal-string bigint boundary.
-- [ ] Запустить focused Telegram E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: map scalar facts from Telegram`.
+- [x] Реализовать thin mapping без копий goal validators/evaluators.
+- [x] Проверить versioned opaque callback and decimal-string bigint boundary.
+- [x] Запустить focused Telegram E2E and `pnpm check:quick`.
+- [x] Commit: `feat: map scalar facts from Telegram`.
 
 ### G04 — Text, checklist and OR mappings
 
