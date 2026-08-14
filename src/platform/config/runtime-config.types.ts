@@ -64,6 +64,14 @@ export interface TelegramOidcRuntimeConfig {
   readonly stateCookieMaxAgeMs: number
 }
 
+export interface TelegramBotRuntimeConfig {
+  readonly ingressMode: 'disabled' | 'get_updates'
+  readonly token?: string
+  readonly getUpdatesTimeoutSeconds: number
+  readonly requestTimeoutMs: number
+  readonly responseBodyLimitBytes: number
+}
+
 export interface ApplicationRuntimeConfig {
   readonly environment: RuntimeEnvironment
   readonly logging: LoggingRuntimeConfig
@@ -71,6 +79,7 @@ export interface ApplicationRuntimeConfig {
   readonly database: DatabaseRuntimeConfig
   readonly redis: RedisRuntimeConfig
   readonly auth: AuthRuntimeConfig
+  readonly telegramBot: TelegramBotRuntimeConfig
   readonly observability: OpenTelemetryRuntimeConfig
 }
 

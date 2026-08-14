@@ -31,31 +31,33 @@ export class GracefulShutdownCoordinator {
 
     let failed = false
     let forced = false
+    const shutdownSignal = this.deadlineSignal(resources.shutdownGraceMs)
+    await resources.telegramIngress.stop(shutdownSignal).catch(() => {
+      failed = true
+    })
     await resources.application.closeListener().catch(() => {
       failed = true
     })
     resources.application.closeIdleConnections()
     const idle = await resources.requestTracker.waitForIdle(
-      this.deadlineSignal(resources.httpDrainTimeoutMs),
+      AbortSignal.any([
+        shutdownSignal,
+        this.deadlineSignal(resources.httpDrainTimeoutMs),
+      ]),
     )
     if (!idle) {
       forced = true
       failed = true
       resources.application.closeAllConnections()
     }
-    const cleanupBudget = Math.max(
-      1,
-      resources.shutdownGraceMs - resources.httpDrainTimeoutMs,
-    )
-    const cleanupSignal = this.deadlineSignal(cleanupBudget)
     const dependencyCleanup = await Promise.allSettled([
-      resources.database.close(cleanupSignal),
-      resources.redis.close(cleanupSignal),
+      resources.database.close(shutdownSignal),
+      resources.redis.close(shutdownSignal),
     ])
     if (dependencyCleanup.some((result) => result.status === 'rejected')) {
       failed = true
     }
-    await this.observability?.close(cleanupSignal).catch(() => undefined)
+    await this.observability?.close(shutdownSignal).catch(() => undefined)
     await resources.application.close().catch(() => {
       failed = true
     })

@@ -19,6 +19,10 @@ import { ApplicationLifecycleState } from '@/platform/lifecycle/application-life
 import type { RedisLifecyclePort } from '@/platform/redis/redis-lifecycle'
 import { REDIS_LIFECYCLE } from '@/platform/redis/redis.tokens'
 import type { ProductClock } from '@/shared/application/product-clock'
+import {
+  TELEGRAM_INGRESS_LIFECYCLE,
+  type TelegramIngressLifecycle,
+} from '@/modules/telegram-bot'
 
 import { ApiModule } from './api.module'
 
@@ -37,6 +41,7 @@ export interface ApiRuntimeResources {
   readonly redis: RedisLifecyclePort
   readonly lifecycle: ApplicationLifecycleState
   readonly requestTracker: ActiveRequestTracker
+  readonly telegramIngress: TelegramIngressLifecycle
   readonly httpDrainTimeoutMs: number
   readonly shutdownGraceMs: number
 }
@@ -54,6 +59,9 @@ export async function configureApi(
   const database = app.get<DatabaseLifecycle>(DATABASE_LIFECYCLE)
   const redis = app.get<RedisLifecyclePort>(REDIS_LIFECYCLE)
   const requestTracker = app.get(ActiveRequestTracker)
+  const telegramIngress = app.get<TelegramIngressLifecycle>(
+    TELEGRAM_INGRESS_LIFECYCLE,
+  )
   configureHttpApplication(
     app,
     lifecycle,
@@ -69,6 +77,7 @@ export async function configureApi(
     redis,
     lifecycle,
     requestTracker,
+    telegramIngress,
     httpDrainTimeoutMs: config.http.drainTimeoutMs,
     shutdownGraceMs: config.http.shutdownGraceMs,
     application: {

@@ -88,6 +88,15 @@ model TelegramExternalIdentity {
   @@map("telegram_external_identities")
 }
 
+model TelegramIngressState {
+  consumerKey  String   @id @map("consumer_key") @db.VarChar(64)
+  nextUpdateId BigInt   @map("next_update_id") @db.BigInt
+  revision     BigInt   @default(0) @db.BigInt
+  updatedAt    DateTime @map("updated_at") @db.Timestamptz(3)
+
+  @@map("telegram_ingress_state")
+}
+
 model PlanMonth {
   id                  String   @id @default(uuid()) @db.Uuid
   spaceId             String   @map("space_id") @db.Uuid

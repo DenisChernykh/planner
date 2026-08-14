@@ -21,3 +21,10 @@ Planner и `nest-js-starter` являются независимыми репо�
 foundation или reusable capabilities в любую сторону выполняется отдельной,
 проверяемой задачей с provenance.
 
+## Локальный Telegram ingress
+
+Bot ingress является opt-in частью API process. По умолчанию
+`TELEGRAM_INGRESS_MODE=disabled`. Для локального long polling задайте
+`TELEGRAM_INGRESS_MODE=get_updates` и секрет `TELEGRAM_BOT_TOKEN`; production
+режим остаётся заблокирован до отдельной deployment-задачи. Один process
+использует PostgreSQL offset и принимает только private messages и callbacks.

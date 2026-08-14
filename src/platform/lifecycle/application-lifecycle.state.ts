@@ -15,10 +15,14 @@ export class ApplicationLifecycleState {
     return this.startupLatch
   }
 
+  public markStartupComplete(): void {
+    this.startupLatch = true
+  }
+
   public markReady(): void {
     if (this.currentPhase !== 'starting') return
     this.currentPhase = 'ready'
-    this.startupLatch = true
+    this.markStartupComplete()
   }
 
   public beginDrain(): boolean {

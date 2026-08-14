@@ -30,6 +30,11 @@ export const runtimeDefaults = Object.freeze({
       stateCookieMaxAgeMs: 300_000,
     }),
   }),
+  telegramBot: Object.freeze({
+    getUpdatesTimeoutSeconds: 25,
+    requestTimeoutMs: 5_000,
+    responseBodyLimitBytes: 1_048_576,
+  }),
   observability: Object.freeze({
     exporterTimeoutMs: 1_000,
     batchSpanScheduleDelayMs: 5_000,

@@ -1952,18 +1952,18 @@ states without product-rule duplication.
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811170000_telegram_ingress_state/migration.sql`
 - Test: `test/contract/telegram/update-normalization.contract.spec.ts`
-- Test: `test/e2e/telegram/today-menu.e2e-spec.ts`
+- Test: `test/e2e/telegram/today-menu.e2e.spec.ts`
 
 **Produces:** normalized trusted Telegram principal and opaque callback schema;
 production webhook/getUpdates choice remains deployment-gated.
 
-- [ ] Написать RED cases private/group, unknown ID, duplicate update, stale
+- [x] Написать RED cases private/group, unknown ID, duplicate update, stale
   schema and no active plan.
-- [ ] Реализовать one active local `getUpdates` consumer with durable offset;
+- [x] Реализовать one active local `getUpdates` consumer with durable offset;
   map only through WorkspaceMemberResolver and public queries.
-- [ ] Проверить absence of catalog/draft wizard and raw Telegram ID logs.
-- [ ] Запустить contract/E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: add private Telegram Today interface`.
+- [x] Проверить absence of catalog/draft wizard and raw Telegram ID logs.
+- [x] Запустить contract/E2E and `pnpm check:quick`.
+- [x] Commit: `feat: add private Telegram Today interface`.
 
 ### G02 — Semantic action intent and basic mutations
 

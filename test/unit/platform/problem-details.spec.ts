@@ -736,6 +736,10 @@ describe('S03 HTTP problem contracts', () => {
       Promise.resolve({
         lifecycle,
         requestTracker,
+        telegramIngress: {
+          start: () => Promise.resolve(),
+          stop: () => Promise.resolve(),
+        },
         httpDrainTimeoutMs: 6_000,
         shutdownGraceMs: 10_000,
         database: {
@@ -777,7 +781,7 @@ describe('S03 HTTP problem contracts', () => {
       exitCode: 0,
       forced: false,
     })
-    expect(deadlines).toEqual([6_000, 4_000])
+    expect(deadlines).toEqual([10_000, 6_000])
     expect(telemetryShutdowns).toBe(1)
   })
 
@@ -804,6 +808,10 @@ describe('S03 HTTP problem contracts', () => {
         Promise.resolve({
           lifecycle: new ApplicationLifecycleState(),
           requestTracker: new ActiveRequestTracker(),
+          telegramIngress: {
+            start: () => Promise.resolve(),
+            stop: () => Promise.resolve(),
+          },
           httpDrainTimeoutMs: 6_000,
           shutdownGraceMs: 10_000,
           database: {
@@ -864,6 +872,10 @@ describe('S03 HTTP problem contracts', () => {
       Promise.resolve({
         lifecycle: new ApplicationLifecycleState(),
         requestTracker: new ActiveRequestTracker(),
+        telegramIngress: {
+          start: () => Promise.resolve(),
+          stop: () => Promise.resolve(),
+        },
         httpDrainTimeoutMs: 6_000,
         shutdownGraceMs: 10_000,
         database: {

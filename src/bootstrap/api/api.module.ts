@@ -6,6 +6,7 @@ import { PlanningModule } from '@/modules/planning/composition/planning.module'
 import { PLANNING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/planning/composition/planning-http-problem.contribution'
 import { TrackingModule } from '@/modules/tracking/composition/tracking.module'
 import { TRACKING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/tracking/composition/tracking-http-problem.contribution'
+import { TelegramBotModule } from '@/modules/telegram-bot'
 import type { ApplicationRuntimeConfig } from '@/platform/config/runtime-config.types'
 import { RuntimeConfigModule } from '@/platform/config/runtime-config.module'
 import { DatabaseModule } from '@/platform/database/database.module'
@@ -39,6 +40,7 @@ export class ApiModule {
         AuthModule,
         PlanningModule,
         TrackingModule.forRoot(trackingClock),
+        TelegramBotModule.forRoot(trackingClock),
       ],
     }
   }

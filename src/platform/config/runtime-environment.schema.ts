@@ -19,6 +19,8 @@ interface ValidatedRuntimeEnvironment {
   readonly TELEGRAM_OIDC_CLIENT_ID: string
   readonly TELEGRAM_OIDC_CLIENT_SECRET: Uint8Array
   readonly TELEGRAM_OIDC_CALLBACK_URL: string
+  readonly TELEGRAM_INGRESS_MODE: 'disabled' | 'get_updates'
+  readonly TELEGRAM_BOT_TOKEN?: string
   readonly OTEL_SDK_DISABLED: boolean
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string
 }
@@ -55,6 +57,16 @@ function encodeOidcClientSecret(value: string): Uint8Array | undefined {
     !containsControl
     ? new Uint8Array(encoded)
     : undefined
+}
+
+function validTelegramBotToken(value: string): boolean {
+  const size = Buffer.byteLength(value, 'utf8')
+  return (
+    size >= 20 &&
+    size <= 256 &&
+    Buffer.from(value, 'utf8').toString('utf8') === value &&
+    !/\p{Cc}/u.test(value)
+  )
 }
 
 function parseOrigins(value: string): readonly string[] | undefined {
@@ -177,6 +189,14 @@ export const runtimeEnvironmentSchema = Joi.object<ValidatedRuntimeEnvironment>(
           encodeOidcClientSecret(value) ?? helpers.error('any.invalid'),
       ),
     TELEGRAM_OIDC_CALLBACK_URL: Joi.string().required(),
+    TELEGRAM_INGRESS_MODE: Joi.string()
+      .valid('disabled', 'get_updates')
+      .default('disabled'),
+    TELEGRAM_BOT_TOKEN: Joi.string()
+      .custom((value: string, helpers) =>
+        validTelegramBotToken(value) ? value : helpers.error('any.invalid'),
+      )
+      .optional(),
     OTEL_SDK_DISABLED: Joi.boolean().default(true),
     OTEL_EXPORTER_OTLP_ENDPOINT: Joi.string()
       .trim()
@@ -201,6 +221,18 @@ export const runtimeEnvironmentSchema = Joi.object<ValidatedRuntimeEnvironment>(
     return helpers.error('auth.productionHttpsOrigin')
   if (!isOidcCallbackUrl(value.TELEGRAM_OIDC_CALLBACK_URL, value.NODE_ENV)) {
     return helpers.error('auth.oidcCallback')
+  }
+  if (
+    value.TELEGRAM_INGRESS_MODE === 'get_updates' &&
+    value.TELEGRAM_BOT_TOKEN === undefined
+  ) {
+    return helpers.error('telegram.botTokenRequired')
+  }
+  if (
+    value.NODE_ENV === 'production' &&
+    value.TELEGRAM_INGRESS_MODE !== 'disabled'
+  ) {
+    return helpers.error('telegram.productionIngressDeferred')
   }
   return value
 }, 'auth runtime constraints')

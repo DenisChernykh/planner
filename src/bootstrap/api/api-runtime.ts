@@ -68,14 +68,16 @@ export class ApiRuntime {
     signal: AbortSignal,
   ): Promise<void> {
     const results = await Promise.allSettled([
-      Promise.resolve().then(() => resources.database.connect(signal)),
+      Promise.resolve()
+        .then(() => resources.database.connect(signal))
+        .then(() => resources.lifecycle.markStartupComplete()),
       Promise.resolve().then(() => resources.redis.connect(signal)),
     ])
     const failure = results.find(
       (result): result is PromiseRejectedResult => result.status === 'rejected',
     )
-    if (failure === undefined) return
-    throw failure.reason
+    if (failure !== undefined) throw failure.reason
+    await resources.telegramIngress.start(signal)
   }
 
   private ensureStartupAllowed(): void {
@@ -93,6 +95,7 @@ export class ApiRuntime {
     if (resources === undefined) return
     this.cleanupPromise ??= (async () => {
       const signal = AbortSignal.timeout(resources.shutdownGraceMs)
+      await resources.telegramIngress.stop(signal).catch(() => undefined)
       await Promise.allSettled([
         resources.database.close(signal),
         resources.redis.close(signal),

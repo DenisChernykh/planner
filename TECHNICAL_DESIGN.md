@@ -2755,6 +2755,47 @@ mode.
 - wizard revision;
 - aggregate expected revision.
 
+G01 фиксирует локальный opt-in transport `getUpdates` внутри `api` process.
+`TELEGRAM_INGRESS_MODE` по умолчанию равен `disabled`; режим `get_updates`
+требует отдельный bot token и в production до deployment gate запрещён.
+Enabled runtime выполняет initial short poll до readiness, затем один
+непересекающийся long-poll loop с `limit = 100` и
+`allowed_updates = [message, callback_query]`. Shutdown сначала прекращает
+Telegram admission и abort-ит активный poll, после чего закрывает HTTP и
+dependencies по одному общему absolute API deadline. Успешное подключение
+PostgreSQL необратимо закрывает startup latch до initial poll; ошибка Telegram
+оставляет readiness закрытой, но не возвращает `/health/startup` в `starting`.
+
+Transport tolerant к новым provider fields, но exact-projects только bounded
+`message|callback_query`. Private `chat.id` обязан совпасть с положительным
+safe-integer `from.id`; actor затем разрешается исключительно через
+`WorkspaceMemberResolver.resolveTelegramId`. Group/channel не запускают
+workspace read, unknown allowlist identity получает нейтральный отказ. Raw
+Telegram/chat IDs и token не входят в structured logs.
+
+Opaque G01 callback schema содержит только `pl1:m|t|p`; payload длиннее 64
+UTF-8 bytes либо другая версия считается stale. Принятый callback получает
+один bounded `answerCallbackQuery`. Product identifiers, permissions и actor в
+callback отсутствуют; G02 расширит этот codec semantic action intent ID.
+
+Migration `20260811170000_telegram_ingress_state` хранит singleton
+`local-get-updates.v1` с monotonic `next_update_id` и revision. Batch сортируется
+по `update_id`; после успешного allowlist/query/render, но до external attempt,
+process атомарно переводит offset через CAS. Только победитель выполняет
+outbound response. Claim до send сознательно выбирает возможный пропуск при
+crash/ambiguous attempt вместо дубля; Bot API idempotency key отсутствует.
+Ошибка или shutdown до claim оставляет update доступным для повторного чтения;
+уже начатый claim получает остаток общего shutdown budget на единственный
+outbound attempt.
+
+G01 вызывает публичный `GetTodayQuery` и только форматирует его channel-neutral
+model: menu, Today, current progress и no-plan/draft/future states. Личные цели
+партнёра не становятся Telegram actions. Сообщения детерминированно режутся по
+строкам до provider limit; input/correction/CloseDay принадлежат G02–G05.
+Module-local Bot API client G01 делает по одному bounded native-fetch attempt
+для интерактивного ответа и запрещает HTTP redirects. Перенос Starter `INT-01`
+и durable reminder attempt ledger остаются отдельной N03 задачей.
+
 ### 14.2. Pilot и v1
 
 Pilot bot предоставляет Today, ввод/исправление, close day, progress и

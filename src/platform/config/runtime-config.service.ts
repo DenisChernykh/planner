@@ -10,6 +10,7 @@ import {
   type OpenTelemetryRuntimeConfig,
   type RedisRuntimeConfig,
   type RuntimeEnvironment,
+  type TelegramBotRuntimeConfig,
 } from './runtime-config.types'
 
 @Injectable()
@@ -56,5 +57,9 @@ export class RuntimeConfigService {
 
   public get observability(): OpenTelemetryRuntimeConfig {
     return this.config.observability
+  }
+
+  public get telegramBot(): TelegramBotRuntimeConfig {
+    return Object.freeze({ ...this.config.telegramBot })
   }
 }

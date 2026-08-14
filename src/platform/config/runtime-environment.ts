@@ -86,6 +86,13 @@ export function buildApiRuntimeConfig(
       ...runtimeDefaults.redis,
     }),
     auth: Object.freeze(auth),
+    telegramBot: Object.freeze({
+      ingressMode: environment.TELEGRAM_INGRESS_MODE,
+      ...(environment.TELEGRAM_BOT_TOKEN === undefined
+        ? {}
+        : { token: environment.TELEGRAM_BOT_TOKEN }),
+      ...runtimeDefaults.telegramBot,
+    }),
     observability: Object.freeze({
       disabled: environment.OTEL_SDK_DISABLED,
       ...(endpoint === undefined ? {} : { endpoint }),

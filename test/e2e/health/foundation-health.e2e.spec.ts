@@ -360,6 +360,10 @@ describe('Planner foundation API health and shutdown', () => {
       Promise.resolve({
         lifecycle,
         requestTracker: tracker,
+        telegramIngress: {
+          start: () => Promise.resolve(),
+          stop: () => Promise.resolve(),
+        },
         httpDrainTimeoutMs: 6_000,
         shutdownGraceMs: 10_000,
         database: {
@@ -401,6 +405,6 @@ describe('Planner foundation API health and shutdown', () => {
     })
     expect(listenerObservedDrain).toBe(true)
     expect(forcedConnections).toBe(1)
-    expect(deadlines).toEqual([6_000, 4_000])
+    expect(deadlines).toEqual([10_000, 6_000])
   })
 })
