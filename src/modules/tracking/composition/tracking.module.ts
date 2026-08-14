@@ -15,11 +15,12 @@ import {
 
 import { TRACKING_APPLICATION } from '../application/tracking-application'
 import { TrackingQueryController } from '../presentation/tracking-query.controller'
+import { ScalarFactController } from '../presentation/scalar-fact.controller'
 import { createTrackingApplication } from './create-tracking-application'
 
 @Module({
   imports: [DatabaseModule, WorkspaceModule],
-  controllers: [TrackingQueryController],
+  controllers: [TrackingQueryController, ScalarFactController],
   providers: [
     {
       provide: TRACKING_APPLICATION,

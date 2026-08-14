@@ -1886,14 +1886,14 @@ the same application commands used by Telegram.
 
 - Create: `src/modules/tracking/presentation/scalar-fact.controller.ts`
 - Create: `src/modules/tracking/presentation/scalar-fact.dto.ts`
-- Test: `test/e2e/tracking/scalar-fact-http.e2e-spec.ts`
+- Test: `test/e2e/tracking/scalar-fact-http.e2e.spec.ts`
 
-- [ ] Написать RED HTTP cases personal/shared auth, idempotency replay,
+- [x] Написать RED HTTP cases personal/shared auth, idempotency replay,
   fingerprint conflict, stale revision and each scalar type.
-- [ ] Map verified member to `trustedActor`; never accept actor from DTO.
-- [ ] Add OpenAPI/Problem Details contracts and prove parity with T01/T02.
-- [ ] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: expose scalar fact commands over HTTP`.
+- [x] Map verified member to `trustedActor`; never accept actor from DTO.
+- [x] Add OpenAPI/Problem Details contracts and prove parity with T01/T02.
+- [x] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
+- [x] Commit: `feat: expose scalar fact commands over HTTP`.
 
 ### H02 — Composite fact HTTP adapter
 

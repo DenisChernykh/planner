@@ -109,6 +109,66 @@ export class DraftConflictProblemResponseDto extends ProblemResponseDto {
   public readonly conflict!: DraftProblemConflictResponseDto
 }
 
+export class TrackingFactTargetUnavailableConflictResponseDto {
+  @ApiProperty({
+    enum: [
+      'not_active',
+      'future_date',
+      'not_applicable',
+      'closed',
+      'unsupported',
+      'correction_required',
+      'already_deleted',
+    ],
+  })
+  public readonly reason!:
+    | 'not_active'
+    | 'future_date'
+    | 'not_applicable'
+    | 'closed'
+    | 'unsupported'
+    | 'correction_required'
+    | 'already_deleted'
+}
+
+export class TrackingFactTargetUnavailableProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['TRACKING_FACT_TARGET_UNAVAILABLE'],
+    example: 'TRACKING_FACT_TARGET_UNAVAILABLE',
+  })
+  declare public readonly code: 'TRACKING_FACT_TARGET_UNAVAILABLE'
+
+  @ApiProperty({ type: () => TrackingFactTargetUnavailableConflictResponseDto })
+  public readonly conflict!: TrackingFactTargetUnavailableConflictResponseDto
+}
+
+export class TrackingFactRevisionConflictResponseDto {
+  @ApiProperty({
+    type: String,
+    pattern: '^[1-9][0-9]*$',
+    nullable: true,
+  })
+  public readonly expectedRevision!: string | null
+
+  @ApiProperty({
+    type: String,
+    pattern: '^[1-9][0-9]*$',
+    nullable: true,
+  })
+  public readonly currentRevision!: string | null
+}
+
+export class TrackingFactRevisionProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['TRACKING_FACT_REVISION_CONFLICT'],
+    example: 'TRACKING_FACT_REVISION_CONFLICT',
+  })
+  declare public readonly code: 'TRACKING_FACT_REVISION_CONFLICT'
+
+  @ApiProperty({ type: () => TrackingFactRevisionConflictResponseDto })
+  public readonly conflict!: TrackingFactRevisionConflictResponseDto
+}
+
 export class PublicationPreviewConflictResponseDto {
   @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$' })
   public readonly currentDraftRevision!: string
@@ -190,6 +250,9 @@ export class PlanPublicationBlockedProblemResponseDto extends ProblemResponseDto
 }
 
 export class ValidationProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({ enum: ['VALIDATION_FAILED'], example: 'VALIDATION_FAILED' })
+  declare public readonly code: 'VALIDATION_FAILED'
+
   @ApiProperty({ type: () => [ProblemFieldErrorResponseDto] })
   public readonly errors!: readonly ProblemFieldErrorResponseDto[]
 }

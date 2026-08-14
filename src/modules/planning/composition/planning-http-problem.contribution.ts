@@ -1,7 +1,4 @@
-import {
-  CommandFingerprintConflictError,
-  CommandValidationError,
-} from '@/shared/application/application-command'
+import { CommandValidationError } from '@/shared/application/application-command'
 import type {
   HttpProblemContribution,
   HttpProblemMapping,
@@ -27,7 +24,6 @@ import {
   PlanningDependencyUnavailableError,
 } from '../application/planning-errors'
 import {
-  COMMAND_FINGERPRINT_CONFLICT_PROBLEM,
   DRAFT_GOAL_NOT_FOUND_PROBLEM,
   DRAFT_REVISION_CONFLICT_PROBLEM,
   GOAL_DEFINITION_NOT_FOUND_PROBLEM,
@@ -57,7 +53,6 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
     definitions: Object.freeze([
       PLANNING_AUTHORIZATION_DENIED_PROBLEM,
       GOAL_DEFINITION_NOT_FOUND_PROBLEM,
-      COMMAND_FINGERPRINT_CONFLICT_PROBLEM,
       GOAL_DEFINITION_REVISION_CONFLICT_PROBLEM,
       GOAL_DEFINITION_STATE_CONFLICT_PROBLEM,
       PLAN_DRAFT_NOT_FOUND_PROBLEM,
@@ -76,7 +71,6 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
     mappedCodes: Object.freeze([
       'PLANNING_AUTHORIZATION_DENIED',
       'GOAL_DEFINITION_NOT_FOUND',
-      'COMMAND_FINGERPRINT_CONFLICT',
       'GOAL_DEFINITION_REVISION_CONFLICT',
       'GOAL_DEFINITION_STATE_CONFLICT',
       'PLAN_DRAFT_NOT_FOUND',
@@ -97,9 +91,6 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
     map: (error: unknown): HttpProblemMapping | undefined => {
       if (error instanceof CommandValidationError) {
         return { code: 'VALIDATION_FAILED', errors: [bodyIssue] }
-      }
-      if (error instanceof CommandFingerprintConflictError) {
-        return { code: 'COMMAND_FINGERPRINT_CONFLICT' }
       }
       if (error instanceof PlanningAuthorizationDeniedError) {
         return { code: 'PLANNING_AUTHORIZATION_DENIED' }

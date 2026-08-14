@@ -46,6 +46,15 @@ function installTrackingSchemas(document: OpenAPIObject): void {
       : { discriminator: { propertyName: discriminator } }),
   })
 
+  schemas['TrackingFactMutationResponseV1Dto'] = object(
+    {
+      kind: { type: 'string', enum: ['tracking.fact-record.v1'] },
+      aggregateId: uuid,
+      aggregateRevision: positive,
+    },
+    ['kind', 'aggregateId', 'aggregateRevision'],
+  )
+
   schemas['TrackingExactRatioV1'] = object(
     { numerator: nonnegative, denominator: positive },
     ['numerator', 'denominator'],
@@ -526,7 +535,17 @@ export const TRACKING_OPENAPI_CONTRIBUTION: OpenApiDocumentContribution = {
   tags: [
     {
       name: 'tracking',
-      description: 'Channel-neutral Today and Month tracking read models.',
+      description: 'Tracking reads and channel-neutral fact mutations.',
+    },
+  ],
+  problemCodeComponents: [
+    {
+      componentName: 'TrackingFactTargetUnavailableProblemResponseDto',
+      codes: ['TRACKING_FACT_TARGET_UNAVAILABLE'],
+    },
+    {
+      componentName: 'TrackingFactRevisionProblemResponseDto',
+      codes: ['TRACKING_FACT_REVISION_CONFLICT'],
     },
   ],
   install: installTrackingSchemas,

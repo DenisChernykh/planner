@@ -21,6 +21,10 @@ import {
   AlreadyPublishedConflictResponseDto,
   PlanPublicationBlockedProblemResponseDto,
   PublicationBlockerResponseDto,
+  TrackingFactRevisionConflictResponseDto,
+  TrackingFactRevisionProblemResponseDto,
+  TrackingFactTargetUnavailableConflictResponseDto,
+  TrackingFactTargetUnavailableProblemResponseDto,
 } from './problem-response.dto'
 
 const problemContentType = 'application/problem+json'
@@ -58,6 +62,12 @@ export function ApiProblemResponses(
           }
           if (code === 'PLAN_PUBLICATION_BLOCKED') {
             return PlanPublicationBlockedProblemResponseDto
+          }
+          if (code === 'TRACKING_FACT_TARGET_UNAVAILABLE') {
+            return TrackingFactTargetUnavailableProblemResponseDto
+          }
+          if (code === 'TRACKING_FACT_REVISION_CONFLICT') {
+            return TrackingFactRevisionProblemResponseDto
           }
           return ProblemResponseDto
         }),
@@ -101,6 +111,10 @@ export function ApiProblemResponses(
       PlanMonthAlreadyPublishedProblemResponseDto,
       PublicationBlockerResponseDto,
       PlanPublicationBlockedProblemResponseDto,
+      TrackingFactTargetUnavailableConflictResponseDto,
+      TrackingFactTargetUnavailableProblemResponseDto,
+      TrackingFactRevisionConflictResponseDto,
+      TrackingFactRevisionProblemResponseDto,
     ),
     ...responses,
   )
@@ -171,6 +185,14 @@ function problemExample(definition: RegisteredProblemDefinition): object {
               detail: 'Target month is not current or next.',
             },
           ],
+        }
+      : {}),
+    ...(definition.code === 'TRACKING_FACT_TARGET_UNAVAILABLE'
+      ? { conflict: { reason: 'not_active' } }
+      : {}),
+    ...(definition.code === 'TRACKING_FACT_REVISION_CONFLICT'
+      ? {
+          conflict: { expectedRevision: '1', currentRevision: '2' },
         }
       : {}),
   }

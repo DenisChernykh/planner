@@ -82,7 +82,9 @@ export function createOpenApiDocument(
   })
   const problemCodes = problems.map(({ code }) => code).sort()
   const componentNames = findProblemComponentNames(document)
-  const componentCodes = new Map<string, ReadonlySet<string>>()
+  const componentCodes = new Map<string, ReadonlySet<string>>([
+    ['ValidationProblemResponseDto', new Set(['VALIDATION_FAILED'])],
+  ])
   for (const contribution of contributions) {
     for (const partition of contribution.problemCodeComponents ?? []) {
       if (componentCodes.has(partition.componentName)) {

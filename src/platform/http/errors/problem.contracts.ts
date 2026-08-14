@@ -22,6 +22,24 @@ export type ProblemConflict =
   | DraftProblemConflict
   | PublicationPreviewProblemConflict
   | AlreadyPublishedProblemConflict
+  | TrackingFactTargetUnavailableProblemConflict
+  | TrackingFactRevisionProblemConflict
+
+export interface TrackingFactTargetUnavailableProblemConflict {
+  readonly reason:
+    | 'not_active'
+    | 'future_date'
+    | 'not_applicable'
+    | 'closed'
+    | 'unsupported'
+    | 'correction_required'
+    | 'already_deleted'
+}
+
+export interface TrackingFactRevisionProblemConflict {
+  readonly expectedRevision: string | null
+  readonly currentRevision: string | null
+}
 
 export interface PublicationPreviewProblemConflict {
   readonly currentDraftRevision: string

@@ -33,6 +33,7 @@ import {
 } from '@/modules/workspace'
 import { ApiProblemResponses } from '@/platform/http/docs/api-problem-responses.decorator'
 import { RequestValidationError } from '@/platform/http/errors/request-validation.error'
+import { COMMAND_FINGERPRINT_CONFLICT_PROBLEM } from '@/platform/http/errors/problem-registry'
 
 import {
   PLANNING_APPLICATION,
@@ -48,7 +49,6 @@ import {
   PlanningDependencyUnavailableError,
 } from '../application/planning-errors'
 import {
-  COMMAND_FINGERPRINT_CONFLICT_PROBLEM,
   GOAL_DEFINITION_NOT_FOUND_PROBLEM,
   GOAL_DEFINITION_REVISION_CONFLICT_PROBLEM,
   GOAL_DEFINITION_STATE_CONFLICT_PROBLEM,

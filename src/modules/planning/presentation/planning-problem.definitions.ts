@@ -16,14 +16,6 @@ export const GOAL_DEFINITION_NOT_FOUND_PROBLEM = defineProblemDefinition({
   detail: 'The requested goal definition was not found.',
 })
 
-export const COMMAND_FINGERPRINT_CONFLICT_PROBLEM = defineProblemDefinition({
-  slug: 'command-fingerprint-conflict',
-  code: 'COMMAND_FINGERPRINT_CONFLICT',
-  status: 409,
-  title: 'Command fingerprint conflict',
-  detail: 'The command key already completed with a different request.',
-})
-
 export const GOAL_DEFINITION_REVISION_CONFLICT_PROBLEM =
   defineProblemDefinition({
     slug: 'goal-definition-revision-conflict',

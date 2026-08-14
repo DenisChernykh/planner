@@ -457,6 +457,7 @@ describe('S03 HTTP contracts', () => {
       '/planning/catalog/goal-definitions/{goalDefinitionId}/restore',
       '/planning/catalog/goal-definitions/{goalDefinitionId}/versions',
       '/planning/drafts',
+      '/planning/drafts/from-seed',
       '/planning/drafts/publication-preview',
       '/planning/drafts/{planMonthId}/goals',
       '/planning/drafts/{planMonthId}/goals/reorder',
@@ -465,6 +466,12 @@ describe('S03 HTTP contracts', () => {
       '/planning/drafts/{planMonthId}/publish',
       '/planning/months/active',
       '/planning/publications/{publicationId}',
+      '/tracking/facts',
+      '/tracking/facts/checkpoint',
+      '/tracking/facts/rating',
+      '/tracking/facts/time',
+      '/tracking/months/{targetMonth}',
+      '/tracking/today',
     ])
     expect(document.paths['/auth/issue']).toBeUndefined()
     expect(Object.keys(document.paths['/auth/me'] ?? {})).toEqual(['get'])
@@ -632,15 +639,24 @@ describe('S03 HTTP contracts', () => {
       'PLANNING_AUTHORIZATION_DENIED',
       'PLAN_DRAFT_NOT_EDITABLE',
       'PLAN_DRAFT_NOT_FOUND',
+      'PLAN_MONTH_ALREADY_EXISTS',
       'PLAN_PUBLICATION_NOT_FOUND',
+      'PLAN_SEED_ALREADY_CONSUMED',
       'RATE_LIMIT_EXCEEDED',
+      'TRACKING_AUTHORIZATION_DENIED',
+      'TRACKING_FACT_TARGET_NOT_FOUND',
+      'TRACKING_FACT_VALUE_INVALID',
+      'TRACKING_QUERY_INVALID',
       'UNSUPPORTED_MEDIA_TYPE',
-      'VALIDATION_FAILED',
     ]
     expect(
       document.components?.schemas?.['ProblemResponseDto']?.properties?.['code']
         ?.enum,
     ).toEqual(exactBaseProblemCodes)
+    expect(
+      document.components?.schemas?.['ValidationProblemResponseDto']
+        ?.properties?.['code']?.enum,
+    ).toEqual(['VALIDATION_FAILED'])
     expect(
       document.components?.schemas?.['ValidationProblemResponseDto']
         ?.properties?.['conflict'],

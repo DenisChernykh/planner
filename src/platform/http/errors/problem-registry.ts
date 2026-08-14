@@ -26,6 +26,13 @@ const problemDefinitions = [
     'The request conflicts with the current resource state.',
   ],
   [
+    'command-fingerprint-conflict',
+    'COMMAND_FINGERPRINT_CONFLICT',
+    409,
+    'Command fingerprint conflict',
+    'The command key already completed with a different request.',
+  ],
+  [
     'payload-too-large',
     'PAYLOAD_TOO_LARGE',
     413,
@@ -94,3 +101,7 @@ export function getProblemDefinition(
     throw new Error(`Unregistered OpenAPI problem: ${code}`)
   return definition
 }
+
+export const COMMAND_FINGERPRINT_CONFLICT_PROBLEM = getProblemDefinition(
+  'COMMAND_FINGERPRINT_CONFLICT',
+)

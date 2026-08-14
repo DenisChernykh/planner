@@ -1158,6 +1158,35 @@ HTTP публикует authenticated GET `/tracking/today` и
 `503 DEPENDENCY_UNAVAILABLE`. Write endpoints, CloseDay, weekly result,
 Telegram и UI остаются H01–H03, T08–T09 и G01–G05.
 
+#### 7.6.8. H01 Scalar fact HTTP adapter
+
+H01 публикует authenticated mutation routes `POST /tracking/facts`,
+`/tracking/facts/time`, `/tracking/facts/rating` и
+`/tracking/facts/checkpoint`. Все четыре требуют session cookie и CSRF и
+являются thin adapters над `tracking.record-fact.v1`,
+`tracking.record-time.v1`, `tracking.record-rating.v1` и
+`tracking.record-checkpoint.v1`. Verified user разрешается через
+`WorkspaceMemberResolver`; actor отсутствует в DTO и всегда передаётся в
+application как trusted member context.
+
+Boolean/quantity route принимает optional positive decimal
+`expectedRevision`, соответствующий T01 create-CAS; quantity `add` сохраняет
+запрет revision на application boundary. Time, rating и checkpoint create DTO
+не принимают `expectedRevision`. Success возвращает
+`tracking.fact-record.v1` с opaque record ID и positive fact revision как
+decimal string. Exact replay и fingerprint conflict остаются свойствами общего
+durable executor, а presentation не повторяет target, lifecycle, ownership или
+published-config validation.
+
+HTTP Problem Details различают concealed target-not-found, finite unavailable
+reason, nullable expected/current revision conflict и value mismatch.
+`COMMAND_FINGERPRINT_CONFLICT` зарегистрирован как core command problem и
+переиспользуется planning/tracking без межмодульной presentation dependency.
+Все mutation schemas exact (`additionalProperties:false`); malformed/oversized
+body, authentication, browser authorization, validation и dependency failures
+используют общие HTTP contracts. Composite facts, correction/delete/undo,
+CloseDay и weekly-result writes остаются H02/H03.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:
@@ -2730,6 +2759,7 @@ multi-value header заменяется `randomUUID()`. Этот же ID вхо�
 добавляет `errors: [{ pointer, code, detail }]`. Namespace типов строго
 `https://planner.invalid/problems/<slug>`. Core registry содержит только
 `MALFORMED_REQUEST` 400, `NOT_FOUND` 404, `CONFLICT` 409,
+`COMMAND_FINGERPRINT_CONFLICT` 409,
 `PAYLOAD_TOO_LARGE` 413, `UNSUPPORTED_MEDIA_TYPE` 415,
 `VALIDATION_FAILED` 422, `RATE_LIMIT_EXCEEDED` 429, `INTERNAL_ERROR` 500 и
 `DEPENDENCY_UNAVAILABLE` 503. Duplicate или unregistered definitions

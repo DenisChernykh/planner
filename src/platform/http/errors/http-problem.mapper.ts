@@ -6,6 +6,7 @@ import type {
 } from './problem.contracts'
 import { PROBLEM_CATALOG, type CoreProblemCode } from './problem-registry'
 import { RequestValidationError } from './request-validation.error'
+import { CommandFingerprintConflictError } from '@/shared/application/application-command'
 
 const httpCodes: Readonly<Record<number, CoreProblemCode>> = Object.freeze({
   400: 'MALFORMED_REQUEST',
@@ -25,6 +26,9 @@ export const CORE_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
     map: (error: unknown): HttpProblemMapping | undefined => {
       if (error instanceof RequestValidationError) {
         return { code: 'VALIDATION_FAILED', errors: error.errors }
+      }
+      if (error instanceof CommandFingerprintConflictError) {
+        return { code: 'COMMAND_FINGERPRINT_CONFLICT' }
       }
       if (isBodyParserError(error, 'entity.too.large', 413)) {
         return { code: 'PAYLOAD_TOO_LARGE' }
