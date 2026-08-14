@@ -1,8 +1,8 @@
 import { Module, type DynamicModule } from '@nestjs/common'
 
 import {
-  GetTodayQuery,
-  PrismaTrackingReadPersistence,
+  createTrackingApplication,
+  type TrackingApplication,
 } from '@/modules/tracking'
 import {
   WorkspaceModule,
@@ -26,14 +26,18 @@ import {
   type TelegramIngressLifecycle,
 } from '../application/telegram-bot.types'
 import { TelegramUpdateHandler } from '../application/telegram-update.handler'
+import { TelegramActionIntentService } from '../application/action-intent.service'
 import {
   GetUpdatesRunner,
   DisabledTelegramIngress,
 } from '../infrastructure/get-updates.runner'
 import { TelegramBotApiClient } from '../infrastructure/telegram-bot-api.client'
 import { PrismaTelegramIngressStateRepository } from '../infrastructure/prisma-telegram-ingress-state.repository'
+import { PrismaActionIntentRepository } from '../infrastructure/prisma-action-intent.repository'
 
-const TELEGRAM_GET_TODAY: unique symbol = Symbol('TELEGRAM_GET_TODAY')
+const TELEGRAM_TRACKING_APPLICATION: unique symbol = Symbol(
+  'TELEGRAM_TRACKING_APPLICATION',
+)
 
 @Module({})
 export class TelegramBotModule {
@@ -45,8 +49,9 @@ export class TelegramBotModule {
       imports: [DatabaseModule, WorkspaceModule],
       providers: [
         PrismaTelegramIngressStateRepository,
+        PrismaActionIntentRepository,
         {
-          provide: TELEGRAM_GET_TODAY,
+          provide: TELEGRAM_TRACKING_APPLICATION,
           inject: [
             PrismaClientProvider,
             DATABASE_TRANSACTION_PORT,
@@ -57,9 +62,28 @@ export class TelegramBotModule {
             transaction: DatabaseTransactionPort,
             workspaceMembers: WorkspaceMemberResolver,
           ) =>
-            new GetTodayQuery(
+            createTrackingApplication({
+              database,
+              transaction,
               workspaceMembers,
-              new PrismaTrackingReadPersistence(database),
+              clock,
+            }),
+        },
+        {
+          provide: TelegramActionIntentService,
+          inject: [
+            PrismaActionIntentRepository,
+            TELEGRAM_TRACKING_APPLICATION,
+            DATABASE_TRANSACTION_PORT,
+          ],
+          useFactory: (
+            intents: PrismaActionIntentRepository,
+            tracking: TrackingApplication,
+            transaction: DatabaseTransactionPort,
+          ) =>
+            new TelegramActionIntentService(
+              intents,
+              tracking,
               transaction,
               clock,
             ),
@@ -86,21 +110,24 @@ export class TelegramBotModule {
           provide: TelegramUpdateHandler,
           inject: [
             WORKSPACE_MEMBER_RESOLVER,
-            TELEGRAM_GET_TODAY,
+            TELEGRAM_TRACKING_APPLICATION,
+            TelegramActionIntentService,
             RuntimeConfigService,
           ],
           useFactory: (
             workspaceMembers: WorkspaceMemberResolver,
-            getToday: GetTodayQuery,
+            tracking: TrackingApplication,
+            actionIntents: TelegramActionIntentService,
             config: RuntimeConfigService,
           ) =>
             new TelegramUpdateHandler(
               workspaceMembers,
-              getToday,
+              tracking.getToday,
               new URL(
                 '/auth/telegram/start',
                 config.auth.telegramOidc.callbackUrl,
               ).toString(),
+              actionIntents,
             ),
         },
         {

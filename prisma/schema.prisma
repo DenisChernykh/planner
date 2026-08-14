@@ -97,6 +97,34 @@ model TelegramIngressState {
   @@map("telegram_ingress_state")
 }
 
+model TelegramActionIntent {
+  id                      String    @id @db.Uuid
+  semanticKey             String    @map("semantic_key") @db.Char(64)
+  commandId               String    @unique @map("command_id") @db.Uuid
+  spaceId                 String    @map("space_id") @db.Uuid
+  memberId                String    @map("member_id") @db.Uuid
+  publicationId           String    @map("publication_id") @db.Uuid
+  planGoalSnapshotId      String    @map("plan_goal_snapshot_id") @db.Uuid
+  localDate               DateTime  @map("local_date") @db.Date
+  sourceFactsRevision     BigInt    @map("source_facts_revision") @db.BigInt
+  intentKind              String    @map("intent_kind") @db.VarChar(16)
+  state                   String    @db.VarChar(24)
+  booleanResult           String?   @map("boolean_result") @db.VarChar(16)
+  quantityValue           String?   @map("quantity_value") @db.Text
+  commandFingerprint      String?   @map("command_fingerprint") @db.Char(64)
+  resultKind              String?   @map("result_kind") @db.VarChar(128)
+  resultAggregateId       String?   @map("result_aggregate_id") @db.Uuid
+  resultAggregateRevision BigInt?   @map("result_aggregate_revision") @db.BigInt
+  expiresAt               DateTime  @map("expires_at") @db.Timestamptz(3)
+  completedAt             DateTime? @map("completed_at") @db.Timestamptz(3)
+  createdAt               DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime  @map("updated_at") @db.Timestamptz(3)
+
+  @@index([spaceId, memberId, state])
+  @@index([expiresAt])
+  @@map("telegram_action_intents")
+}
+
 model PlanMonth {
   id                  String   @id @default(uuid()) @db.Uuid
   spaceId             String   @map("space_id") @db.Uuid

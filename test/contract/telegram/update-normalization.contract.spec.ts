@@ -2,6 +2,7 @@ import {
   TELEGRAM_CALLBACKS,
   TelegramBotApiClient,
   decodeTelegramCallback,
+  encodeTelegramIntentCallback,
   normalizeTelegramUpdate,
 } from '@/modules/telegram-bot'
 
@@ -140,6 +141,26 @@ describe('G01 Telegram update normalization contract', () => {
     expect(decodeTelegramCallback('pl1:p')).toBe('progress')
     expect(decodeTelegramCallback('pl2:t')).toBe('stale')
     expect(decodeTelegramCallback('pl1:a:unowned')).toBe('stale')
+    const actionIntentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    expect(
+      decodeTelegramCallback(
+        encodeTelegramIntentCallback('select', actionIntentId),
+      ),
+    ).toEqual({ kind: 'select_intent', actionIntentId })
+    expect(
+      decodeTelegramCallback(
+        encodeTelegramIntentCallback('confirm', actionIntentId),
+      ),
+    ).toEqual({ kind: 'confirm_intent', actionIntentId })
+    expect(
+      decodeTelegramCallback('pl1:s:AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA'),
+    ).toBe('stale')
+    expect(
+      Buffer.byteLength(
+        encodeTelegramIntentCallback('confirm', actionIntentId),
+        'utf8',
+      ),
+    ).toBeLessThanOrEqual(64)
   })
 
   it.each([0, -1, Number.MAX_SAFE_INTEGER, 1.5])(

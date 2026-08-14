@@ -9,6 +9,8 @@ import {
   TELEGRAM_CALLBACKS,
   type TelegramInlineKeyboard,
 } from './telegram-bot.types'
+import type { TelegramActionButton } from './action-intent.types'
+import { encodeTelegramIntentCallback } from './telegram-callback.codec'
 
 const messageLimit = 4_000
 
@@ -56,9 +58,23 @@ function chunks(lines: readonly string[]): readonly string[] {
   return Object.freeze(result)
 }
 
-export function telegramMenu(webLoginUrl: string): TelegramInlineKeyboard {
+export function telegramMenu(
+  webLoginUrl: string,
+  actions: readonly TelegramActionButton[] = [],
+): TelegramInlineKeyboard {
   return Object.freeze({
     inline_keyboard: Object.freeze([
+      ...actions.map((action) =>
+        Object.freeze([
+          Object.freeze({
+            text: action.text,
+            callback_data: encodeTelegramIntentCallback(
+              'select',
+              action.actionIntentId,
+            ),
+          }),
+        ]),
+      ),
       Object.freeze([
         Object.freeze({
           text: 'Сегодня',
@@ -79,6 +95,27 @@ export function telegramMenu(webLoginUrl: string): TelegramInlineKeyboard {
         Object.freeze({ text: 'План', url: webLoginUrl }),
         Object.freeze({ text: 'Настройки', url: webLoginUrl }),
       ]),
+    ]),
+  })
+}
+
+export function telegramConfirmation(
+  actionIntentId: string,
+  webLoginUrl: string,
+): TelegramInlineKeyboard {
+  const menu = telegramMenu(webLoginUrl)
+  return Object.freeze({
+    inline_keyboard: Object.freeze([
+      Object.freeze([
+        Object.freeze({
+          text: 'Подтвердить',
+          callback_data: encodeTelegramIntentCallback(
+            'confirm',
+            actionIntentId,
+          ),
+        }),
+      ]),
+      ...menu.inline_keyboard,
     ]),
   })
 }

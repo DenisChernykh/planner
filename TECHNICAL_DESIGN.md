@@ -2796,6 +2796,28 @@ Module-local Bot API client G01 делает по одному bounded native-fe
 для интерактивного ответа и запрещает HTTP redirects. Перенос Starter `INT-01`
 и durable reminder attempt ledger остаются отдельной N03 задачей.
 
+G02 добавляет callback `pl1:s:<actionIntentId>` для выбора и
+`pl1:c:<actionIntentId>` для подтверждения; оба используют canonical lowercase
+UUID и укладываются в 64-byte provider limit. Callback не содержит actor,
+target или typed value. PostgreSQL `telegram_action_intents` связывает opaque
+intent с resolved member, immutable publication/goal/date, исходной
+`factsRevision`, canonical T01 fingerprint, 15-minute expiry и finite state
+`offered → awaiting_value → ready → completed` либо `expired`. Active semantic
+key переиспользуется при повторном render одной версии Today, а новый intent
+после expiry либо новой `factsRevision` получает новый UUID. Этот UUID является
+application `commandId`; transport update/callback IDs остаются только ingress
+identity. На одного member разрешён один `awaiting_value` quantity intent.
+
+Confirm выполняет intent/month lock, active-publication, month-status,
+expiry и exact `sourceFactsRevision` checks в общей transaction, после чего
+вызывает публичный `tracking.record-fact.v1` через nested transaction context и
+атомарно сохраняет typed result. Completed replay возвращает этот result до
+stale/expiry checks. Поэтому разные callback query IDs не создают второй факт,
+а stale aggregate, replaced publication и closed month не перезаписывают новое
+состояние. G02 предлагает только writable Boolean и quantity actions: existing
+Boolean/`latest` остаются будущей G05 correction, `add` создаёт новый
+contribution; time/rating/checkpoints/composites остаются G03/G04.
+
 ### 14.2. Pilot и v1
 
 Pilot bot предоставляет Today, ввод/исправление, close day, progress и

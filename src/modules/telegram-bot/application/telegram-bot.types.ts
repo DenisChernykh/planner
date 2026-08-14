@@ -8,6 +8,14 @@ export const TELEGRAM_CALLBACKS = Object.freeze({
 
 export type TelegramCallbackAction = keyof typeof TELEGRAM_CALLBACKS
 
+export type DecodedTelegramCallback =
+  | TelegramCallbackAction
+  | {
+      readonly kind: 'select_intent' | 'confirm_intent'
+      readonly actionIntentId: string
+    }
+  | 'stale'
+
 type TelegramUpdateBase = {
   readonly updateId: bigint
 }

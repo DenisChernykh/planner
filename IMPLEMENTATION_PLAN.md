@@ -1980,15 +1980,15 @@ to existing commands; repeated Confirm is harmless even with a new callback ID.
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811200000_telegram_action_intents/migration.sql`
 - Test: `test/integration/telegram/action-intent.integration.spec.ts`
-- Test: `test/e2e/telegram/pilot-mutations.e2e-spec.ts`
+- Test: `test/e2e/telegram/pilot-mutations.e2e.spec.ts`
 
-- [ ] Написать RED journey Boolean/quantity с двумя callback query IDs для
+- [x] Написать RED journey Boolean/quantity с двумя callback query IDs для
   одного Confirm, stale aggregate, expired intent and closed plan.
-- [ ] Реализовать bounded per-action state and deterministic commandId from
+- [x] Реализовать bounded per-action state and deterministic commandId from
   actionIntentId; transport update ID используется только для ingress dedupe.
-- [ ] Проверить add/latest/Boolean через те же T01 commands, что HTTP.
-- [ ] Запустить migration integration/E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: add idempotent Telegram fact actions`.
+- [x] Проверить add/latest/Boolean через те же T01 commands, что HTTP.
+- [x] Запустить migration integration/E2E and `pnpm check:quick`.
+- [x] Commit: `feat: add idempotent Telegram fact actions`.
 
 ### G03 — Time, rating and checkpoint mappings
 
