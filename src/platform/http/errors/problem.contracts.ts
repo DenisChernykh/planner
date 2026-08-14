@@ -24,6 +24,12 @@ export type ProblemConflict =
   | AlreadyPublishedProblemConflict
   | TrackingFactTargetUnavailableProblemConflict
   | TrackingFactRevisionProblemConflict
+  | TrackingFactUndoProblemConflict
+  | TrackingExistingFactProblemConflict
+  | TrackingCloseDayTargetProblemConflict
+  | TrackingCloseDayRetryProblemConflict
+  | TrackingExistingDayCloseProblemConflict
+  | TrackingWeeklyTaskTargetProblemConflict
 
 export interface TrackingFactTargetUnavailableProblemConflict {
   readonly reason:
@@ -39,6 +45,38 @@ export interface TrackingFactTargetUnavailableProblemConflict {
 export interface TrackingFactRevisionProblemConflict {
   readonly expectedRevision: string | null
   readonly currentRevision: string | null
+}
+
+export interface TrackingFactUndoProblemConflict {
+  readonly reason: 'nothing_to_undo' | 'not_latest' | 'superseded'
+  readonly nextAction: 'reload-tracking-state'
+}
+
+export interface TrackingExistingFactProblemConflict {
+  readonly factRecordId: string
+  readonly revision: string
+  readonly nextAction: 'correct-existing-record'
+}
+
+export interface TrackingCloseDayTargetProblemConflict {
+  readonly reason: 'not_active' | 'future_date' | 'not_applicable' | 'closed'
+}
+
+export interface TrackingCloseDayRetryProblemConflict {
+  readonly expectedRevision?: string
+  readonly currentRevision?: string
+  readonly nextAction: 'reload-close-day-preview-and-retry'
+}
+
+export interface TrackingExistingDayCloseProblemConflict {
+  readonly dayCloseId: string
+  readonly revision: string
+  readonly nextAction: 'open-closed-day'
+}
+
+export interface TrackingWeeklyTaskTargetProblemConflict {
+  readonly reason:
+    'not_active' | 'future_period' | 'preactivation' | 'stale_period' | 'closed'
 }
 
 export interface PublicationPreviewProblemConflict {

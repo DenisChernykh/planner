@@ -474,7 +474,13 @@ describe('S03 HTTP contracts', () => {
       '/tracking/facts/rating',
       '/tracking/facts/text',
       '/tracking/facts/time',
+      '/tracking/facts/{factRecordId}/correct',
+      '/tracking/facts/{factRecordId}/delete',
+      '/tracking/facts/{factRecordId}/undo',
       '/tracking/months/{targetMonth}',
+      '/tracking/publications/{publicationId}/days/{localDate}/close',
+      '/tracking/publications/{publicationId}/days/{localDate}/close-preview',
+      '/tracking/publications/{publicationId}/weekly-tasks/{flexiblePeriodId}/result',
       '/tracking/today',
     ])
     expect(document.paths['/auth/issue']).toBeUndefined()
@@ -648,9 +654,11 @@ describe('S03 HTTP contracts', () => {
       'PLAN_SEED_ALREADY_CONSUMED',
       'RATE_LIMIT_EXCEEDED',
       'TRACKING_AUTHORIZATION_DENIED',
+      'TRACKING_CLOSE_DAY_TARGET_NOT_FOUND',
       'TRACKING_FACT_TARGET_NOT_FOUND',
       'TRACKING_FACT_VALUE_INVALID',
       'TRACKING_QUERY_INVALID',
+      'TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND',
       'UNSUPPORTED_MEDIA_TYPE',
     ]
     expect(

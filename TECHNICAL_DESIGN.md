@@ -1211,6 +1211,31 @@ tracking problem registry. Все outer и discriminated component schemas exact
 (`additionalProperties:false`). Correction/delete/undo, CloseDay и weekly
 task writes остаются H03.
 
+#### 7.6.10. H03 Fact maintenance and closure HTTP adapter
+
+H03 публикует resource-oriented authenticated routes для correction, personal
+delete и own Undo по opaque `factRecordId`; CloseDay preview/confirmation по
+publication/date; initial weekly planned task result по publication/physical
+period. Все POST требуют session cookie и CSRF, GET preview — только session.
+Verified user разрешается через `WorkspaceMemberResolver`; actor никогда не
+принимается из path или body.
+
+Correction принимает exact typed union всех T01–T04 значений, current positive
+fact revision и обязательную причину. Delete и Undo также требуют current
+positive revision. Initial weekly result не принимает revision. CloseDay
+confirmation принимает non-negative month facts revision и exact versioned
+preview hash; preview сериализует revisions decimal strings и timestamp как
+ISO-8601. Mutation results переиспользуют `tracking.fact-record.v1`, а closure
+возвращает `tracking.day-close.v1`.
+
+HTTP Problem Details сохраняют finite application outcomes и recovery data:
+fact revision/undo, existing record для correction, CloseDay target/hash/CAS и
+existing closure, weekly target и system-closed record. Stale CloseDay требует
+reload preview; existing weekly result направляет в dedicated correction.
+Presentation не повторяет lifecycle, ownership, stack, preview projector или
+weekly-period validation. Все request, response и conflict schemas exact
+(`additionalProperties:false`). Telegram adapters остаются G05.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:

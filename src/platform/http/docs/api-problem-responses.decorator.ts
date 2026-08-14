@@ -25,6 +25,18 @@ import {
   TrackingFactRevisionProblemResponseDto,
   TrackingFactTargetUnavailableConflictResponseDto,
   TrackingFactTargetUnavailableProblemResponseDto,
+  TrackingFactUndoConflictResponseDto,
+  TrackingFactUndoProblemResponseDto,
+  TrackingExistingFactConflictResponseDto,
+  TrackingExistingFactProblemResponseDto,
+  TrackingCloseDayTargetConflictResponseDto,
+  TrackingCloseDayTargetProblemResponseDto,
+  TrackingCloseDayRetryConflictResponseDto,
+  TrackingCloseDayRetryProblemResponseDto,
+  TrackingExistingDayCloseConflictResponseDto,
+  TrackingExistingDayCloseProblemResponseDto,
+  TrackingWeeklyTaskTargetConflictResponseDto,
+  TrackingWeeklyTaskTargetProblemResponseDto,
 } from './problem-response.dto'
 
 const problemContentType = 'application/problem+json'
@@ -68,6 +80,30 @@ export function ApiProblemResponses(
           }
           if (code === 'TRACKING_FACT_REVISION_CONFLICT') {
             return TrackingFactRevisionProblemResponseDto
+          }
+          if (code === 'TRACKING_FACT_UNDO_UNAVAILABLE') {
+            return TrackingFactUndoProblemResponseDto
+          }
+          if (
+            code === 'TRACKING_FACT_CORRECTION_REQUIRED' ||
+            code === 'TRACKING_WEEKLY_TASK_ALREADY_SYSTEM_CLOSED'
+          ) {
+            return TrackingExistingFactProblemResponseDto
+          }
+          if (code === 'TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE') {
+            return TrackingCloseDayTargetProblemResponseDto
+          }
+          if (
+            code === 'TRACKING_CLOSE_DAY_REVISION_CONFLICT' ||
+            code === 'TRACKING_CLOSE_DAY_PREVIEW_CONFLICT'
+          ) {
+            return TrackingCloseDayRetryProblemResponseDto
+          }
+          if (code === 'TRACKING_CLOSE_DAY_ALREADY_CLOSED') {
+            return TrackingExistingDayCloseProblemResponseDto
+          }
+          if (code === 'TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE') {
+            return TrackingWeeklyTaskTargetProblemResponseDto
           }
           return ProblemResponseDto
         }),
@@ -115,6 +151,18 @@ export function ApiProblemResponses(
       TrackingFactTargetUnavailableProblemResponseDto,
       TrackingFactRevisionConflictResponseDto,
       TrackingFactRevisionProblemResponseDto,
+      TrackingFactUndoConflictResponseDto,
+      TrackingFactUndoProblemResponseDto,
+      TrackingExistingFactConflictResponseDto,
+      TrackingExistingFactProblemResponseDto,
+      TrackingCloseDayTargetConflictResponseDto,
+      TrackingCloseDayTargetProblemResponseDto,
+      TrackingCloseDayRetryConflictResponseDto,
+      TrackingCloseDayRetryProblemResponseDto,
+      TrackingExistingDayCloseConflictResponseDto,
+      TrackingExistingDayCloseProblemResponseDto,
+      TrackingWeeklyTaskTargetConflictResponseDto,
+      TrackingWeeklyTaskTargetProblemResponseDto,
     ),
     ...responses,
   )
@@ -194,6 +242,55 @@ function problemExample(definition: RegisteredProblemDefinition): object {
       ? {
           conflict: { expectedRevision: '1', currentRevision: '2' },
         }
+      : {}),
+    ...(definition.code === 'TRACKING_FACT_UNDO_UNAVAILABLE'
+      ? {
+          conflict: {
+            reason: 'not_latest',
+            nextAction: 'reload-tracking-state',
+          },
+        }
+      : {}),
+    ...(definition.code === 'TRACKING_FACT_CORRECTION_REQUIRED' ||
+    definition.code === 'TRACKING_WEEKLY_TASK_ALREADY_SYSTEM_CLOSED'
+      ? {
+          conflict: {
+            factRecordId: '11111111-1111-4111-8111-111111111111',
+            revision: '1',
+            nextAction: 'correct-existing-record',
+          },
+        }
+      : {}),
+    ...(definition.code === 'TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE'
+      ? { conflict: { reason: 'not_active' } }
+      : {}),
+    ...(definition.code === 'TRACKING_CLOSE_DAY_REVISION_CONFLICT'
+      ? {
+          conflict: {
+            expectedRevision: '1',
+            currentRevision: '2',
+            nextAction: 'reload-close-day-preview-and-retry',
+          },
+        }
+      : {}),
+    ...(definition.code === 'TRACKING_CLOSE_DAY_PREVIEW_CONFLICT'
+      ? {
+          conflict: {
+            nextAction: 'reload-close-day-preview-and-retry',
+          },
+        }
+      : {}),
+    ...(definition.code === 'TRACKING_CLOSE_DAY_ALREADY_CLOSED'
+      ? {
+          conflict: {
+            dayCloseId: '11111111-1111-4111-8111-111111111111',
+            revision: '1',
+            nextAction: 'open-closed-day',
+          },
+        }
+      : {}),
+    ...(definition.code === 'TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE'
+      ? { conflict: { reason: 'stale_period' } }
       : {}),
   }
 }

@@ -1927,12 +1927,12 @@ records weekly task results through application commands.
 - Create: `src/modules/tracking/presentation/fact-maintenance.controller.ts`
 - Test: `test/e2e/tracking/fact-maintenance-http.e2e-spec.ts`
 
-- [ ] Написать RED HTTP cases reason, owner/shared rights, own undo, CloseDay
+- [x] Написать RED HTTP cases reason, owner/shared rights, own undo, CloseDay
   preview race and weekly result correction.
-- [ ] Implement trusted actor and command ID/revision mapping.
-- [ ] Add OpenAPI/Problem Details and verify stale/conflict recovery payloads.
-- [ ] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: maintain and close tracking over HTTP`.
+- [x] Implement trusted actor and command ID/revision mapping.
+- [x] Add OpenAPI/Problem Details and verify stale/conflict recovery payloads.
+- [x] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
+- [x] Commit: `feat: maintain and close tracking over HTTP`.
 
 ---
 

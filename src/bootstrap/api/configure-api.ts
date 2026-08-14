@@ -18,6 +18,7 @@ import {
 import { ApplicationLifecycleState } from '@/platform/lifecycle/application-lifecycle.state'
 import type { RedisLifecyclePort } from '@/platform/redis/redis-lifecycle'
 import { REDIS_LIFECYCLE } from '@/platform/redis/redis.tokens'
+import type { ProductClock } from '@/shared/application/product-clock'
 
 import { ApiModule } from './api.module'
 
@@ -42,9 +43,10 @@ export interface ApiRuntimeResources {
 
 export async function configureApi(
   runtimeConfig: ApplicationRuntimeConfig = createApiRuntimeConfig(),
+  trackingClock?: ProductClock,
 ): Promise<ApiRuntimeResources> {
   const app = await NestFactory.create<NestExpressApplication>(
-    ApiModule.forRoot(runtimeConfig),
+    ApiModule.forRoot(runtimeConfig, trackingClock),
     { logger: false },
   )
   const config = app.get(RuntimeConfigService)

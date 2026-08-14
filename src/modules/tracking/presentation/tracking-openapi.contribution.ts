@@ -54,6 +54,96 @@ function installTrackingSchemas(document: OpenAPIObject): void {
     },
     ['kind', 'aggregateId', 'aggregateRevision'],
   )
+  schemas['TrackingDayCloseMutationResponseV1'] = object(
+    {
+      kind: { type: 'string', enum: ['tracking.day-close.v1'] },
+      aggregateId: uuid,
+      aggregateRevision: positive,
+    },
+    ['kind', 'aggregateId', 'aggregateRevision'],
+  )
+  schemas['TrackingCloseDayPreviewItemV1'] = object(
+    {
+      fixedExpectationId: uuid,
+      planGoalSnapshotId: uuid,
+      goalTitle: { type: 'string' },
+      componentKind: {
+        type: 'string',
+        enum: ['goal', 'checkpoint', 'checklist_item'],
+      },
+      componentId: nullableUuid,
+      componentLabel: { type: 'string', nullable: true },
+      scope: { type: 'string', enum: ['personal', 'shared'] },
+    },
+    [
+      'fixedExpectationId',
+      'planGoalSnapshotId',
+      'goalTitle',
+      'componentKind',
+      'componentId',
+      'componentLabel',
+      'scope',
+    ],
+  )
+  const closeDayPreviewBase = {
+    schemaVersion: {
+      type: 'string',
+      enum: ['tracking.close-day-preview.v1'],
+    },
+    publicationId: uuid,
+    localDate: date,
+  }
+  schemas['TrackingCloseDayPreviewReadyV1'] = object(
+    {
+      ...closeDayPreviewBase,
+      state: { type: 'string', enum: ['ready'] },
+      factsRevision: nonnegative,
+      previewHashVersion: {
+        type: 'string',
+        enum: ['tracking.close-day-preview-hash.v1'],
+      },
+      previewHash: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+      unresolved: {
+        type: 'array',
+        maxItems: 10_000,
+        items: ref('TrackingCloseDayPreviewItemV1'),
+      },
+    },
+    [
+      'schemaVersion',
+      'state',
+      'publicationId',
+      'localDate',
+      'factsRevision',
+      'previewHashVersion',
+      'previewHash',
+      'unresolved',
+    ],
+  )
+  schemas['TrackingCloseDayPreviewClosedV1'] = object(
+    {
+      ...closeDayPreviewBase,
+      state: { type: 'string', enum: ['closed'] },
+      dayCloseId: uuid,
+      revision: positive,
+      closedAt: { type: 'string', format: 'date-time' },
+      closedCount: { type: 'integer', minimum: 0, maximum: 10_000 },
+    },
+    [
+      'schemaVersion',
+      'state',
+      'publicationId',
+      'localDate',
+      'dayCloseId',
+      'revision',
+      'closedAt',
+      'closedCount',
+    ],
+  )
+  schemas['TrackingCloseDayPreviewResponseV1'] = oneOf(
+    ['TrackingCloseDayPreviewReadyV1', 'TrackingCloseDayPreviewClosedV1'],
+    'state',
+  )
   schemas['TrackingChecklistOccurrenceComponentV1'] = object(
     {
       kind: { type: 'string', enum: ['checklist_item'] },
@@ -206,7 +296,7 @@ function installTrackingSchemas(document: OpenAPIObject): void {
     TrackingTextFactValueV1: object(
       {
         kind: { type: 'string', enum: ['text'] },
-        text: { type: 'string', minLength: 1, maxLength: 2000 },
+        text: { type: 'string', minLength: 1 },
         result: { type: 'string', enum: ['done', 'not_done'] },
       },
       ['kind', 'text', 'result'],
@@ -545,6 +635,33 @@ function installTrackingSchemas(document: OpenAPIObject): void {
     ],
     'state',
   )
+
+  for (const name of [
+    'ProblemFieldErrorResponseDto',
+    'ProblemResponseDto',
+    'ValidationProblemResponseDto',
+    'TrackingFactTargetUnavailableConflictResponseDto',
+    'TrackingFactTargetUnavailableProblemResponseDto',
+    'TrackingFactRevisionConflictResponseDto',
+    'TrackingFactRevisionProblemResponseDto',
+    'TrackingFactUndoConflictResponseDto',
+    'TrackingFactUndoProblemResponseDto',
+    'TrackingExistingFactConflictResponseDto',
+    'TrackingExistingFactProblemResponseDto',
+    'TrackingCloseDayTargetConflictResponseDto',
+    'TrackingCloseDayTargetProblemResponseDto',
+    'TrackingCloseDayRetryConflictResponseDto',
+    'TrackingCloseDayRetryProblemResponseDto',
+    'TrackingExistingDayCloseConflictResponseDto',
+    'TrackingExistingDayCloseProblemResponseDto',
+    'TrackingWeeklyTaskTargetConflictResponseDto',
+    'TrackingWeeklyTaskTargetProblemResponseDto',
+  ]) {
+    const schema = schemas[name]
+    if (typeof schema === 'object' && schema !== null) {
+      Object.assign(schema, { additionalProperties: false })
+    }
+  }
 }
 
 export const TRACKING_OPENAPI_CONTRIBUTION: OpenApiDocumentContribution = {
@@ -562,6 +679,36 @@ export const TRACKING_OPENAPI_CONTRIBUTION: OpenApiDocumentContribution = {
     {
       componentName: 'TrackingFactRevisionProblemResponseDto',
       codes: ['TRACKING_FACT_REVISION_CONFLICT'],
+    },
+    {
+      componentName: 'TrackingFactUndoProblemResponseDto',
+      codes: ['TRACKING_FACT_UNDO_UNAVAILABLE'],
+    },
+    {
+      componentName: 'TrackingExistingFactProblemResponseDto',
+      codes: [
+        'TRACKING_FACT_CORRECTION_REQUIRED',
+        'TRACKING_WEEKLY_TASK_ALREADY_SYSTEM_CLOSED',
+      ],
+    },
+    {
+      componentName: 'TrackingCloseDayTargetProblemResponseDto',
+      codes: ['TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE'],
+    },
+    {
+      componentName: 'TrackingCloseDayRetryProblemResponseDto',
+      codes: [
+        'TRACKING_CLOSE_DAY_REVISION_CONFLICT',
+        'TRACKING_CLOSE_DAY_PREVIEW_CONFLICT',
+      ],
+    },
+    {
+      componentName: 'TrackingExistingDayCloseProblemResponseDto',
+      codes: ['TRACKING_CLOSE_DAY_ALREADY_CLOSED'],
+    },
+    {
+      componentName: 'TrackingWeeklyTaskTargetProblemResponseDto',
+      codes: ['TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE'],
     },
   ],
   install: installTrackingSchemas,

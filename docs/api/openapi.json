@@ -1339,6 +1339,7 @@
         "type": "object"
       },
       "ProblemFieldErrorResponseDto": {
+        "additionalProperties": false,
         "properties": {
           "code": {
             "example": "invalid_value",
@@ -1363,6 +1364,7 @@
         "type": "object"
       },
       "ProblemResponseDto": {
+        "additionalProperties": false,
         "properties": {
           "code": {
             "enum": [
@@ -1389,9 +1391,11 @@
               "PLAN_SEED_ALREADY_CONSUMED",
               "RATE_LIMIT_EXCEEDED",
               "TRACKING_AUTHORIZATION_DENIED",
+              "TRACKING_CLOSE_DAY_TARGET_NOT_FOUND",
               "TRACKING_FACT_TARGET_NOT_FOUND",
               "TRACKING_FACT_VALUE_INVALID",
               "TRACKING_QUERY_INVALID",
+              "TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND",
               "UNSUPPORTED_MEDIA_TYPE"
             ],
             "example": "INTERNAL_ERROR",
@@ -3428,6 +3432,331 @@
         ],
         "type": "object"
       },
+      "TrackingCloseDayPreviewClosedV1": {
+        "additionalProperties": false,
+        "properties": {
+          "closedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "closedCount": {
+            "maximum": 10000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "dayCloseId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "localDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "publicationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.close-day-preview.v1"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "closed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "state",
+          "publicationId",
+          "localDate",
+          "dayCloseId",
+          "revision",
+          "closedAt",
+          "closedCount"
+        ],
+        "type": "object"
+      },
+      "TrackingCloseDayPreviewItemV1": {
+        "additionalProperties": false,
+        "properties": {
+          "componentId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "componentKind": {
+            "enum": [
+              "goal",
+              "checkpoint",
+              "checklist_item"
+            ],
+            "type": "string"
+          },
+          "componentLabel": {
+            "nullable": true,
+            "type": "string"
+          },
+          "fixedExpectationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "goalTitle": {
+            "type": "string"
+          },
+          "planGoalSnapshotId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "personal",
+              "shared"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "fixedExpectationId",
+          "planGoalSnapshotId",
+          "goalTitle",
+          "componentKind",
+          "componentId",
+          "componentLabel",
+          "scope"
+        ],
+        "type": "object"
+      },
+      "TrackingCloseDayPreviewReadyV1": {
+        "additionalProperties": false,
+        "properties": {
+          "factsRevision": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "localDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "previewHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "previewHashVersion": {
+            "enum": [
+              "tracking.close-day-preview-hash.v1"
+            ],
+            "type": "string"
+          },
+          "publicationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.close-day-preview.v1"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ready"
+            ],
+            "type": "string"
+          },
+          "unresolved": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingCloseDayPreviewItemV1"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "state",
+          "publicationId",
+          "localDate",
+          "factsRevision",
+          "previewHashVersion",
+          "previewHash",
+          "unresolved"
+        ],
+        "type": "object"
+      },
+      "TrackingCloseDayPreviewResponseV1": {
+        "discriminator": {
+          "propertyName": "state"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrackingCloseDayPreviewReadyV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingCloseDayPreviewClosedV1"
+          }
+        ]
+      },
+      "TrackingCloseDayRetryConflictResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "currentRevision": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "expectedRevision": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "nextAction": {
+            "enum": [
+              "reload-close-day-preview-and-retry"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "nextAction"
+        ],
+        "type": "object"
+      },
+      "TrackingCloseDayRetryProblemResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "TRACKING_CLOSE_DAY_PREVIEW_CONFLICT",
+              "TRACKING_CLOSE_DAY_REVISION_CONFLICT"
+            ],
+            "example": "TRACKING_CLOSE_DAY_REVISION_CONFLICT",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/TrackingCloseDayRetryConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
+      "TrackingCloseDayTargetConflictResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "not_active",
+              "future_date",
+              "not_applicable",
+              "closed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "TrackingCloseDayTargetProblemResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE"
+            ],
+            "example": "TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/TrackingCloseDayTargetConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
       "TrackingCoverageV1": {
         "additionalProperties": false,
         "properties": {
@@ -3443,6 +3772,31 @@
         "required": [
           "filled",
           "applicable"
+        ],
+        "type": "object"
+      },
+      "TrackingDayCloseMutationResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregateId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "aggregateRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "tracking.day-close.v1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "aggregateId",
+          "aggregateRevision"
         ],
         "type": "object"
       },
@@ -3633,6 +3987,165 @@
         ],
         "type": "object"
       },
+      "TrackingExistingDayCloseConflictResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "dayCloseId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "nextAction": {
+            "enum": [
+              "open-closed-day"
+            ],
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dayCloseId",
+          "revision",
+          "nextAction"
+        ],
+        "type": "object"
+      },
+      "TrackingExistingDayCloseProblemResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "TRACKING_CLOSE_DAY_ALREADY_CLOSED"
+            ],
+            "example": "TRACKING_CLOSE_DAY_ALREADY_CLOSED",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/TrackingExistingDayCloseConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
+      "TrackingExistingFactConflictResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "factRecordId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "nextAction": {
+            "enum": [
+              "correct-existing-record"
+            ],
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "factRecordId",
+          "revision",
+          "nextAction"
+        ],
+        "type": "object"
+      },
+      "TrackingExistingFactProblemResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "TRACKING_FACT_CORRECTION_REQUIRED",
+              "TRACKING_WEEKLY_TASK_ALREADY_SYSTEM_CLOSED"
+            ],
+            "example": "TRACKING_FACT_CORRECTION_REQUIRED",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/TrackingExistingFactConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
       "TrackingFactMutationResponseV1Dto": {
         "additionalProperties": false,
         "properties": {
@@ -3754,6 +4267,7 @@
         "type": "object"
       },
       "TrackingFactRevisionConflictResponseDto": {
+        "additionalProperties": false,
         "properties": {
           "currentRevision": {
             "nullable": true,
@@ -3773,6 +4287,7 @@
         "type": "object"
       },
       "TrackingFactRevisionProblemResponseDto": {
+        "additionalProperties": false,
         "properties": {
           "code": {
             "enum": [
@@ -3826,6 +4341,7 @@
         "type": "object"
       },
       "TrackingFactTargetUnavailableConflictResponseDto": {
+        "additionalProperties": false,
         "properties": {
           "reason": {
             "enum": [
@@ -3846,6 +4362,7 @@
         "type": "object"
       },
       "TrackingFactTargetUnavailableProblemResponseDto": {
+        "additionalProperties": false,
         "properties": {
           "code": {
             "enum": [
@@ -3856,6 +4373,84 @@
           },
           "conflict": {
             "$ref": "#/components/schemas/TrackingFactTargetUnavailableConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
+      "TrackingFactUndoConflictResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "nextAction": {
+            "enum": [
+              "reload-tracking-state"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "nothing_to_undo",
+              "not_latest",
+              "superseded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "nextAction"
+        ],
+        "type": "object"
+      },
+      "TrackingFactUndoProblemResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "TRACKING_FACT_UNDO_UNAVAILABLE"
+            ],
+            "example": "TRACKING_FACT_UNDO_UNAVAILABLE",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/TrackingFactUndoConflictResponseDto"
           },
           "detail": {
             "example": "The server could not complete the request.",
@@ -4591,7 +5186,6 @@
             "type": "string"
           },
           "text": {
-            "maxLength": 2000,
             "minLength": 1,
             "type": "string"
           }
@@ -4866,6 +5460,79 @@
         ],
         "type": "object"
       },
+      "TrackingWeeklyTaskTargetConflictResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "not_active",
+              "future_period",
+              "preactivation",
+              "stale_period",
+              "closed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "TrackingWeeklyTaskTargetProblemResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE"
+            ],
+            "example": "TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/TrackingWeeklyTaskTargetConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
       "UpdateAnyOfMeasurementV1": {
         "additionalProperties": false,
         "properties": {
@@ -5106,6 +5773,7 @@
         ]
       },
       "ValidationProblemResponseDto": {
+        "additionalProperties": false,
         "properties": {
           "code": {
             "enum": [
@@ -14186,6 +14854,1104 @@
         ]
       }
     },
+    "/tracking/facts/{factRecordId}/correct": {
+      "post": {
+        "operationId": "FactMaintenanceController_correct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "factRecordId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  "reason": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
+                    "type": "string"
+                  },
+                  "value": {
+                    "discriminator": {
+                      "propertyName": "kind"
+                    },
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/TrackingBooleanFactValueV1"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TrackingQuantityFactValueV1"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TrackingTimeFactValueV1"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TrackingRatingFactValueV1"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TrackingTextFactValueV1"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TrackingChecklistFactValueV1"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TrackingOrFactValueV1"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "expectedRevision",
+                  "value",
+                  "reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingFactMutationResponseV1Dto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Tracking authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_FACT_TARGET_NOT_FOUND": {
+                    "summary": "Tracking fact target not found",
+                    "value": {
+                      "code": "TRACKING_FACT_TARGET_NOT_FOUND",
+                      "detail": "The requested tracking fact target was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Tracking fact target not found",
+                      "type": "https://planner.invalid/problems/tracking-fact-target-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking fact target not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "TRACKING_FACT_REVISION_CONFLICT": {
+                    "summary": "Tracking fact revision conflict",
+                    "value": {
+                      "code": "TRACKING_FACT_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "expectedRevision": "1"
+                      },
+                      "detail": "The tracking fact changed before this request was applied.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Tracking fact revision conflict",
+                      "type": "https://planner.invalid/problems/tracking-fact-revision-conflict"
+                    }
+                  },
+                  "TRACKING_FACT_TARGET_UNAVAILABLE": {
+                    "summary": "Tracking fact target unavailable",
+                    "value": {
+                      "code": "TRACKING_FACT_TARGET_UNAVAILABLE",
+                      "conflict": {
+                        "reason": "not_active"
+                      },
+                      "detail": "The requested tracking fact target cannot be changed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Tracking fact target unavailable",
+                      "type": "https://planner.invalid/problems/tracking-fact-target-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingFactTargetUnavailableProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingFactRevisionProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Tracking fact target unavailable; Tracking fact revision conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_FACT_VALUE_INVALID": {
+                    "summary": "Tracking fact value invalid",
+                    "value": {
+                      "code": "TRACKING_FACT_VALUE_INVALID",
+                      "detail": "The fact value does not match the published target.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Tracking fact value invalid",
+                      "type": "https://planner.invalid/problems/tracking-fact-value-invalid"
+                    }
+                  },
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Validation failed; Tracking fact value invalid"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Append a corrected typed fact revision.",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/tracking/facts/{factRecordId}/delete": {
+      "post": {
+        "operationId": "FactMaintenanceController_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "factRecordId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  "reason": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "expectedRevision",
+                  "reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingFactMutationResponseV1Dto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Tracking authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_FACT_TARGET_NOT_FOUND": {
+                    "summary": "Tracking fact target not found",
+                    "value": {
+                      "code": "TRACKING_FACT_TARGET_NOT_FOUND",
+                      "detail": "The requested tracking fact target was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Tracking fact target not found",
+                      "type": "https://planner.invalid/problems/tracking-fact-target-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking fact target not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "TRACKING_FACT_REVISION_CONFLICT": {
+                    "summary": "Tracking fact revision conflict",
+                    "value": {
+                      "code": "TRACKING_FACT_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "expectedRevision": "1"
+                      },
+                      "detail": "The tracking fact changed before this request was applied.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Tracking fact revision conflict",
+                      "type": "https://planner.invalid/problems/tracking-fact-revision-conflict"
+                    }
+                  },
+                  "TRACKING_FACT_TARGET_UNAVAILABLE": {
+                    "summary": "Tracking fact target unavailable",
+                    "value": {
+                      "code": "TRACKING_FACT_TARGET_UNAVAILABLE",
+                      "conflict": {
+                        "reason": "not_active"
+                      },
+                      "detail": "The requested tracking fact target cannot be changed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Tracking fact target unavailable",
+                      "type": "https://planner.invalid/problems/tracking-fact-target-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingFactTargetUnavailableProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingFactRevisionProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Tracking fact target unavailable; Tracking fact revision conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Append a personal fact tombstone.",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/tracking/facts/{factRecordId}/undo": {
+      "post": {
+        "operationId": "FactMaintenanceController_undo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "factRecordId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "expectedRevision"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingFactMutationResponseV1Dto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Tracking authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_FACT_TARGET_NOT_FOUND": {
+                    "summary": "Tracking fact target not found",
+                    "value": {
+                      "code": "TRACKING_FACT_TARGET_NOT_FOUND",
+                      "detail": "The requested tracking fact target was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Tracking fact target not found",
+                      "type": "https://planner.invalid/problems/tracking-fact-target-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking fact target not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "TRACKING_FACT_REVISION_CONFLICT": {
+                    "summary": "Tracking fact revision conflict",
+                    "value": {
+                      "code": "TRACKING_FACT_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "expectedRevision": "1"
+                      },
+                      "detail": "The tracking fact changed before this request was applied.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Tracking fact revision conflict",
+                      "type": "https://planner.invalid/problems/tracking-fact-revision-conflict"
+                    }
+                  },
+                  "TRACKING_FACT_TARGET_UNAVAILABLE": {
+                    "summary": "Tracking fact target unavailable",
+                    "value": {
+                      "code": "TRACKING_FACT_TARGET_UNAVAILABLE",
+                      "conflict": {
+                        "reason": "not_active"
+                      },
+                      "detail": "The requested tracking fact target cannot be changed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Tracking fact target unavailable",
+                      "type": "https://planner.invalid/problems/tracking-fact-target-unavailable"
+                    }
+                  },
+                  "TRACKING_FACT_UNDO_UNAVAILABLE": {
+                    "summary": "Tracking fact undo unavailable",
+                    "value": {
+                      "code": "TRACKING_FACT_UNDO_UNAVAILABLE",
+                      "conflict": {
+                        "nextAction": "reload-tracking-state",
+                        "reason": "not_latest"
+                      },
+                      "detail": "The requested own action can no longer be undone.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Tracking fact undo unavailable",
+                      "type": "https://planner.invalid/problems/tracking-fact-undo-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingFactTargetUnavailableProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingFactRevisionProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingFactUndoProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Tracking fact target unavailable; Tracking fact revision conflict; Tracking fact undo unavailable"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Undo the latest uncompensated own action.",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
     "/tracking/months/{targetMonth}": {
       "get": {
         "operationId": "TrackingQueryController_month",
@@ -14314,6 +16080,980 @@
           }
         ],
         "summary": "Read a complete channel-neutral tracking month.",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/tracking/publications/{publicationId}/days/{localDate}/close": {
+      "post": {
+        "operationId": "FactMaintenanceController_closeDay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "localDate",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "publicationId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^(?:0|[1-9][0-9]*)$",
+                    "type": "string"
+                  },
+                  "previewHash": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "previewHashVersion": {
+                    "enum": [
+                      "tracking.close-day-preview-hash.v1"
+                    ],
+                    "type": "string"
+                  },
+                  "previewSchemaVersion": {
+                    "enum": [
+                      "tracking.close-day-preview.v1"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "expectedRevision",
+                  "previewSchemaVersion",
+                  "previewHashVersion",
+                  "previewHash"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingDayCloseMutationResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Tracking authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_CLOSE_DAY_TARGET_NOT_FOUND": {
+                    "summary": "CloseDay target not found",
+                    "value": {
+                      "code": "TRACKING_CLOSE_DAY_TARGET_NOT_FOUND",
+                      "detail": "The requested publication day was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "CloseDay target not found",
+                      "type": "https://planner.invalid/problems/tracking-close-day-target-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "CloseDay target not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "TRACKING_CLOSE_DAY_ALREADY_CLOSED": {
+                    "summary": "Day already closed",
+                    "value": {
+                      "code": "TRACKING_CLOSE_DAY_ALREADY_CLOSED",
+                      "conflict": {
+                        "dayCloseId": "11111111-1111-4111-8111-111111111111",
+                        "nextAction": "open-closed-day",
+                        "revision": "1"
+                      },
+                      "detail": "This member already closed the requested publication day.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Day already closed",
+                      "type": "https://planner.invalid/problems/tracking-close-day-already-closed"
+                    }
+                  },
+                  "TRACKING_CLOSE_DAY_PREVIEW_CONFLICT": {
+                    "summary": "CloseDay preview conflict",
+                    "value": {
+                      "code": "TRACKING_CLOSE_DAY_PREVIEW_CONFLICT",
+                      "conflict": {
+                        "nextAction": "reload-close-day-preview-and-retry"
+                      },
+                      "detail": "The CloseDay preview no longer matches unresolved expectations.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "CloseDay preview conflict",
+                      "type": "https://planner.invalid/problems/tracking-close-day-preview-conflict"
+                    }
+                  },
+                  "TRACKING_CLOSE_DAY_REVISION_CONFLICT": {
+                    "summary": "CloseDay revision conflict",
+                    "value": {
+                      "code": "TRACKING_CLOSE_DAY_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "expectedRevision": "1",
+                        "nextAction": "reload-close-day-preview-and-retry"
+                      },
+                      "detail": "Tracking facts changed after the CloseDay preview was built.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "CloseDay revision conflict",
+                      "type": "https://planner.invalid/problems/tracking-close-day-revision-conflict"
+                    }
+                  },
+                  "TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE": {
+                    "summary": "CloseDay target unavailable",
+                    "value": {
+                      "code": "TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE",
+                      "conflict": {
+                        "reason": "not_active"
+                      },
+                      "detail": "The requested publication day cannot be closed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "CloseDay target unavailable",
+                      "type": "https://planner.invalid/problems/tracking-close-day-target-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingCloseDayTargetProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingCloseDayRetryProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingExistingDayCloseProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; CloseDay target unavailable; CloseDay revision conflict; CloseDay preview conflict; Day already closed"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Atomically close unresolved fixed expectations for one day.",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/tracking/publications/{publicationId}/days/{localDate}/close-preview": {
+      "get": {
+        "operationId": "FactMaintenanceController_closeDayPreview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "localDate",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "publicationId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingCloseDayPreviewResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_CLOSE_DAY_TARGET_NOT_FOUND": {
+                    "summary": "CloseDay target not found",
+                    "value": {
+                      "code": "TRACKING_CLOSE_DAY_TARGET_NOT_FOUND",
+                      "detail": "The requested publication day was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "CloseDay target not found",
+                      "type": "https://planner.invalid/problems/tracking-close-day-target-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "CloseDay target not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE": {
+                    "summary": "CloseDay target unavailable",
+                    "value": {
+                      "code": "TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE",
+                      "conflict": {
+                        "reason": "not_active"
+                      },
+                      "detail": "The requested publication day cannot be closed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "CloseDay target unavailable",
+                      "type": "https://planner.invalid/problems/tracking-close-day-target-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingCloseDayTargetProblemResponseDto"
+                }
+              }
+            },
+            "description": "CloseDay target unavailable"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Build an actor-relative CloseDay preview.",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/tracking/publications/{publicationId}/weekly-tasks/{flexiblePeriodId}/result": {
+      "post": {
+        "operationId": "FactMaintenanceController_recordWeeklyTaskResult",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "flexiblePeriodId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "publicationId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "result": {
+                    "enum": [
+                      "done",
+                      "not_done"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "result"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingFactMutationResponseV1Dto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Tracking authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND": {
+                    "summary": "Weekly task target not found",
+                    "value": {
+                      "code": "TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND",
+                      "detail": "The requested weekly planned task was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Weekly task target not found",
+                      "type": "https://planner.invalid/problems/tracking-weekly-task-target-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Weekly task target not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "TRACKING_FACT_CORRECTION_REQUIRED": {
+                    "summary": "Tracking fact correction required",
+                    "value": {
+                      "code": "TRACKING_FACT_CORRECTION_REQUIRED",
+                      "conflict": {
+                        "factRecordId": "11111111-1111-4111-8111-111111111111",
+                        "nextAction": "correct-existing-record",
+                        "revision": "1"
+                      },
+                      "detail": "The existing tracking fact must be changed through correction.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Tracking fact correction required",
+                      "type": "https://planner.invalid/problems/tracking-fact-correction-required"
+                    }
+                  },
+                  "TRACKING_WEEKLY_TASK_ALREADY_SYSTEM_CLOSED": {
+                    "summary": "Weekly task already system closed",
+                    "value": {
+                      "code": "TRACKING_WEEKLY_TASK_ALREADY_SYSTEM_CLOSED",
+                      "conflict": {
+                        "factRecordId": "11111111-1111-4111-8111-111111111111",
+                        "nextAction": "correct-existing-record",
+                        "revision": "1"
+                      },
+                      "detail": "The weekly planned task already has a system result.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Weekly task already system closed",
+                      "type": "https://planner.invalid/problems/tracking-weekly-task-already-system-closed"
+                    }
+                  },
+                  "TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE": {
+                    "summary": "Weekly task target unavailable",
+                    "value": {
+                      "code": "TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE",
+                      "conflict": {
+                        "reason": "stale_period"
+                      },
+                      "detail": "The requested weekly planned task cannot accept a result.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Weekly task target unavailable",
+                      "type": "https://planner.invalid/problems/tracking-weekly-task-target-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingWeeklyTaskTargetProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrackingExistingFactProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Weekly task target unavailable; Tracking fact correction required; Weekly task already system closed"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Record the initial result of a weekly planned task.",
         "tags": [
           "tracking"
         ]

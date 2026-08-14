@@ -169,6 +169,153 @@ export class TrackingFactRevisionProblemResponseDto extends ProblemResponseDto {
   public readonly conflict!: TrackingFactRevisionConflictResponseDto
 }
 
+export class TrackingFactUndoConflictResponseDto {
+  @ApiProperty({ enum: ['nothing_to_undo', 'not_latest', 'superseded'] })
+  public readonly reason!: 'nothing_to_undo' | 'not_latest' | 'superseded'
+
+  @ApiProperty({ enum: ['reload-tracking-state'] })
+  public readonly nextAction!: 'reload-tracking-state'
+}
+
+export class TrackingFactUndoProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['TRACKING_FACT_UNDO_UNAVAILABLE'],
+    example: 'TRACKING_FACT_UNDO_UNAVAILABLE',
+  })
+  declare public readonly code: 'TRACKING_FACT_UNDO_UNAVAILABLE'
+
+  @ApiProperty({ type: () => TrackingFactUndoConflictResponseDto })
+  public readonly conflict!: TrackingFactUndoConflictResponseDto
+}
+
+export class TrackingExistingFactConflictResponseDto {
+  @ApiProperty({ type: String, format: 'uuid' })
+  public readonly factRecordId!: string
+
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$' })
+  public readonly revision!: string
+
+  @ApiProperty({ enum: ['correct-existing-record'] })
+  public readonly nextAction!: 'correct-existing-record'
+}
+
+export class TrackingExistingFactProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: [
+      'TRACKING_FACT_CORRECTION_REQUIRED',
+      'TRACKING_WEEKLY_TASK_ALREADY_SYSTEM_CLOSED',
+    ],
+    example: 'TRACKING_FACT_CORRECTION_REQUIRED',
+  })
+  declare public readonly code:
+    | 'TRACKING_FACT_CORRECTION_REQUIRED'
+    | 'TRACKING_WEEKLY_TASK_ALREADY_SYSTEM_CLOSED'
+
+  @ApiProperty({ type: () => TrackingExistingFactConflictResponseDto })
+  public readonly conflict!: TrackingExistingFactConflictResponseDto
+}
+
+export class TrackingCloseDayTargetConflictResponseDto {
+  @ApiProperty({
+    enum: ['not_active', 'future_date', 'not_applicable', 'closed'],
+  })
+  public readonly reason!:
+    'not_active' | 'future_date' | 'not_applicable' | 'closed'
+}
+
+export class TrackingCloseDayTargetProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE'],
+    example: 'TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE',
+  })
+  declare public readonly code: 'TRACKING_CLOSE_DAY_TARGET_UNAVAILABLE'
+
+  @ApiProperty({ type: () => TrackingCloseDayTargetConflictResponseDto })
+  public readonly conflict!: TrackingCloseDayTargetConflictResponseDto
+}
+
+export class TrackingCloseDayRetryConflictResponseDto {
+  @ApiProperty({
+    type: String,
+    pattern: '^(?:0|[1-9][0-9]*)$',
+    required: false,
+  })
+  public readonly expectedRevision?: string
+
+  @ApiProperty({
+    type: String,
+    pattern: '^(?:0|[1-9][0-9]*)$',
+    required: false,
+  })
+  public readonly currentRevision?: string
+
+  @ApiProperty({ enum: ['reload-close-day-preview-and-retry'] })
+  public readonly nextAction!: 'reload-close-day-preview-and-retry'
+}
+
+export class TrackingCloseDayRetryProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: [
+      'TRACKING_CLOSE_DAY_REVISION_CONFLICT',
+      'TRACKING_CLOSE_DAY_PREVIEW_CONFLICT',
+    ],
+    example: 'TRACKING_CLOSE_DAY_REVISION_CONFLICT',
+  })
+  declare public readonly code:
+    | 'TRACKING_CLOSE_DAY_REVISION_CONFLICT'
+    | 'TRACKING_CLOSE_DAY_PREVIEW_CONFLICT'
+
+  @ApiProperty({ type: () => TrackingCloseDayRetryConflictResponseDto })
+  public readonly conflict!: TrackingCloseDayRetryConflictResponseDto
+}
+
+export class TrackingExistingDayCloseConflictResponseDto {
+  @ApiProperty({ type: String, format: 'uuid' })
+  public readonly dayCloseId!: string
+
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$' })
+  public readonly revision!: string
+
+  @ApiProperty({ enum: ['open-closed-day'] })
+  public readonly nextAction!: 'open-closed-day'
+}
+
+export class TrackingExistingDayCloseProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['TRACKING_CLOSE_DAY_ALREADY_CLOSED'],
+    example: 'TRACKING_CLOSE_DAY_ALREADY_CLOSED',
+  })
+  declare public readonly code: 'TRACKING_CLOSE_DAY_ALREADY_CLOSED'
+
+  @ApiProperty({ type: () => TrackingExistingDayCloseConflictResponseDto })
+  public readonly conflict!: TrackingExistingDayCloseConflictResponseDto
+}
+
+export class TrackingWeeklyTaskTargetConflictResponseDto {
+  @ApiProperty({
+    enum: [
+      'not_active',
+      'future_period',
+      'preactivation',
+      'stale_period',
+      'closed',
+    ],
+  })
+  public readonly reason!:
+    'not_active' | 'future_period' | 'preactivation' | 'stale_period' | 'closed'
+}
+
+export class TrackingWeeklyTaskTargetProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE'],
+    example: 'TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE',
+  })
+  declare public readonly code: 'TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE'
+
+  @ApiProperty({ type: () => TrackingWeeklyTaskTargetConflictResponseDto })
+  public readonly conflict!: TrackingWeeklyTaskTargetConflictResponseDto
+}
+
 export class PublicationPreviewConflictResponseDto {
   @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$' })
   public readonly currentDraftRevision!: string

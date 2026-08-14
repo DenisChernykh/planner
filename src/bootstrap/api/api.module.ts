@@ -14,10 +14,14 @@ import { HttpContextModule } from '@/platform/http/context/http-context.module'
 import { HttpErrorsModule } from '@/platform/http/errors/http-errors.module'
 import { CORE_HTTP_PROBLEM_CONTRIBUTION } from '@/platform/http/errors/http-problem.mapper'
 import { LifecycleModule } from '@/platform/lifecycle/lifecycle.module'
+import type { ProductClock } from '@/shared/application/product-clock'
 
 @Module({})
 export class ApiModule {
-  public static forRoot(config: ApplicationRuntimeConfig): DynamicModule {
+  public static forRoot(
+    config: ApplicationRuntimeConfig,
+    trackingClock?: ProductClock,
+  ): DynamicModule {
     return {
       module: ApiModule,
       imports: [
@@ -34,7 +38,7 @@ export class ApiModule {
         HealthModule,
         AuthModule,
         PlanningModule,
-        TrackingModule,
+        TrackingModule.forRoot(trackingClock),
       ],
     }
   }
