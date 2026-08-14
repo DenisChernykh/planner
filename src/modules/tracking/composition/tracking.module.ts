@@ -14,13 +14,18 @@ import {
 } from '@/shared/application/database-transaction.port'
 
 import { TRACKING_APPLICATION } from '../application/tracking-application'
+import { CompositeFactController } from '../presentation/composite-fact.controller'
 import { TrackingQueryController } from '../presentation/tracking-query.controller'
 import { ScalarFactController } from '../presentation/scalar-fact.controller'
 import { createTrackingApplication } from './create-tracking-application'
 
 @Module({
   imports: [DatabaseModule, WorkspaceModule],
-  controllers: [TrackingQueryController, ScalarFactController],
+  controllers: [
+    TrackingQueryController,
+    ScalarFactController,
+    CompositeFactController,
+  ],
   providers: [
     {
       provide: TRACKING_APPLICATION,

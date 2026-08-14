@@ -1187,6 +1187,30 @@ body, authentication, browser authorization, validation и dependency failures
 используют общие HTTP contracts. Composite facts, correction/delete/undo,
 CloseDay и weekly-result writes остаются H02/H03.
 
+#### 7.6.9. H02 Composite fact HTTP adapter
+
+H02 публикует authenticated mutation routes
+`POST /tracking/facts/text`, `/tracking/facts/checklist-item`,
+`/tracking/facts/or-variant` и `/tracking/facts/composite-occurrence`. Все routes
+требуют session cookie и CSRF и являются thin adapters над уже существующими
+T03/T04 application commands. Verified user разрешается через
+`WorkspaceMemberResolver`; actor и `expectedRevision` отсутствуют в request
+DTO, потому что эти операции создают новый logical component fact.
+
+Fixed text, checklist item и OR variant получают publication/snapshot,
+expectation date и обязательный nullable checkpoint ID. Flexible composite
+occurrence получает local date и exact discriminated component
+`checklist_item|or_variant`. Stable item, variant и checkpoint IDs всегда
+приходят из immutable publication snapshot; presentation не вычисляет
+progress, applicability, scope или ownership.
+
+Success и Problem Details переиспользуют H01 contracts: результат —
+`tracking.fact-record.v1` с revision как decimal string, exact replay остаётся
+свойством durable executor, а target/lifecycle/value ошибки маппятся на общий
+tracking problem registry. Все outer и discriminated component schemas exact
+(`additionalProperties:false`). Correction/delete/undo, CloseDay и weekly
+task writes остаются H03.
+
 ### 7.7. Action history
 
 Каждая logical command создаёт action group:

@@ -54,6 +54,22 @@ function installTrackingSchemas(document: OpenAPIObject): void {
     },
     ['kind', 'aggregateId', 'aggregateRevision'],
   )
+  schemas['TrackingChecklistOccurrenceComponentV1'] = object(
+    {
+      kind: { type: 'string', enum: ['checklist_item'] },
+      checklistItemId: uuid,
+      state: { type: 'string', enum: ['done', 'not_done'] },
+    },
+    ['kind', 'checklistItemId', 'state'],
+  )
+  schemas['TrackingOrOccurrenceComponentV1'] = object(
+    {
+      kind: { type: 'string', enum: ['or_variant'] },
+      variantId: uuid,
+      value: decimal,
+    },
+    ['kind', 'variantId', 'value'],
+  )
 
   schemas['TrackingExactRatioV1'] = object(
     { numerator: nonnegative, denominator: positive },

@@ -1908,12 +1908,12 @@ existing tracking commands.
 - Create: `src/modules/tracking/presentation/composite-fact.dto.ts`
 - Test: `test/e2e/tracking/composite-fact-http.e2e-spec.ts`
 
-- [ ] Написать RED HTTP table cases for every composite type, partial progress,
+- [x] Написать RED HTTP table cases for every composite type, partial progress,
   validation, authorization and replay.
-- [ ] Implement thin DTO/command mapping without evaluator duplication.
-- [ ] Add OpenAPI discriminators and Problem Details.
-- [ ] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: expose composite fact commands over HTTP`.
+- [x] Implement thin DTO/command mapping without evaluator duplication.
+- [x] Add OpenAPI discriminators and Problem Details.
+- [x] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
+- [x] Commit: `feat: expose composite fact commands over HTTP`.
 
 ### H03 — Fact maintenance and closure HTTP adapter
 
