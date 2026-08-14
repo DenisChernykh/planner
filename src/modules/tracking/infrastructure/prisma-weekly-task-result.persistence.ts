@@ -91,9 +91,6 @@ export class PrismaWeeklyTaskResultPersistence implements WeeklyTaskResultPersis
       if (input.currentLocalDate < target.period_start) {
         throw new WeeklyTaskTargetUnavailableError('future_period')
       }
-      if (input.currentLocalDate > target.period_end) {
-        throw new WeeklyTaskTargetUnavailableError('stale_period')
-      }
       if (
         target.scope_kind === 'personal' &&
         target.owner_member_id !== input.memberId
@@ -127,6 +124,9 @@ export class PrismaWeeklyTaskResultPersistence implements WeeklyTaskResultPersis
           throw new WeeklyTaskAlreadySystemClosedError(existingRef)
         }
         throw new FactCorrectionRequiredError(existingRef)
+      }
+      if (input.currentLocalDate > target.period_end) {
+        throw new WeeklyTaskTargetUnavailableError('stale_period')
       }
 
       const factRecordId = randomUUID()

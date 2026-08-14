@@ -94,6 +94,17 @@ services:
       retries: 30
       start_period: 5s
 
+  planner-worker:
+    <<: *runtime-image
+    command: ['pnpm', 'start:planner-worker']
+    environment:
+      DATABASE_URL: *database-url
+      PLANNER_WORKER_INTERVAL_MS: 30000
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-auth-data:

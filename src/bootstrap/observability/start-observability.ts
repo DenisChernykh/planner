@@ -7,7 +7,7 @@ import { resourceFromAttributes } from '@opentelemetry/resources'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 
-import type { ApplicationRuntimeConfig } from '@/platform/config/runtime-config.types'
+import type { OpenTelemetryRuntimeConfig } from '@/platform/config/runtime-config.types'
 import { ObservabilityRuntime } from '@/platform/observability/observability.runtime'
 import { SanitizingSpanExporter } from '@/platform/observability/sanitizing-span.exporter'
 
@@ -18,9 +18,13 @@ interface TracerProviderLifecycle {
 
 export interface ObservabilityBootstrapDependencies {
   readonly createProvider: (
-    config: ApplicationRuntimeConfig,
+    config: ObservabilityBootstrapConfig,
   ) => TracerProviderLifecycle
   readonly registerInstrumentations: () => () => void
+}
+
+export type ObservabilityBootstrapConfig = {
+  readonly observability: OpenTelemetryRuntimeConfig
 }
 
 const defaultDependencies: ObservabilityBootstrapDependencies = {
@@ -51,7 +55,7 @@ const defaultDependencies: ObservabilityBootstrapDependencies = {
 }
 
 export function startObservability(
-  config: ApplicationRuntimeConfig,
+  config: ObservabilityBootstrapConfig,
   dependencies: ObservabilityBootstrapDependencies = defaultDependencies,
 ): ObservabilityRuntime {
   if (config.observability.disabled) return new ObservabilityRuntime()
@@ -81,7 +85,7 @@ export function startObservability(
   }
 }
 
-function traceEndpoint(config: ApplicationRuntimeConfig): {
+function traceEndpoint(config: ObservabilityBootstrapConfig): {
   readonly url?: string
 } {
   const endpoint = config.observability.endpoint

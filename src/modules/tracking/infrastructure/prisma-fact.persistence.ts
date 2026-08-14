@@ -152,7 +152,8 @@ type StateRow = {
   readonly checklist_item_state: 'done' | 'not_done' | null
   readonly or_variant_value: string | null
   readonly fixed_outcome: 'not_done' | null
-  readonly recorded_by_member_id: string
+  readonly recorded_by_member_id: string | null
+  readonly recorded_by_system_actor_id: 'planner-worker' | null
 }
 
 type ProgressHeaderRow = {
@@ -191,6 +192,16 @@ function freeze<T>(value: T): T {
     return Object.freeze(value)
   }
   return value
+}
+
+function memberRecorder(row: StateRow): string {
+  if (
+    row.recorded_by_member_id === null ||
+    row.recorded_by_system_actor_id !== null
+  ) {
+    throw new Error('Member fact actor is invalid')
+  }
+  return row.recorded_by_member_id
 }
 
 function quantityScale(value: string): number {
@@ -1440,7 +1451,8 @@ export class PrismaFactPersistence implements FactPersistencePort {
                revision.checklist_item_state,
                revision.or_variant_value,
                revision.fixed_outcome,
-               revision.recorded_by_member_id::text
+               revision.recorded_by_member_id::text,
+               revision.recorded_by_system_actor_id
           FROM tracking_fact_records record
           JOIN tracking_fact_revisions revision
             ON revision.id = record.current_revision_id
@@ -1492,7 +1504,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
             factRecordId: row.fact_record_id,
             revision: row.revision_number,
             value: row.quantity_value,
-            recordedByMemberId: row.recorded_by_member_id,
+            recordedByMemberId: memberRecorder(row),
           }
         })
         fact = { kind: 'quantity_add', contributions }
@@ -1505,7 +1517,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
           factRecordId: first.fact_record_id,
           revision: first.revision_number,
           value: first.quantity_value,
-          recordedByMemberId: first.recorded_by_member_id,
+          recordedByMemberId: memberRecorder(first),
         }
       } else if (first?.fact_kind === 'boolean') {
         if (first.boolean_result === null || rows.length !== 1) {
@@ -1516,7 +1528,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
           factRecordId: first.fact_record_id,
           revision: first.revision_number,
           result: first.boolean_result,
-          recordedByMemberId: first.recorded_by_member_id,
+          recordedByMemberId: memberRecorder(first),
         }
       } else if (first?.fact_kind === 'actual_time') {
         if (first.actual_time_value === null || rows.length !== 1) {
@@ -1527,7 +1539,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
           factRecordId: first.fact_record_id,
           revision: first.revision_number,
           value: first.actual_time_value,
-          recordedByMemberId: first.recorded_by_member_id,
+          recordedByMemberId: memberRecorder(first),
         }
       } else if (first?.fact_kind === 'rating') {
         if (first.rating_value === null || rows.length !== 1) {
@@ -1538,7 +1550,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
           factRecordId: first.fact_record_id,
           revision: first.revision_number,
           value: storedRating(first.rating_value),
-          recordedByMemberId: first.recorded_by_member_id,
+          recordedByMemberId: memberRecorder(first),
         }
       } else if (first?.fact_kind === 'text') {
         if (
@@ -1554,7 +1566,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
           revision: first.revision_number,
           text: first.text_value,
           result: first.text_result,
-          recordedByMemberId: first.recorded_by_member_id,
+          recordedByMemberId: memberRecorder(first),
         }
       } else if (first?.fact_kind === 'fixed_not_done') {
         if (first.fixed_outcome !== 'not_done' || rows.length !== 1) {
@@ -1565,7 +1577,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
           factRecordId: first.fact_record_id,
           revision: first.revision_number,
           result: 'not_done',
-          recordedByMemberId: first.recorded_by_member_id,
+          recordedByMemberId: memberRecorder(first),
         }
       }
       return freeze({
@@ -1621,6 +1633,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
                revision.or_variant_value,
                revision.fixed_outcome,
                revision.recorded_by_member_id::text,
+               revision.recorded_by_system_actor_id,
                expectation.component_kind,
                expectation.component_id::text,
                period.period_start::text, period.period_end::text

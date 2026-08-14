@@ -42,7 +42,8 @@ export type TrackingFactReadV1 = {
   readonly orVariantId: string | null
   readonly revisionKind: 'recorded' | 'tombstoned'
   readonly value: TrackingStoredFactValueV1 | null
-  readonly recordedByMemberId: string
+  readonly recordedByMemberId: string | null
+  readonly recordedBySystemActorId: 'planner-worker' | null
 }
 
 export type TrackingFixedExpectationV1 = {

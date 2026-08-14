@@ -3642,8 +3642,24 @@
             "type": "string"
           },
           "recordedByMemberId": {
+            "nullable": true,
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
             "type": "string"
+          },
+          "recordedBySystemActorId": {
+            "oneOf": [
+              {
+                "enum": [
+                  "planner-worker"
+                ],
+                "type": "string"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
           },
           "revision": {
             "pattern": "^[1-9][0-9]*$",
@@ -3678,7 +3694,8 @@
           "orVariantId",
           "revisionKind",
           "value",
-          "recordedByMemberId"
+          "recordedByMemberId",
+          "recordedBySystemActorId"
         ],
         "type": "object"
       },

@@ -403,6 +403,7 @@ function readFact(row: FactRow): TrackingFactReadV1 {
     revisionKind: row.revision_kind,
     value: factValue(row),
     recordedByMemberId: row.recorded_by_member_id,
+    recordedBySystemActorId: row.recorded_by_system_actor_id,
   }
 }
 
@@ -785,6 +786,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
                revision.or_variant_value,
                revision.fixed_outcome,
                revision.recorded_by_member_id::text,
+               revision.recorded_by_system_actor_id,
                expectation.component_kind,
                expectation.component_id::text,
                period.period_start::text, period.period_end::text,

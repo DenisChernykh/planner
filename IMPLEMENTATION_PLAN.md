@@ -1865,15 +1865,15 @@ T10 также владеет physical system-result persistence и реальн
 сценарием `already-system-closed`; T09 проверяет эту конечную ошибку только на
 application fake boundary.
 
-- [ ] Написать fake-clock RED cases Monday, month edge, restart, duplicate tick
+- [x] Написать fake-clock RED cases Monday, month edge, restart, duplicate tick
   and two competing runners.
-- [ ] Перенести `run-worker-application` and periodic runner source paths с
+- [x] Перенести `run-worker-application` and periodic runner source paths с
   provenance; append exact SHA/paths, CloseWeek consumer, shutdown/restart
   failure model, adaptations and exclusions; реализовать DB due ownership.
-- [ ] Доказать, что CloseWeek сохраняет user result, закрывает unresolved task и
+- [x] Доказать, что CloseWeek сохраняет user result, закрывает unresolved task и
   не daily-fails flexible goals.
-- [ ] Проверить graceful shutdown, readiness and `pnpm check:quick`.
-- [ ] Commit: `feat: run weekly plan lifecycle worker`.
+- [x] Проверить graceful shutdown, readiness and `pnpm check:quick`.
+- [x] Commit: `feat: run weekly plan lifecycle worker`.
 
 ### H01 — Scalar fact HTTP adapter
 

@@ -1427,6 +1427,40 @@ system actor result и автоматический already-system-closed path �
 
 Повторный запуск не меняет уже выставленный пользователем результат.
 
+T10 реализует это внутренней durable-командой `planning.close-week.v1` с
+payload `{ publicationId, periodStart, periodEnd }`, без `expectedRevision` и
+только от `system:planner-worker`. Все physical weekly planned tasks одной
+публикации с одинаковыми границами образуют одну группу; минимальный
+`flexiblePeriodId` группы является стабильной group identity и command ID
+первого закрытия. Если уже закрытый system-result впоследствии tombstoned,
+следующее закрытие получает детерминированный generation command ID из group
+identity и числа предыдущих `week_closed` actions. Поэтому competing workers
+используют один durable key внутри generation, а completed receipt предыдущей
+generation не подавляет повторное закрытие. Receipt возвращает
+`planning.week-close.v1`, aggregate ID action group и aggregate revision,
+равную новому `factsRevision`.
+
+Transaction блокирует month и повторно читает logical results. Recorded
+`done/not_done` сохраняются; отсутствующий record получает system-authored
+revision `1`, а текущий tombstone — следующую system-authored recorded revision
+`not_done`. Один `week_closed` action содержит все changes и увеличивает
+`factsRevision` ровно один раз. Если под lock незаполненных задач уже нет,
+операция не создаёт receipt или history. Tracking actor columns используют
+exact-one member/system representation; Today/Month возвращают nullable
+`recordedByMemberId` и `recordedBySystemActorId`.
+
+Отдельный `planner-worker` сначала выполняет authoritative due-scan и только
+после его успеха объявляет process-local readiness. Затем transferred REL-03
+runner запускает непересекающиеся циклы с default delay 30 секунд
+(конфигурируемый диапазон 15–60 секунд). Due instant равен `00:00` дня после
+`periodEnd` в `Asia/Yekaterinburg`, поэтому один контракт покрывает Monday и
+month boundary. Неожиданная ошибка завершает process; restart повторяет scan.
+Runner прекращает admission и ждёт активный цикл до 5 секунд, общий shutdown
+PostgreSQL/observability ограничен 10 секундами.
+SIGINT/SIGTERM admission устанавливается до PostgreSQL connect и initial scan;
+сигнал отменяет startup, не допускает readiness и запускает тот же bounded
+cleanup PostgreSQL/observability.
+
 ### 9.7. `CloseMonth` и `RecloseMonth`
 
 Owner lifecycle — `planning`; `reporting` предоставляет детерминированный

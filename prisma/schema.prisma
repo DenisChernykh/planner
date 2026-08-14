@@ -507,22 +507,23 @@ model PlanningSeedConsumption {
 }
 
 model TrackingFactRecord {
-  id                 String   @id @db.Uuid
-  spaceId            String   @map("space_id") @db.Uuid
-  planMonthId        String   @map("plan_month_id") @db.Uuid
-  publicationId      String   @map("publication_id") @db.Uuid
-  planGoalSnapshotId String   @map("plan_goal_snapshot_id") @db.Uuid
-  localDate          DateTime @map("local_date") @db.Date
-  factKind           String   @map("fact_kind") @db.VarChar(24)
-  fixedExpectationId String?  @map("fixed_expectation_id") @db.Uuid
-  flexiblePeriodId   String?  @map("flexible_period_id") @db.Uuid
-  contributionId     String?  @unique @map("contribution_id") @db.Uuid
-  checklistItemId    String?  @map("checklist_item_id") @db.Uuid
-  orVariantId        String?  @map("or_variant_id") @db.Uuid
-  currentRevisionId  String?  @map("current_revision_id") @db.Uuid
-  createdByMemberId  String   @map("created_by_member_id") @db.Uuid
-  createdAt          DateTime @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime @map("updated_at") @db.Timestamptz(3)
+  id                     String   @id @db.Uuid
+  spaceId                String   @map("space_id") @db.Uuid
+  planMonthId            String   @map("plan_month_id") @db.Uuid
+  publicationId          String   @map("publication_id") @db.Uuid
+  planGoalSnapshotId     String   @map("plan_goal_snapshot_id") @db.Uuid
+  localDate              DateTime @map("local_date") @db.Date
+  factKind               String   @map("fact_kind") @db.VarChar(24)
+  fixedExpectationId     String?  @map("fixed_expectation_id") @db.Uuid
+  flexiblePeriodId       String?  @map("flexible_period_id") @db.Uuid
+  contributionId         String?  @unique @map("contribution_id") @db.Uuid
+  checklistItemId        String?  @map("checklist_item_id") @db.Uuid
+  orVariantId            String?  @map("or_variant_id") @db.Uuid
+  currentRevisionId      String?  @map("current_revision_id") @db.Uuid
+  createdByMemberId      String?  @map("created_by_member_id") @db.Uuid
+  createdBySystemActorId String?  @map("created_by_system_actor_id") @db.VarChar(32)
+  createdAt              DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime @map("updated_at") @db.Timestamptz(3)
 
   space            Space                  @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   planMonth        PlanMonth              @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
@@ -530,7 +531,7 @@ model TrackingFactRecord {
   planGoalSnapshot PlanGoalSnapshot       @relation(fields: [publicationId, planGoalSnapshotId], references: [publicationId, id], onDelete: Restrict, onUpdate: Restrict)
   fixedExpectation FixedExpectation?      @relation(fields: [fixedExpectationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   flexiblePeriod   FlexiblePeriod?        @relation(fields: [flexiblePeriodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  createdBy        Membership             @relation("FactRecordCreator", fields: [spaceId, createdByMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy        Membership?            @relation("FactRecordCreator", fields: [spaceId, createdByMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
   revisions        TrackingFactRevision[] @relation("FactRecordRevisions")
   currentRevision  TrackingFactRevision?  @relation("CurrentFactRevision", fields: [id, currentRevisionId], references: [factRecordId, id], onDelete: Restrict, onUpdate: Restrict)
   changes          TrackingFactChange[]
@@ -542,25 +543,26 @@ model TrackingFactRecord {
 }
 
 model TrackingFactRevision {
-  id                 String    @id @db.Uuid
-  factRecordId       String    @map("fact_record_id") @db.Uuid
-  revisionNumber     BigInt    @map("revision_number") @db.BigInt
-  revisionKind       String    @map("revision_kind") @db.VarChar(16)
-  booleanResult      String?   @map("boolean_result") @db.VarChar(16)
-  quantityValue      String?   @map("quantity_value") @db.Text
-  actualTimeValue    DateTime? @map("actual_time_value") @db.Time(0)
-  ratingValue        BigInt?   @map("rating_value") @db.BigInt
-  textValue          String?   @map("text_value") @db.Text
-  textResult         String?   @map("text_result") @db.VarChar(16)
-  checklistItemState String?   @map("checklist_item_state") @db.VarChar(16)
-  orVariantValue     String?   @map("or_variant_value") @db.Text
-  fixedOutcome       String?   @map("fixed_outcome") @db.VarChar(16)
-  recordedByMemberId String    @map("recorded_by_member_id") @db.Uuid
-  createdAt          DateTime  @map("created_at") @db.Timestamptz(3)
+  id                      String    @id @db.Uuid
+  factRecordId            String    @map("fact_record_id") @db.Uuid
+  revisionNumber          BigInt    @map("revision_number") @db.BigInt
+  revisionKind            String    @map("revision_kind") @db.VarChar(16)
+  booleanResult           String?   @map("boolean_result") @db.VarChar(16)
+  quantityValue           String?   @map("quantity_value") @db.Text
+  actualTimeValue         DateTime? @map("actual_time_value") @db.Time(0)
+  ratingValue             BigInt?   @map("rating_value") @db.BigInt
+  textValue               String?   @map("text_value") @db.Text
+  textResult              String?   @map("text_result") @db.VarChar(16)
+  checklistItemState      String?   @map("checklist_item_state") @db.VarChar(16)
+  orVariantValue          String?   @map("or_variant_value") @db.Text
+  fixedOutcome            String?   @map("fixed_outcome") @db.VarChar(16)
+  recordedByMemberId      String?   @map("recorded_by_member_id") @db.Uuid
+  recordedBySystemActorId String?   @map("recorded_by_system_actor_id") @db.VarChar(32)
+  createdAt               DateTime  @map("created_at") @db.Timestamptz(3)
 
   factRecord    TrackingFactRecord       @relation("FactRecordRevisions", fields: [factRecordId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   currentFor    TrackingFactRecord?      @relation("CurrentFactRevision")
-  recordedBy    Membership               @relation("FactRevisionActor", fields: [recordedByMemberId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  recordedBy    Membership?              @relation("FactRevisionActor", fields: [recordedByMemberId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   beforeChanges TrackingFactChange[]     @relation("FactChangeBeforeRevision")
   afterChanges  TrackingFactChange[]     @relation("FactChangeAfterRevision")
   undoRestores  TrackingFactUndoChange[]
@@ -575,7 +577,8 @@ model TrackingActionGroup {
   actionKind          String   @map("action_kind") @db.VarChar(32)
   actorKind           String   @map("actor_kind") @db.VarChar(16)
   actorScope          String   @map("actor_scope") @db.VarChar(64)
-  memberId            String   @map("member_id") @db.Uuid
+  memberId            String?  @map("member_id") @db.Uuid
+  systemActorId       String?  @map("system_actor_id") @db.VarChar(32)
   spaceId             String   @map("space_id") @db.Uuid
   planMonthId         String   @map("plan_month_id") @db.Uuid
   publicationId       String   @map("publication_id") @db.Uuid
@@ -587,7 +590,7 @@ model TrackingActionGroup {
   reason              String?  @db.Text
   occurredAt          DateTime @map("occurred_at") @db.Timestamptz(3)
 
-  member           Membership              @relation(fields: [spaceId, memberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  member           Membership?             @relation(fields: [spaceId, memberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
   space            Space                   @relation(fields: [spaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   planMonth        PlanMonth               @relation(fields: [spaceId, planMonthId], references: [spaceId, id], onDelete: Restrict, onUpdate: Restrict)
   publication      PlanPublication         @relation(fields: [planMonthId, publicationId], references: [planMonthId, id], onDelete: Restrict, onUpdate: Restrict)

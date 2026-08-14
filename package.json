@@ -26,6 +26,7 @@
     "provision:pair": "tsx src/bootstrap/provision-pair/main.ts",
     "start:api": "node dist/bootstrap/api/main.js",
     "start:migrate": "prisma migrate deploy --config prisma.config.ts",
+    "start:planner-worker": "node dist/bootstrap/planner-worker/main.js",
     "test": "pnpm run test:run",
     "test:contract:run": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.contract.config.mjs --runInBand",
     "test:e2e:run": "pnpm run prisma:generate && node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.e2e.config.mjs --runInBand",

@@ -251,6 +251,7 @@ describe('T09 weekly planned task result on PostgreSQL', () => {
     const beforeUpgrade = await digest()
     await applyMigration(pool, '20260811167000_weekly_task_result')
     expect(await digest()).toBe(beforeUpgrade)
+    await applyMigration(pool, '20260811168000_close_week')
     const postUpgradeCorrection = await tracking.correctRecord.execute({
       commandId: randomUUID(),
       trustedActor: actor(),

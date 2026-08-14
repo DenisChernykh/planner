@@ -205,6 +205,35 @@ Focused unit/E2E, offline generation/drift/lint, architecture and quick gates
 are local evidence only. They do not prove collector availability, GitHub CI,
 OCI publication, deployment, hosted HTTP behavior, Telegram smoke or restore.
 
+## T10 planner-worker and REL-03 adoption
+
+T10 selectively adapts the clean Starter repository at
+`/Users/denischernykh/projects/starters/nest-js-starter`, where
+`stage = origin/stage = a0c8e8002af59536dea3c8209fe527bd033b2eca`.
+The transferred source paths are
+`src/platform/maintenance/periodic-maintenance-runner.ts` and
+`src/bootstrap/workers/run-worker-application.ts`, with their focused unit
+suites. The periodic runner entered Starter through merge `c010753` and is
+present at the pinned source SHA.
+
+Planner adopts only the process-local non-overlapping timer, signal admission
+and bounded drain. The named consumer is PostgreSQL-backed CloseWeek. Durable
+due state is the immutable physical weekly period; stable group identity,
+generation command identity, receipt replay, month locking and exact effect
+constraints remain product-owned.
+The worker performs one authoritative scan before readiness, then waits a fixed
+delay between settled cycles. Restart repeats the scan; competing processes may
+observe the same row but serialize through the database command key and month.
+
+Planner installs signal admission before PostgreSQL connect and initial scan,
+then adapts the standalone application helper to race process termination with
+a failed maintenance loop and close PostgreSQL before the outer ten-second
+deadline. Startup cancellation does not announce readiness. It excludes
+Starter outbox, BullMQ, queue Redis, leases, retry state,
+dead letters, HTTP health endpoints and deployment policy. The local Compose
+service proves only executable composition; hosted readiness, multi-replica
+rollout and recovery remain deployment evidence.
+
 ## S04 local User and opaque-session transfer
 
 ### Source and target mapping

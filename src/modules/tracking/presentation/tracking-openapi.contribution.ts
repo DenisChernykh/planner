@@ -234,7 +234,10 @@ function installTrackingSchemas(document: OpenAPIObject): void {
       orVariantId: nullableUuid,
       revisionKind: { type: 'string', enum: ['recorded', 'tombstoned'] },
       value: { oneOf: [ref('TrackingFactValueV1'), { enum: [null] }] },
-      recordedByMemberId: uuid,
+      recordedByMemberId: nullableUuid,
+      recordedBySystemActorId: {
+        oneOf: [{ type: 'string', enum: ['planner-worker'] }, { enum: [null] }],
+      },
     },
     [
       'factRecordId',
@@ -246,6 +249,7 @@ function installTrackingSchemas(document: OpenAPIObject): void {
       'revisionKind',
       'value',
       'recordedByMemberId',
+      'recordedBySystemActorId',
     ],
   )
   const state = {

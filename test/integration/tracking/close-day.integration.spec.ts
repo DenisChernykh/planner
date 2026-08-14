@@ -142,6 +142,8 @@ describe('T08 Atomic CloseDay on PostgreSQL', () => {
     const beforeUpgrade = await trackingDigest(pool)
     await applyMigration(pool, '20260811166000_close_day')
     expect(await trackingDigest(pool)).toBe(beforeUpgrade)
+    await applyMigration(pool, '20260811167000_weekly_task_result')
+    await applyMigration(pool, '20260811168000_close_week')
   })
 
   afterAll(async () => {
