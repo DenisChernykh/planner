@@ -2111,27 +2111,29 @@ recovery without blind retry.
 
 **Files:**
 
-- Create: `src/modules/reminders/infrastructure/telegram-outbound.transport.ts`
-- Create: `src/modules/reminders/infrastructure/notification-attempt.repository.ts`
+- Create: `src/modules/telegram-bot/infrastructure/telegram-outbound.transport.ts`
+- Create: `src/modules/reminders/infrastructure/prisma-notification-attempt.persistence.ts`
 - Create: `src/modules/reminders/application/deliver-reminder.command.ts`
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/20260811230000_notification_attempts/migration.sql`
 - Modify: `docs/provenance/starter-core.md`
+- Modify: `src/modules/reminders/infrastructure/prisma-notification-intent.persistence.ts`
+- Modify: `src/modules/workspace/application/workspace-member-resolver.port.ts`
 - Test: `test/contract/telegram/outbound-transport.contract.spec.ts`
 - Test: `test/integration/reminders/delivery-recovery.integration.spec.ts`
 
 **Produces:** `TelegramAttemptOutcome = accepted | retryable | terminal |
 ambiguous`; no schedule/template/retry policy inside transport.
 
-- [ ] Написать fake provider RED matrix accepted, 429/retry_after, 5xx,
+- [x] Написать fake provider RED matrix accepted, 429/retry_after, 5xx,
   blocked/chat-not-found, timeout-after-possible-send and oversize response.
-- [ ] Перенести INT-01 selected paths; append exact SHA/source/target paths,
+- [x] Перенести INT-01 selected paths; append exact SHA/source/target paths,
   reminder consumer, timeout/ambiguous failure model, adaptations and
   exclusions to provenance; implement single attempt mapping.
-- [ ] Проверить crash at each transition: orphaned prepared reclaim;
+- [x] Проверить crash at each transition: orphaned prepared reclaim;
   dispatching becomes terminal ambiguous; fencing rejects stale outcome.
-- [ ] Запустить contract/integration and `pnpm check:quick`.
-- [ ] Commit: `feat: deliver reminders with bounded Telegram attempts`.
+- [x] Запустить contract/integration and `pnpm check:quick`.
+- [x] Commit: `feat: deliver reminders with bounded Telegram attempts`.
 
 ### N04 — Reminder settings and delivery status HTTP adapter
 

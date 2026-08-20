@@ -1,5 +1,6 @@
 export * from './claim-due-occurrences.command'
 export * from './build-reminder-intent.command'
+export * from './deliver-reminder.command'
 export * from './reminder-errors'
 export * from './reminder.types'
 export * from './reminder.validation'

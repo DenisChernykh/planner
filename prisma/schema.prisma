@@ -55,6 +55,7 @@ model Membership {
   dayClosures             TrackingDayClosure[]
   reminderSchedule        ReminderSchedule?
   reminderOccurrences     ReminderOccurrence[]
+  notificationAttempts    NotificationAttempt[]
 
   @@unique([spaceId, slot])
   @@unique([spaceId, id])
@@ -288,6 +289,7 @@ model ReminderOccurrence {
 
   recipient Membership       @relation(fields: [spaceId, recipientMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Cascade)
   schedule  ReminderSchedule @relation(fields: [spaceId, scheduleId, recipientMemberId], references: [spaceId, id, memberId], onDelete: Restrict, onUpdate: Cascade)
+  notificationAttempts NotificationAttempt[]
 
   @@unique([recipientMemberId, localDate, slotKind], map: "reminder_occurrences_recipient_date_slot_key")
   @@index([state, dueAt, expiresAt, id], map: "reminder_occurrences_due_scan_idx")
@@ -312,11 +314,42 @@ model NotificationIntent {
   supersedesIntentId  String?  @map("supersedes_intent_id") @db.Uuid
   createdAt           DateTime @map("created_at") @db.Timestamptz(3)
 
+  attempts NotificationAttempt[]
+
+  @@unique([id, occurrenceId, spaceId, recipientMemberId], map: "notification_intents_identity_key")
   @@unique([occurrenceId, intentRevision])
   @@unique([occurrenceId, sourceFactsRevision, contentHash])
   @@index([occurrenceId, intentRevision])
   @@index([spaceId, recipientMemberId, expiresAt])
   @@map("notification_intents")
+}
+
+model NotificationAttempt {
+  id                    String    @id @db.Uuid
+  intentId              String    @map("intent_id") @db.Uuid
+  occurrenceId          String    @map("occurrence_id") @db.Uuid
+  spaceId               String    @map("space_id") @db.Uuid
+  recipientMemberId     String    @map("recipient_member_id") @db.Uuid
+  attemptNumber         Int       @map("attempt_number")
+  state                 String    @db.VarChar(16)
+  fencingToken          BigInt    @default(0) @map("fencing_token") @db.BigInt
+  outcome               String?   @db.VarChar(16)
+  outcomeReason         String?   @map("outcome_reason") @db.VarChar(32)
+  providerRetryAfterSec Int?      @map("provider_retry_after_sec")
+  startedAt             DateTime? @map("started_at") @db.Timestamptz(3)
+  completedAt           DateTime? @map("completed_at") @db.Timestamptz(3)
+  createdAt             DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @map("updated_at") @db.Timestamptz(3)
+
+  intent    NotificationIntent  @relation(fields: [intentId, occurrenceId, spaceId, recipientMemberId], references: [id, occurrenceId, spaceId, recipientMemberId], onUpdate: Restrict, onDelete: Restrict)
+  occurrence ReminderOccurrence @relation(fields: [occurrenceId], references: [id], onUpdate: Restrict, onDelete: Restrict)
+  recipient Membership          @relation(fields: [spaceId, recipientMemberId], references: [spaceId, id], onUpdate: Cascade, onDelete: Restrict)
+
+  @@unique([intentId, attemptNumber])
+  @@index([state, createdAt, id])
+  @@index([occurrenceId, attemptNumber])
+  @@index([spaceId, recipientMemberId, outcome, completedAt])
+  @@map("notification_attempts")
 }
 
 model ReminderScheduleChange {

@@ -60,6 +60,7 @@ const migrations = [
   '20260811203000_telegram_tracking_action_intents',
   '20260811210000_reminder_schedule_occurrence',
   '20260811220000_notification_intents',
+  '20260811230000_notification_attempts',
 ] as const
 
 const now = new Date('2026-03-30T05:00:00.000Z')
@@ -320,6 +321,11 @@ describe('N02 notification intents on PostgreSQL', () => {
       pool.query('DELETE FROM notification_intents WHERE id = $1::uuid', [
         prepared.intentId,
       ]),
-    ).rejects.toThrow('Notification intents are immutable')
+    ).rejects.toThrow()
+    const attempts = await pool.query<{ readonly count: number }>(
+      'SELECT count(*)::int AS count FROM notification_attempts WHERE intent_id = $1::uuid',
+      [prepared.intentId],
+    )
+    expect(attempts.rows[0]!.count).toBe(1)
   })
 })

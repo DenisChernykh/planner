@@ -313,3 +313,57 @@ Focused unit, real PostgreSQL/Redis integration, HTTP E2E, OpenAPI, Compose and
 quick gates are local evidence. They do not prove GitHub CI, hosted runtime,
 production credentials, OCI publication, deployment, backup restore, OIDC or
 the later A01/A03 consumers.
+
+## N03 Telegram outbound attempt ledger
+
+### Source and target mapping
+
+N03 consumes the independently verified Starter INT-01 merge commit
+`a0c8e8002af59536dea3c8209fe527bd033b2eca` from
+`/Users/denischernykh/projects/starters/nest-js-starter` `stage`. The source
+checkout was clean; its local branch lagged `origin/stage` only by later INT-01
+roadmap/status documentation commits. Planner starts from `5fa46c6` on
+`agent/n03-telegram-outbound-attempt-ledger`.
+
+Only the framework-free source path
+`src/platform/http/outbound/fetch-outbound-http-attempt-transport.ts` and its
+focused unit and loopback integration tests are transferred to the same target
+paths. `BoundedOutboundHttpRunner` is intentionally excluded: retry sequencing,
+durable state and restart recovery belong to Planner's PostgreSQL attempt ledger.
+
+The named consumer is
+`src/modules/telegram-bot/infrastructure/telegram-outbound.transport.ts`,
+which implements the reminders application port
+`ReminderDeliveryTransportPort`. Recipient resolution is a workspace-owned
+`memberId → allowlisted Telegram ID` port; reminders does not query workspace
+tables directly.
+
+### Failure model and adaptations
+
+The adapter performs one bounded native-fetch `sendMessage` attempt with the
+existing Telegram token, timeout, response-body bounds and redirect rejection.
+Accepted responses, retryable `429 retry_after`/`5xx`, terminal blocked or
+chat-not-found errors, and ambiguous timeout/transport/malformed/oversized
+responses are mapped to finite safe outcomes. Raw token, Telegram ID,
+provider description, request body and rendered private content never enter
+logs or attempt rows.
+
+N03 adds the Planner-owned append-only `notification_attempts` ledger and
+creates the initial `prepared` attempt atomically with the immutable N02
+notification intent. Fencing protects `dispatching` and terminal completion;
+orphaned `prepared` rows can be reclaimed, while orphaned `dispatching` rows
+become terminal `ambiguous` and are never blindly resent. N03 records
+retryable outcomes for the later N05 worker but does not own schedule,
+template or retry policy.
+
+### Evidence boundary
+
+The INT-01 transfer tests, Telegram fake-provider contract tests, PostgreSQL
+ledger recovery integration and local quick gates are local evidence. They do
+not prove live Telegram delivery, hosted restart behavior, provider-side
+acceptance, GitHub CI, deployment or pilot readiness.
+
+The recovery suite also applies N02 migrations with a populated legacy intent
+before applying N03 and verifies the upgrade backfill creates its initial
+prepared attempt; stale completion is checked against the authoritative
+occurrence fence and lease.

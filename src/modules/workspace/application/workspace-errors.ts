@@ -19,6 +19,13 @@ export class WorkspaceMemberNotFoundError extends Error {
   }
 }
 
+export class WorkspaceTelegramRecipientNotFoundError extends Error {
+  public constructor() {
+    super('Workspace Telegram recipient was not found')
+    this.name = 'WorkspaceTelegramRecipientNotFoundError'
+  }
+}
+
 export class WorkspaceDependencyUnavailableError extends Error {
   public constructor(options?: ErrorOptions) {
     super('Workspace dependency is unavailable', options)

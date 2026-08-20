@@ -5,10 +5,12 @@ import { PrismaClientProvider } from '@/platform/database/prisma-client.provider
 import type {
   MemberContext,
   WorkspaceMemberResolver,
+  WorkspaceTelegramRecipientResolver,
 } from '../application/workspace-member-resolver.port'
 import {
   WorkspaceDependencyUnavailableError,
   WorkspaceMemberNotFoundError,
+  WorkspaceTelegramRecipientNotFoundError,
 } from '../application/workspace-errors'
 
 interface ResolvedRow {
@@ -27,7 +29,9 @@ function toMemberContext(row: ResolvedRow | null): MemberContext {
 }
 
 @Injectable()
-export class PrismaWorkspaceMemberResolver implements WorkspaceMemberResolver {
+export class PrismaWorkspaceMemberResolver
+  implements WorkspaceMemberResolver, WorkspaceTelegramRecipientResolver
+{
   public constructor(private readonly database: PrismaClientProvider) {}
 
   public async resolveUser(userId: string): Promise<MemberContext> {
@@ -76,6 +80,27 @@ export class PrismaWorkspaceMemberResolver implements WorkspaceMemberResolver {
       return toMemberContext(row)
     } catch (error: unknown) {
       if (error instanceof WorkspaceMemberNotFoundError) throw error
+      throw new WorkspaceDependencyUnavailableError({ cause: error })
+    }
+  }
+
+  public async resolveTelegramRecipient(memberId: string): Promise<bigint> {
+    try {
+      const row = await this.database.withClient((client) =>
+        client.membership.findUnique({
+          where: { id: memberId },
+          select: { allowlist: { select: { telegramId: true } } },
+        }),
+      )
+      const telegramId = row?.allowlist?.telegramId
+      if (telegramId === undefined) {
+        throw new WorkspaceTelegramRecipientNotFoundError()
+      }
+      return telegramId
+    } catch (error: unknown) {
+      if (error instanceof WorkspaceTelegramRecipientNotFoundError) {
+        throw error
+      }
       throw new WorkspaceDependencyUnavailableError({ cause: error })
     }
   }

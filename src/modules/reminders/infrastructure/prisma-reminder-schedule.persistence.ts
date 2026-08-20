@@ -120,6 +120,30 @@ function occurrenceState(expiresAt: Date, now: Date): 'pending' | 'expired' {
   return expiresAt <= now ? 'expired' : 'pending'
 }
 
+async function closeOrphanedDispatchingAttempts(
+  client: Client,
+  now: Date,
+): Promise<void> {
+  const ledger = await client.$queryRaw<{ readonly relation: string | null }[]>(
+    Prisma.sql`SELECT to_regclass('notification_attempts')::text AS relation`,
+  )
+  if (ledger[0]?.relation === null) return
+  await client.$executeRaw(
+    Prisma.sql`UPDATE notification_attempts attempt
+                  SET state = 'terminal', outcome = 'ambiguous',
+                      outcome_reason = 'transport_error',
+                      completed_at = ${now}, updated_at = ${now}
+                 FROM reminder_occurrences occurrence
+                WHERE attempt.occurrence_id = occurrence.id
+                  AND attempt.state = 'dispatching'
+                  AND (
+                    occurrence.state <> 'claimed'
+                    OR occurrence.lease_until <= ${now}
+                    OR occurrence.expires_at <= ${now}
+                  )`,
+  )
+}
+
 async function upsertOccurrence(
   client: Client,
   input: {
@@ -423,6 +447,7 @@ export class PrismaReminderSchedulePersistence implements ReminderSchedulePersis
                       AND lease_until <= ${input.now}
                       AND expires_at > ${input.now}`,
       )
+      await closeOrphanedDispatchingAttempts(client, input.now)
 
       const due = await client.$queryRaw<SlotRow[]>(
         Prisma.sql`SELECT slot.id, slot.schedule_id, slot.slot_kind,

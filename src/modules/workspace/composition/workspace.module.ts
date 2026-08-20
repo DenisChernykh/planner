@@ -9,7 +9,10 @@ import { DATABASE_TRANSACTION_PORT } from '@/shared/application/database-transac
 
 import { PAIR_WORKSPACE_PORT } from '../application/pair-workspace.port'
 import { ProvisionPairUseCase } from '../application/provision-pair.use-case'
-import { WORKSPACE_MEMBER_RESOLVER } from '../application/workspace-member-resolver.port'
+import {
+  WORKSPACE_MEMBER_RESOLVER,
+  WORKSPACE_TELEGRAM_RECIPIENT_RESOLVER,
+} from '../application/workspace-member-resolver.port'
 import { PrismaPairWorkspaceRepository } from '../infrastructure/prisma-pair-workspace.repository'
 import { PrismaWorkspaceMemberResolver } from '../infrastructure/prisma-workspace-member.resolver'
 
@@ -27,6 +30,10 @@ import { PrismaWorkspaceMemberResolver } from '../infrastructure/prisma-workspac
       useExisting: PrismaWorkspaceMemberResolver,
     },
     {
+      provide: WORKSPACE_TELEGRAM_RECIPIENT_RESOLVER,
+      useExisting: PrismaWorkspaceMemberResolver,
+    },
+    {
       provide: ProvisionPairUseCase,
       inject: [
         DATABASE_TRANSACTION_PORT,
@@ -38,6 +45,6 @@ import { PrismaWorkspaceMemberResolver } from '../infrastructure/prisma-workspac
       ) => new ProvisionPairUseCase(...dependencies),
     },
   ],
-  exports: [WORKSPACE_MEMBER_RESOLVER],
+  exports: [WORKSPACE_MEMBER_RESOLVER, WORKSPACE_TELEGRAM_RECIPIENT_RESOLVER],
 })
 export class WorkspaceModule {}

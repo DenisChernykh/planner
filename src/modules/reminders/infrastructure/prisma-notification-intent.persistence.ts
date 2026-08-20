@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma, type PrismaClient } from '@/generated/prisma/client'
 import type { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 
 import { ReminderIntentClaimStaleError } from '../application/reminder-errors'
@@ -24,6 +24,13 @@ type ExistingIntentRow = {
   readonly intent_revision: bigint
   readonly content_hash: string
 }
+
+type AttemptRow = {
+  readonly id: string
+  readonly attempt_number: number
+}
+
+type PrismaClientLike = PrismaClient | Prisma.TransactionClient
 
 function contentHash(value: unknown): string {
   return createHash('sha256')
@@ -99,10 +106,22 @@ export class PrismaNotificationIntentPersistence implements ReminderIntentPersis
                     LIMIT 1`,
       )
       if (existing[0] !== undefined) {
+        const attempt = await latestAttempt(client, existing[0].id)
+        const attemptId =
+          attempt?.id ??
+          (await createAttempt(client, {
+            intentId: existing[0].id,
+            occurrenceId: input.claim.occurrenceId,
+            spaceId: occurrence.space_id,
+            recipientMemberId: input.claim.recipientMemberId,
+            attemptNumber: 1,
+            now: input.now,
+          }))
         return {
           kind: 'prepared',
           occurrenceId: input.claim.occurrenceId,
           intentId: existing[0].id,
+          attemptId,
           intentRevision: existing[0].intent_revision,
           contentHash: existing[0].content_hash,
           expiresAt: new Date(occurrence.expires_at.getTime()),
@@ -121,6 +140,7 @@ export class PrismaNotificationIntentPersistence implements ReminderIntentPersis
       )
       const previous = latest[0]
       const intentId = randomUUID()
+      const attemptId = randomUUID()
       const intentRevision = (previous?.intent_revision ?? 0n) + 1n
       await client.$executeRaw(
         Prisma.sql`INSERT INTO notification_intents
@@ -140,14 +160,64 @@ export class PrismaNotificationIntentPersistence implements ReminderIntentPersis
                   ${previous?.id === undefined ? null : Prisma.sql`${previous.id}::uuid`},
                   ${input.now})`,
       )
+      await client.$executeRaw(
+        Prisma.sql`INSERT INTO notification_attempts
+          (id, intent_id, occurrence_id, space_id, recipient_member_id,
+           attempt_number, state, fencing_token, created_at, updated_at)
+          VALUES (${attemptId}::uuid, ${intentId}::uuid,
+                  ${input.claim.occurrenceId}::uuid,
+                  ${occurrence.space_id}::uuid,
+                  ${input.claim.recipientMemberId}::uuid,
+                  1, 'prepared', 0, ${input.now}, ${input.now})`,
+      )
       return {
         kind: 'prepared',
         occurrenceId: input.claim.occurrenceId,
         intentId,
+        attemptId,
         intentRevision,
         contentHash: hash,
         expiresAt: new Date(occurrence.expires_at.getTime()),
       }
     })
   }
+}
+
+async function latestAttempt(
+  client: PrismaClientLike,
+  intentId: string,
+): Promise<AttemptRow | undefined> {
+  const rows = await client.$queryRaw<AttemptRow[]>(
+    Prisma.sql`SELECT id, attempt_number
+                 FROM notification_attempts
+                WHERE intent_id = ${intentId}::uuid
+                ORDER BY attempt_number DESC
+                LIMIT 1
+                FOR UPDATE`,
+  )
+  return rows[0]
+}
+
+async function createAttempt(
+  client: PrismaClientLike,
+  input: {
+    readonly intentId: string
+    readonly occurrenceId: string
+    readonly spaceId: string
+    readonly recipientMemberId: string
+    readonly attemptNumber: number
+    readonly now: Date
+  },
+): Promise<string> {
+  const attemptId = randomUUID()
+  await client.$executeRaw(
+    Prisma.sql`INSERT INTO notification_attempts
+      (id, intent_id, occurrence_id, space_id, recipient_member_id,
+       attempt_number, state, fencing_token, created_at, updated_at)
+      VALUES (${attemptId}::uuid, ${input.intentId}::uuid,
+              ${input.occurrenceId}::uuid, ${input.spaceId}::uuid,
+              ${input.recipientMemberId}::uuid, ${input.attemptNumber},
+              'prepared', 0, ${input.now}, ${input.now})`,
+  )
+  return attemptId
 }

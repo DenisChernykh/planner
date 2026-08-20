@@ -90,6 +90,7 @@ export type ReminderIntentBuildResult =
       readonly kind: 'prepared'
       readonly occurrenceId: string
       readonly intentId: string
+      readonly attemptId: string
       readonly intentRevision: bigint
       readonly contentHash: string
       readonly expiresAt: Date
@@ -118,6 +119,104 @@ export interface ReminderIntentPersistencePort {
   persistIntent(
     input: PersistReminderIntentInput,
   ): Promise<ReminderIntentBuildResult>
+}
+
+export type TelegramAttemptOutcome =
+  | { readonly kind: 'accepted' }
+  | {
+      readonly kind: 'retryable'
+      readonly reason: 'rate_limited' | 'provider_error'
+      readonly retryAfterSeconds: number | null
+    }
+  | {
+      readonly kind: 'terminal'
+      readonly reason:
+        | 'blocked'
+        | 'chat_not_found'
+        | 'provider_rejected'
+        | 'expired'
+        | 'superseded'
+    }
+  | {
+      readonly kind: 'ambiguous'
+      readonly reason:
+        | 'timeout'
+        | 'aborted'
+        | 'transport_error'
+        | 'malformed_response'
+        | 'oversized_response'
+    }
+
+export interface ReminderDeliveryTransportPort {
+  send(input: {
+    readonly chatId: bigint
+    readonly text: string
+    readonly signal: AbortSignal
+  }): Promise<TelegramAttemptOutcome>
+}
+
+export type DeliverReminderInput = {
+  readonly claim: ReminderOccurrenceClaim
+  readonly leaseOwner: string
+  readonly intentId: string
+  readonly attemptId: string
+  readonly signal: AbortSignal
+}
+
+export type DeliverReminderResult = {
+  readonly attemptId: string
+  readonly outcome: TelegramAttemptOutcome
+}
+
+export interface ReminderAttemptPersistencePort {
+  inspectPrepared(input: {
+    readonly attemptId: string
+    readonly intentId: string
+    readonly occurrenceId: string
+    readonly leaseOwner: string
+    readonly fencingToken: bigint
+    readonly now: Date
+  }): Promise<
+    | {
+        readonly kind: 'prepared'
+        readonly intentId: string
+        readonly recipientMemberId: string
+        readonly content: ReminderRenderedContentV1
+      }
+    | { readonly kind: 'dispatching' }
+    | { readonly kind: 'terminal'; readonly outcome: TelegramAttemptOutcome }
+    | { readonly kind: 'stale' }
+  >
+  beginDispatch(input: {
+    readonly attemptId: string
+    readonly intentId: string
+    readonly occurrenceId: string
+    readonly leaseOwner: string
+    readonly fencingToken: bigint
+    readonly now: Date
+  }): Promise<
+    | {
+        readonly kind: 'dispatch'
+      }
+    | { readonly kind: 'terminal'; readonly outcome: TelegramAttemptOutcome }
+    | { readonly kind: 'stale' }
+  >
+  completePrepared(input: {
+    readonly attemptId: string
+    readonly occurrenceId: string
+    readonly leaseOwner: string
+    readonly fencingToken: bigint
+    readonly now: Date
+    readonly outcome: TelegramAttemptOutcome
+  }): Promise<boolean>
+  completeDispatch(input: {
+    readonly attemptId: string
+    readonly occurrenceId: string
+    readonly leaseOwner: string
+    readonly fencingToken: bigint
+    readonly now: Date
+    readonly outcome: TelegramAttemptOutcome
+  }): Promise<boolean>
 }
 
 export interface ReminderTodayReadPort {

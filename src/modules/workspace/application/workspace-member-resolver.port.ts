@@ -14,6 +14,14 @@ export interface WorkspaceMemberResolver {
   resolveMember(memberId: MemberId): Promise<MemberContext>
 }
 
+export interface WorkspaceTelegramRecipientResolver {
+  resolveTelegramRecipient(memberId: MemberId): Promise<bigint>
+}
+
 export const WORKSPACE_MEMBER_RESOLVER: unique symbol = Symbol(
   'WORKSPACE_MEMBER_RESOLVER',
+)
+
+export const WORKSPACE_TELEGRAM_RECIPIENT_RESOLVER: unique symbol = Symbol(
+  'WORKSPACE_TELEGRAM_RECIPIENT_RESOLVER',
 )

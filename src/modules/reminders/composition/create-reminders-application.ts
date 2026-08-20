@@ -7,6 +7,7 @@ import type { WorkspaceMemberResolver } from '@/modules/workspace/application/wo
 
 import {
   BuildReminderIntentCommand,
+  DeliverReminderCommand,
   ClaimDueOccurrences,
   ReminderIntentDependencyUnavailableError,
   SaveReminderScheduleCommand,
@@ -14,14 +15,21 @@ import {
 } from '../application'
 import {
   PrismaNotificationIntentPersistence,
+  PrismaNotificationAttemptPersistence,
   PrismaReminderSchedulePersistence,
 } from '../infrastructure'
 import type { ReminderIntentPersistencePort } from '../application/reminder.types'
+import type {
+  ReminderAttemptPersistencePort,
+  ReminderDeliveryTransportPort,
+} from '../application/reminder.types'
+import type { WorkspaceTelegramRecipientResolver } from '@/modules/workspace/application/workspace-member-resolver.port'
 
 export type RemindersApplication = {
   readonly saveReminderSchedule: SaveReminderScheduleCommand
   readonly claimDueOccurrences: ClaimDueOccurrences
   readonly buildReminderIntent: BuildReminderIntentCommand
+  readonly deliverReminder?: DeliverReminderCommand
 }
 
 export function createRemindersApplication(dependencies: {
@@ -30,6 +38,8 @@ export function createRemindersApplication(dependencies: {
   readonly workspaceMembers: WorkspaceMemberResolver
   readonly clock: ProductClock
   readonly today?: ReminderTodayReadPort
+  readonly telegramRecipientResolver?: WorkspaceTelegramRecipientResolver
+  readonly deliveryTransport?: ReminderDeliveryTransportPort
 }): RemindersApplication {
   const persistence = new PrismaReminderSchedulePersistence(
     dependencies.database,
@@ -45,6 +55,19 @@ export function createRemindersApplication(dependencies: {
   }
   const intentPersistence: ReminderIntentPersistencePort =
     new PrismaNotificationIntentPersistence(dependencies.database)
+  const attemptPersistence: ReminderAttemptPersistencePort =
+    new PrismaNotificationAttemptPersistence(dependencies.database)
+  const deliverReminder =
+    dependencies.telegramRecipientResolver !== undefined &&
+    dependencies.deliveryTransport !== undefined
+      ? new DeliverReminderCommand(
+          attemptPersistence,
+          dependencies.telegramRecipientResolver,
+          dependencies.deliveryTransport,
+          dependencies.transaction,
+          dependencies.clock,
+        )
+      : undefined
   return Object.freeze({
     saveReminderSchedule: new SaveReminderScheduleCommand(
       executor,
@@ -62,5 +85,6 @@ export function createRemindersApplication(dependencies: {
       dependencies.transaction,
       dependencies.clock,
     ),
+    ...(deliverReminder === undefined ? {} : { deliverReminder }),
   })
 }
