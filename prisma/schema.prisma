@@ -295,6 +295,30 @@ model ReminderOccurrence {
   @@map("reminder_occurrences")
 }
 
+model NotificationIntent {
+  id                  String   @id @db.Uuid
+  occurrenceId        String   @map("occurrence_id") @db.Uuid
+  spaceId             String   @map("space_id") @db.Uuid
+  recipientMemberId   String   @map("recipient_member_id") @db.Uuid
+  publicationId       String   @map("publication_id") @db.Uuid
+  localDate           DateTime @map("local_date") @db.Date
+  slotKind            String   @map("slot_kind") @db.VarChar(16)
+  sourceFactsRevision BigInt   @map("source_facts_revision") @db.BigInt
+  intentRevision      BigInt   @map("intent_revision") @db.BigInt
+  contentSchemaVersion String  @map("content_schema_version") @db.VarChar(100)
+  content             Json     @db.JsonB
+  contentHash         String   @map("content_hash") @db.Char(64)
+  expiresAt           DateTime @map("expires_at") @db.Timestamptz(3)
+  supersedesIntentId  String?  @map("supersedes_intent_id") @db.Uuid
+  createdAt           DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@unique([occurrenceId, intentRevision])
+  @@unique([occurrenceId, sourceFactsRevision, contentHash])
+  @@index([occurrenceId, intentRevision])
+  @@index([spaceId, recipientMemberId, expiresAt])
+  @@map("notification_intents")
+}
+
 model ReminderScheduleChange {
   actionId          String    @id @map("action_id") @db.Uuid
   scheduleId        String    @map("schedule_id") @db.Uuid

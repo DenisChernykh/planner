@@ -25,3 +25,17 @@ export class ReminderClaimValidationError extends Error {
     this.name = 'ReminderClaimValidationError'
   }
 }
+
+export class ReminderIntentClaimStaleError extends Error {
+  public constructor() {
+    super('Reminder occurrence claim is stale or expired')
+    this.name = 'ReminderIntentClaimStaleError'
+  }
+}
+
+export class ReminderIntentDependencyUnavailableError extends Error {
+  public constructor(options?: { readonly cause?: unknown }) {
+    super('Reminder intent dependency is unavailable', options)
+    this.name = 'ReminderIntentDependencyUnavailableError'
+  }
+}

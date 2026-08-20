@@ -2092,14 +2092,14 @@ for non-empty reminder.
 **Produces:** immutable rendered intent with expiry/supersession and terminal
 `suppressed` outcome before any provider call.
 
-- [ ] Написать RED cases personal/shared completion, partial remainder,
+- [x] Написать RED cases personal/shared completion, partial remainder,
   focus-only, no active plan, grace/reopen and new fact after initial claim.
-- [ ] Реализовать pure relevance/content policy using P04/P05 and authoritative
+- [x] Реализовать pure relevance/content policy using P04/P05 and authoritative
   planning/tracking queries.
-- [ ] Повторно проверять relevance максимально близко к first attempt; empty
+- [x] Повторно проверять relevance максимально близко к first attempt; empty
   content marks occurrence suppressed atomically.
-- [ ] Запустить unit/integration and `pnpm check:quick`.
-- [ ] Commit: `feat: build relevant reminder intents`.
+- [x] Запустить unit/integration and `pnpm check:quick`.
+- [x] Commit: `feat: build relevant reminder intents`.
 
 ### N03 — Telegram outbound attempt ledger
 

@@ -4,9 +4,16 @@ import type {
   CanonicalJsonObject,
   DurableCommandResultRef,
 } from '@/shared/application/application-command'
+import type { TrackingTodayReadModelV1 } from '@/modules/tracking/application/tracking-read.types'
+import type {
+  ReminderContentItem as DomainReminderContentItem,
+  ReminderRenderedContent as DomainReminderRenderedContent,
+} from '../domain/reminder-relevance'
 
 export const REMINDER_TIME_ZONE = 'Asia/Yekaterinburg' as const
 export const REMINDER_SCHEDULE_RESULT_KIND = 'reminders.schedule.v1' as const
+export const REMINDER_CONTENT_SCHEMA_VERSION =
+  'reminders.rendered-content.v1' as const
 
 export type ReminderSlotKind = 'morning' | 'day' | 'evening'
 
@@ -66,6 +73,55 @@ export type TransitionReminderOccurrenceClaimInput = {
   readonly fencingToken: bigint
   readonly nextState: 'cancelled' | 'expired'
   readonly now: Date
+}
+
+export type ReminderContentItemV1 = DomainReminderContentItem
+
+export type ReminderRenderedContentV1 = DomainReminderRenderedContent
+
+export type ReminderRelevanceSnapshot = {
+  readonly read: TrackingTodayReadModelV1
+  readonly localDate: string
+  readonly localTime: string
+}
+
+export type ReminderIntentBuildResult =
+  | {
+      readonly kind: 'prepared'
+      readonly occurrenceId: string
+      readonly intentId: string
+      readonly intentRevision: bigint
+      readonly contentHash: string
+      readonly expiresAt: Date
+    }
+  | {
+      readonly kind: 'suppressed'
+      readonly occurrenceId: string
+      readonly reason:
+        'no_active_plan' | 'inactive_lifecycle' | 'nothing_relevant' | 'expired'
+    }
+
+export type PersistReminderIntentInput = {
+  readonly claim: ReminderOccurrenceClaim
+  readonly leaseOwner: string
+  readonly now: Date
+  readonly source: Extract<
+    TrackingTodayReadModelV1,
+    { readonly state: 'published' }
+  > | null
+  readonly content: ReminderRenderedContentV1 | null
+  readonly suppressionReason:
+    'no_active_plan' | 'inactive_lifecycle' | 'nothing_relevant' | 'expired'
+}
+
+export interface ReminderIntentPersistencePort {
+  persistIntent(
+    input: PersistReminderIntentInput,
+  ): Promise<ReminderIntentBuildResult>
+}
+
+export interface ReminderTodayReadPort {
+  getToday(memberId: string): Promise<TrackingTodayReadModelV1>
 }
 
 export interface ReminderSchedulePersistencePort {
