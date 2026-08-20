@@ -2064,13 +2064,13 @@ exact expiry and 30-second due scan работают без relevance or provide
 **Produces:** `SaveReminderScheduleCommand` and `ClaimDueOccurrences`;
 occurrence key excludes schedule revision.
 
-- [ ] Написать RED cases reschedule/disable, next-slot expiry, duplicate
+- [x] Написать RED cases reschedule/disable, next-slot expiry, duplicate
   generation, lease/fencing and downtime expiry.
-- [ ] Реализовать indexed due rows, bounded claim and occurrence state machine.
-- [ ] Проверить unique `(recipient, localDate, slotKind)` independent of schedule
+- [x] Реализовать indexed due rows, bounded claim and occurrence state machine.
+- [x] Проверить unique `(recipient, localDate, slotKind)` independent of schedule
   revision and no catch-up after expiry.
-- [ ] Запустить focused integration and `pnpm check:quick`.
-- [ ] Commit: `feat: schedule planner reminder occurrences`.
+- [x] Запустить focused integration and `pnpm check:quick`.
+- [x] Commit: `feat: schedule planner reminder occurrences`.
 
 ### N02 — Reminder relevance and immutable intents
 

@@ -53,6 +53,8 @@ model Membership {
   recordedFactRevisions   TrackingFactRevision[]    @relation("FactRevisionActor")
   trackingActions         TrackingActionGroup[]
   dayClosures             TrackingDayClosure[]
+  reminderSchedule        ReminderSchedule?
+  reminderOccurrences     ReminderOccurrence[]
 
   @@unique([spaceId, slot])
   @@unique([spaceId, id])
@@ -194,6 +196,7 @@ model CommandReceipt {
   completedAt       DateTime @map("completed_at") @db.Timestamptz(3)
 
   planningActions PlanningActionGroup[]
+  reminderScheduleChanges ReminderScheduleChange[]
   trackingActions TrackingActionGroup[]
 
   @@id([actorScope, commandType, commandId])
@@ -228,6 +231,93 @@ model PlanningActionGroup {
 
   @@unique([actorScope, commandType, commandId])
   @@map("planning_action_groups")
+}
+
+model ReminderSchedule {
+  id        String   @id @default(uuid()) @db.Uuid
+  spaceId   String   @map("space_id") @db.Uuid
+  memberId  String   @unique @map("member_id") @db.Uuid
+  revision  BigInt   @default(1) @db.BigInt
+  timeZone  String   @map("time_zone") @db.VarChar(64)
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
+
+  member      Membership              @relation(fields: [spaceId, memberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Cascade)
+  slots       ReminderScheduleSlot[]
+  occurrences ReminderOccurrence[]
+  changes     ReminderScheduleChange[]
+
+  @@unique([spaceId, memberId])
+  @@unique([spaceId, id])
+  @@unique([spaceId, id, memberId])
+  @@map("reminder_schedules")
+}
+
+model ReminderScheduleSlot {
+  id         String    @id @default(uuid()) @db.Uuid
+  scheduleId String    @map("schedule_id") @db.Uuid
+  slotKind   String    @map("slot_kind") @db.VarChar(16)
+  localTime  DateTime? @map("local_time") @db.Time(0)
+  nextDueAt  DateTime? @map("next_due_at") @db.Timestamptz(3)
+  createdAt  DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @map("updated_at") @db.Timestamptz(3)
+
+  schedule ReminderSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([scheduleId, slotKind])
+  @@index([nextDueAt, slotKind, id])
+  @@map("reminder_schedule_slots")
+}
+
+model ReminderOccurrence {
+  id                String    @id @default(uuid()) @db.Uuid
+  spaceId           String    @map("space_id") @db.Uuid
+  recipientMemberId String    @map("recipient_member_id") @db.Uuid
+  scheduleId        String    @map("schedule_id") @db.Uuid
+  localDate         DateTime  @map("local_date") @db.Date
+  slotKind          String    @map("slot_kind") @db.VarChar(16)
+  scheduleRevision  BigInt    @map("schedule_revision") @db.BigInt
+  dueAt             DateTime  @map("due_at") @db.Timestamptz(3)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+  state             String    @db.VarChar(16)
+  leaseOwner        String?   @map("lease_owner") @db.VarChar(128)
+  leaseUntil        DateTime? @map("lease_until") @db.Timestamptz(3)
+  fencingToken      BigInt    @default(0) @map("fencing_token") @db.BigInt
+  createdAt         DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @map("updated_at") @db.Timestamptz(3)
+
+  recipient Membership       @relation(fields: [spaceId, recipientMemberId], references: [spaceId, id], onDelete: Restrict, onUpdate: Cascade)
+  schedule  ReminderSchedule @relation(fields: [spaceId, scheduleId, recipientMemberId], references: [spaceId, id, memberId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([recipientMemberId, localDate, slotKind], map: "reminder_occurrences_recipient_date_slot_key")
+  @@index([state, dueAt, expiresAt, id], map: "reminder_occurrences_due_scan_idx")
+  @@index([scheduleId, slotKind, localDate, state], map: "reminder_occurrences_schedule_slot_idx")
+  @@map("reminder_occurrences")
+}
+
+model ReminderScheduleChange {
+  actionId          String    @id @map("action_id") @db.Uuid
+  scheduleId        String    @map("schedule_id") @db.Uuid
+  spaceId           String    @map("space_id") @db.Uuid
+  memberId          String    @map("member_id") @db.Uuid
+  actorScope        String    @map("actor_scope") @db.VarChar(64)
+  commandType       String    @map("command_type") @db.VarChar(128)
+  commandId         String    @map("command_id") @db.Uuid
+  beforeRevision    BigInt?   @map("before_revision") @db.BigInt
+  afterRevision     BigInt    @map("after_revision") @db.BigInt
+  beforeMorning     DateTime? @map("before_morning") @db.Time(0)
+  beforeDay         DateTime? @map("before_day") @db.Time(0)
+  beforeEvening     DateTime? @map("before_evening") @db.Time(0)
+  afterMorning      DateTime? @map("after_morning") @db.Time(0)
+  afterDay          DateTime? @map("after_day") @db.Time(0)
+  afterEvening      DateTime? @map("after_evening") @db.Time(0)
+  occurredAt        DateTime  @map("occurred_at") @db.Timestamptz(3)
+
+  schedule      ReminderSchedule @relation(fields: [spaceId, scheduleId, memberId], references: [spaceId, id, memberId], onDelete: Restrict, onUpdate: Cascade)
+  commandReceipt CommandReceipt  @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([actorScope, commandType, commandId])
+  @@map("reminder_schedule_changes")
 }
 
 model PlanningMonthFocusChange {
