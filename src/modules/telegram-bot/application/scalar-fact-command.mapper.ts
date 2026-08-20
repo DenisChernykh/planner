@@ -119,6 +119,7 @@ export function scalarCommandForIntent(
   member: MemberContext,
   intent: StoredTelegramActionIntent,
 ): ScalarCommand | null {
+  if (intent.planGoalSnapshotId === null) return null
   const actor = { kind: 'member' as const, id: member.memberId }
   const base = {
     publicationId: intent.publicationId,

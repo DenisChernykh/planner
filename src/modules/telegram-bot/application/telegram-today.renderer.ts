@@ -36,9 +36,14 @@ export function telegramIntentPreviewText(input: {
     if (input.value.kind === 'text') {
       return `${input.value.result === 'done' ? 'выполнено' : 'не выполнено'}: ${input.value.text}`
     }
+    if (input.value.kind === 'action') return input.value.label
     return `${input.value.value}${input.unit === null ? '' : ` ${input.unit}`}`
   })()
-  return `${input.title}\nДата: ${input.localDate}\nЗначение: ${value}\n\nПодтвердить?`
+  const reason =
+    'reason' in input && typeof input.reason === 'string'
+      ? `\nПричина: ${input.reason}`
+      : ''
+  return `${input.title}\nДата: ${input.localDate}\nЗначение: ${value}${reason}\n\nПодтвердить?`
 }
 
 const dayStateLabels = Object.freeze({

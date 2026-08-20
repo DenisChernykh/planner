@@ -14,7 +14,7 @@ type IntentRow = {
   readonly space_id: string
   readonly member_id: string
   readonly publication_id: string
-  readonly plan_goal_snapshot_id: string
+  readonly plan_goal_snapshot_id: string | null
   readonly local_date: Date | string
   readonly source_facts_revision: bigint
   readonly current_facts_revision: bigint
@@ -33,11 +33,20 @@ type IntentRow = {
   readonly rating_value: bigint | null
   readonly text_value: string | null
   readonly or_variant_value: string | null
+  readonly fact_record_id: string | null
+  readonly expected_record_revision: bigint | null
+  readonly flexible_period_id: string | null
+  readonly reason: string | null
+  readonly close_preview_schema_version: string | null
+  readonly close_preview_hash_version: string | null
+  readonly close_preview_hash: string | null
+  readonly close_unresolved_count: number | null
   readonly command_fingerprint: string | null
   readonly expires_at: Date
-  readonly title: string
+  readonly title: string | null
   readonly config: unknown
-  readonly result_kind: 'tracking.fact-record.v1' | null
+  readonly result_kind:
+    'tracking.fact-record.v1' | 'tracking.day-close.v1' | null
   readonly result_aggregate_id: string | null
   readonly result_aggregate_revision: bigint | null
 }
@@ -69,10 +78,51 @@ function presentation(
         null)
   const effective =
     checkpoint === null ? measurement : object(checkpoint['satisfaction'])
+  const snapshotTitle = row.title ?? 'Закрыть день'
   const title =
     checkpoint === null || typeof checkpoint['name'] !== 'string'
-      ? row.title
-      : `${row.title} · ${checkpoint['name']}`
+      ? snapshotTitle
+      : `${snapshotTitle} · ${checkpoint['name']}`
+  if (row.intent_kind === 'close_day') {
+    return {
+      title: 'Закрыть день',
+      unit: null,
+      precision: null,
+      aggregation: null,
+    }
+  }
+  if (
+    row.intent_kind === 'delete_record' ||
+    row.intent_kind === 'undo_record' ||
+    row.intent_kind === 'weekly_task_result'
+  ) {
+    return { title, unit: null, precision: null, aggregation: null }
+  }
+  if (row.intent_kind.startsWith('correct_')) {
+    if (row.intent_kind === 'correct_quantity') {
+      const precision = measurement?.['precision']
+      const unit = measurement?.['unit']
+      const aggregation = measurement?.['aggregation']
+      if (
+        measurement?.['kind'] !== 'quantity' ||
+        typeof unit !== 'string' ||
+        ![0, 1, 2, 3].includes(precision as number) ||
+        (aggregation !== 'add' && aggregation !== 'latest')
+      ) {
+        throw new Error('Telegram correction quantity target is invalid')
+      }
+      return {
+        title,
+        unit,
+        precision: precision as 0 | 1 | 2 | 3,
+        aggregation,
+      }
+    }
+    if (row.intent_kind === 'correct_or_variant') {
+      return { title, unit: null, precision: 3, aggregation: null }
+    }
+    return { title, unit: null, precision: null, aggregation: null }
+  }
   if (
     row.intent_kind === 'boolean' ||
     row.intent_kind === 'checkpoint_boolean'
@@ -218,6 +268,14 @@ function stored(row: IntentRow): StoredTelegramActionIntent {
     ratingValue: row.rating_value,
     textValue: row.text_value,
     orVariantValue: row.or_variant_value,
+    factRecordId: row.fact_record_id,
+    expectedRecordRevision: row.expected_record_revision,
+    flexiblePeriodId: row.flexible_period_id,
+    reason: row.reason,
+    closePreviewSchemaVersion: row.close_preview_schema_version,
+    closePreviewHashVersion: row.close_preview_hash_version,
+    closePreviewHash: row.close_preview_hash,
+    closeUnresolvedCount: row.close_unresolved_count,
     commandFingerprint: row.command_fingerprint,
     expiresAt: row.expires_at,
     ...presentation(row),
@@ -239,12 +297,17 @@ const selectIntent = `
          intent.or_variant_id, intent.quantity_value,
          intent.actual_time_value::text, intent.rating_value,
          intent.text_value, intent.or_variant_value,
+         intent.fact_record_id, intent.expected_record_revision,
+         intent.flexible_period_id, intent.reason,
+         intent.close_preview_schema_version,
+         intent.close_preview_hash_version, intent.close_preview_hash,
+         intent.close_unresolved_count,
          intent.command_fingerprint,
          intent.expires_at, snapshot.title, snapshot.config,
          intent.result_kind, intent.result_aggregate_id,
          intent.result_aggregate_revision
     FROM telegram_action_intents intent
-    JOIN plan_goal_snapshots snapshot
+    LEFT JOIN plan_goal_snapshots snapshot
       ON snapshot.publication_id = intent.publication_id
      AND snapshot.id = intent.plan_goal_snapshot_id
     JOIN plan_publications publication
@@ -265,7 +328,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         `UPDATE telegram_action_intents
             SET state = 'expired', updated_at = $2
           WHERE semantic_key = $1
-            AND state IN ('offered', 'awaiting_value', 'ready')
+            AND state IN ('offered', 'awaiting_value', 'awaiting_reason', 'ready')
             AND expires_at <= $2`,
         input.semanticKey,
         now,
@@ -277,14 +340,19 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
             source_facts_revision, intent_kind, state, checkpoint_id,
             boolean_result, text_result, checklist_item_id,
             checklist_item_state, or_variant_id,
+            fact_record_id, expected_record_revision, flexible_period_id,
+            reason, close_preview_schema_version,
+            close_preview_hash_version, close_preview_hash,
+            close_unresolved_count,
             command_fingerprint, expires_at, created_at, updated_at)
          VALUES
            ($1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
             $5::uuid, $6::uuid, $7::date, $8, $9, $10, $11::uuid, $12,
             $13, $14::uuid, $15, $16::uuid,
-            $17, $18, $19, $19)
+            $17::uuid, $18, $19::uuid, $20, $21, $22, $23, $24,
+            $25, $26, $27, $27)
          ON CONFLICT (semantic_key)
-           WHERE state IN ('offered', 'awaiting_value', 'ready')
+           WHERE state IN ('offered', 'awaiting_value', 'awaiting_reason', 'ready')
          DO NOTHING`,
         input.actionIntentId,
         input.semanticKey,
@@ -302,6 +370,14 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         input.checklistItemId,
         input.checklistItemState,
         input.orVariantId,
+        input.factRecordId,
+        input.expectedRecordRevision,
+        input.flexiblePeriodId,
+        input.reason,
+        input.closePreviewSchemaVersion,
+        input.closePreviewHashVersion,
+        input.closePreviewHash,
+        input.closeUnresolvedCount,
         input.commandFingerprint,
         input.expiresAt,
         now,
@@ -309,7 +385,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
       const rows = await client.$queryRawUnsafe<IntentRow[]>(
         `${selectIntent}
           WHERE intent.semantic_key = $1
-            AND intent.state IN ('offered', 'awaiting_value', 'ready')`,
+            AND intent.state IN ('offered', 'awaiting_value', 'awaiting_reason', 'ready')`,
         input.semanticKey,
       )
       const row = rows[0]
@@ -350,7 +426,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         `UPDATE telegram_action_intents
             SET state = 'expired', updated_at = $3
           WHERE space_id = $1::uuid AND member_id = $2::uuid
-            AND state IN ('offered', 'awaiting_value', 'ready')
+            AND state IN ('offered', 'awaiting_value', 'awaiting_reason', 'ready')
             AND expires_at <= $3`,
         input.spaceId,
         input.memberId,
@@ -360,7 +436,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         `UPDATE telegram_action_intents
             SET state = 'expired', updated_at = $4
           WHERE space_id = $1::uuid AND member_id = $2::uuid
-            AND id <> $3::uuid AND state = 'awaiting_value'`,
+            AND id <> $3::uuid AND state IN ('awaiting_value', 'awaiting_reason')`,
         input.spaceId,
         input.memberId,
         input.actionIntentId,
@@ -371,7 +447,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
             SET state = 'awaiting_value', quantity_value = NULL,
                 actual_time_value = NULL, rating_value = NULL,
                 text_value = NULL, or_variant_value = NULL,
-                command_fingerprint = NULL, updated_at = $4
+                reason = NULL, command_fingerprint = NULL, updated_at = $4
           WHERE id = $1::uuid AND space_id = $2::uuid
             AND member_id = $3::uuid
             AND intent_kind IN (
@@ -379,6 +455,8 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
               'checkpoint_actual_time', 'checkpoint_rating',
               'text', 'checkpoint_text', 'or_variant',
               'checkpoint_or_variant', 'composite_or_variant'
+              , 'correct_quantity', 'correct_actual_time', 'correct_rating',
+              'correct_text', 'correct_or_variant'
             )
             AND state IN ('offered', 'ready') AND expires_at > $4`,
         input.actionIntentId,
@@ -409,7 +487,8 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         `UPDATE telegram_action_intents
             SET state = 'expired', updated_at = $3
           WHERE space_id = $1::uuid AND member_id = $2::uuid
-            AND state = 'awaiting_value' AND expires_at <= $3`,
+            AND state IN ('awaiting_value', 'awaiting_reason')
+            AND expires_at <= $3`,
         input.spaceId,
         input.memberId,
         input.now,
@@ -418,7 +497,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         `${selectIntent}
           WHERE intent.space_id = $1::uuid
             AND intent.member_id = $2::uuid
-            AND intent.state = 'awaiting_value'
+            AND intent.state IN ('awaiting_value', 'awaiting_reason')
             AND intent.expires_at > $3
           FOR UPDATE OF intent`,
         input.spaceId,
@@ -438,19 +517,20 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
     readonly ratingValue: bigint | null
     readonly textValue: string | null
     readonly orVariantValue: string | null
-    readonly commandFingerprint: string
+    readonly commandFingerprint: string | null
+    readonly nextState: 'ready' | 'awaiting_reason'
     readonly now: Date
   }): Promise<StoredTelegramActionIntent | null> {
     return this.database.withClient(async (client) => {
       await client.$executeRawUnsafe(
         `UPDATE telegram_action_intents
-            SET state = 'ready', quantity_value = $4,
+            SET state = $10, quantity_value = $4,
                 actual_time_value = $5::time,
                 rating_value = $6, text_value = $7,
-                or_variant_value = $8, command_fingerprint = $9, updated_at = $10
+                or_variant_value = $8, command_fingerprint = $9, updated_at = $11
           WHERE id = $1::uuid AND space_id = $2::uuid
             AND member_id = $3::uuid AND state = 'awaiting_value'
-            AND expires_at > $10`,
+            AND expires_at > $11`,
         input.actionIntentId,
         input.spaceId,
         input.memberId,
@@ -459,6 +539,137 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         input.ratingValue,
         input.textValue,
         input.orVariantValue,
+        input.commandFingerprint,
+        input.nextState,
+        input.now,
+      )
+      const rows = await client.$queryRawUnsafe<IntentRow[]>(
+        `${selectIntent}
+          WHERE intent.id = $1::uuid
+            AND intent.space_id = $2::uuid
+            AND intent.member_id = $3::uuid`,
+        input.actionIntentId,
+        input.spaceId,
+        input.memberId,
+      )
+      return rows[0] === undefined ? null : stored(rows[0])
+    })
+  }
+
+  public beginReason(input: {
+    readonly actionIntentId: string
+    readonly spaceId: string
+    readonly memberId: string
+    readonly now: Date
+  }): Promise<StoredTelegramActionIntent | null> {
+    return this.database.withClient(async (client) => {
+      await client.$executeRawUnsafe(
+        `UPDATE telegram_action_intents
+            SET state = 'expired', updated_at = $4
+          WHERE space_id = $1::uuid AND member_id = $2::uuid
+            AND id <> $3::uuid
+            AND state IN ('awaiting_value', 'awaiting_reason')`,
+        input.spaceId,
+        input.memberId,
+        input.actionIntentId,
+        input.now,
+      )
+      await client.$executeRawUnsafe(
+        `UPDATE telegram_action_intents
+            SET state = 'awaiting_reason', reason = NULL,
+                command_fingerprint = NULL, updated_at = $4
+          WHERE id = $1::uuid AND space_id = $2::uuid
+            AND member_id = $3::uuid
+            AND intent_kind IN (
+              'correct_boolean', 'correct_checklist_item', 'delete_record'
+            )
+            AND state IN ('offered', 'ready') AND expires_at > $4`,
+        input.actionIntentId,
+        input.spaceId,
+        input.memberId,
+        input.now,
+      )
+      const rows = await client.$queryRawUnsafe<IntentRow[]>(
+        `${selectIntent}
+          WHERE intent.id = $1::uuid
+            AND intent.space_id = $2::uuid
+            AND intent.member_id = $3::uuid`,
+        input.actionIntentId,
+        input.spaceId,
+        input.memberId,
+      )
+      return rows[0] === undefined ? null : stored(rows[0])
+    })
+  }
+
+  public setReason(input: {
+    readonly actionIntentId: string
+    readonly spaceId: string
+    readonly memberId: string
+    readonly reason: string
+    readonly commandFingerprint: string
+    readonly now: Date
+  }): Promise<StoredTelegramActionIntent | null> {
+    return this.database.withClient(async (client) => {
+      await client.$executeRawUnsafe(
+        `UPDATE telegram_action_intents
+            SET state = 'ready', reason = $4,
+                command_fingerprint = $5, updated_at = $6
+          WHERE id = $1::uuid AND space_id = $2::uuid
+            AND member_id = $3::uuid AND state = 'awaiting_reason'
+            AND expires_at > $6`,
+        input.actionIntentId,
+        input.spaceId,
+        input.memberId,
+        input.reason,
+        input.commandFingerprint,
+        input.now,
+      )
+      const rows = await client.$queryRawUnsafe<IntentRow[]>(
+        `${selectIntent}
+          WHERE intent.id = $1::uuid
+            AND intent.space_id = $2::uuid
+            AND intent.member_id = $3::uuid`,
+        input.actionIntentId,
+        input.spaceId,
+        input.memberId,
+      )
+      return rows[0] === undefined ? null : stored(rows[0])
+    })
+  }
+
+  public prepareCloseDay(input: {
+    readonly actionIntentId: string
+    readonly spaceId: string
+    readonly memberId: string
+    readonly sourceFactsRevision: bigint
+    readonly previewSchemaVersion: string
+    readonly previewHashVersion: string
+    readonly previewHash: string
+    readonly unresolvedCount: number
+    readonly commandFingerprint: string
+    readonly now: Date
+  }): Promise<StoredTelegramActionIntent | null> {
+    return this.database.withClient(async (client) => {
+      await client.$executeRawUnsafe(
+        `UPDATE telegram_action_intents
+            SET state = 'ready', source_facts_revision = $4,
+                close_preview_schema_version = $5,
+                close_preview_hash_version = $6,
+                close_preview_hash = $7,
+                close_unresolved_count = $8,
+                command_fingerprint = $9, updated_at = $10
+          WHERE id = $1::uuid AND space_id = $2::uuid
+            AND member_id = $3::uuid AND intent_kind = 'close_day'
+            AND state = 'offered' AND expires_at > $10`,
+        input.actionIntentId,
+        input.spaceId,
+        input.memberId,
+        input.sourceFactsRevision,
+        input.previewSchemaVersion,
+        input.previewHashVersion,
+        input.previewHash,
+        input.unresolvedCount,
         input.commandFingerprint,
         input.now,
       )
@@ -478,7 +689,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
   public markCompleted(input: {
     readonly actionIntentId: string
     readonly result: {
-      readonly kind: 'tracking.fact-record.v1'
+      readonly kind: 'tracking.fact-record.v1' | 'tracking.day-close.v1'
       readonly aggregateId: string
       readonly aggregateRevision: bigint
     }
@@ -509,7 +720,7 @@ export class PrismaActionIntentRepository implements TelegramActionIntentPersist
         `UPDATE telegram_action_intents
             SET state = 'expired', updated_at = $2
           WHERE id = $1::uuid
-            AND state IN ('offered', 'awaiting_value', 'ready')`,
+            AND state IN ('offered', 'awaiting_value', 'awaiting_reason', 'ready')`,
         actionIntentId,
         now,
       )

@@ -152,6 +152,7 @@ export function compositeCommandForIntent(
   member: MemberContext,
   intent: StoredTelegramActionIntent,
 ): CompositeCommand | null {
+  if (intent.planGoalSnapshotId === null) return null
   const actor = { kind: 'member' as const, id: member.memberId }
   if (isText(intent)) {
     if (intent.textValue === null || intent.textResult === null) return null

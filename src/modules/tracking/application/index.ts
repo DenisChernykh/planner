@@ -19,6 +19,9 @@ export * from './record-text.command'
 export * from './record-weekly-task-result.command'
 export * from './tracking-application'
 export {
+  canonicalCloseDayPayload,
+  canonicalCorrectRecordPayload,
+  canonicalDeleteRecordPayload,
   canonicalRecordCheckpointPayload,
   canonicalRecordChecklistItemPayload,
   canonicalRecordCompositeOccurrencePayload,
@@ -27,6 +30,8 @@ export {
   canonicalRecordRatingPayload,
   canonicalRecordTextPayload,
   canonicalRecordTimePayload,
+  canonicalRecordWeeklyTaskResultPayload,
+  canonicalUndoLastOwnActionPayload,
 } from './tracking-command.validation'
 export * from './tracking-errors'
 export * from './tracking-read-persistence.port'

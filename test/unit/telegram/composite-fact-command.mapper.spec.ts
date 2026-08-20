@@ -13,7 +13,7 @@ const member = {
 function intent(
   overrides: Partial<StoredTelegramActionIntent>,
 ): StoredTelegramActionIntent {
-  return {
+  const base: StoredTelegramActionIntent = {
     actionIntentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     commandId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     spaceId: member.spaceId,
@@ -38,6 +38,14 @@ function intent(
     ratingValue: null,
     textValue: 'Готово',
     orVariantValue: null,
+    factRecordId: null,
+    expectedRecordRevision: null,
+    flexiblePeriodId: null,
+    reason: null,
+    closePreviewSchemaVersion: null,
+    closePreviewHashVersion: null,
+    closePreviewHash: null,
+    closeUnresolvedCount: null,
     commandFingerprint: null,
     expiresAt: new Date('2026-04-10T07:15:00.000Z'),
     title: 'Journal',
@@ -45,8 +53,8 @@ function intent(
     precision: null,
     aggregation: null,
     result: null,
-    ...overrides,
   }
+  return { ...base, ...overrides }
 }
 
 describe('G04 composite Telegram fact command mapping', () => {

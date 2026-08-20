@@ -32,6 +32,12 @@ import {
   executeCompositeFactIntent,
 } from './composite-fact-command.mapper'
 import {
+  executeTrackingIntent,
+  trackingActionErrorOutcome,
+  trackingFingerprintForIntent,
+  trackingIntentValue,
+} from './tracking-action.mapper'
+import {
   telegramIntentMessageLimit,
   telegramIntentPreviewText,
 } from './telegram-today.renderer'
@@ -48,6 +54,22 @@ const intentTtlMs = 15 * 60 * 1_000
 const canonicalDecimal = /^(?:0|[1-9][0-9]*)(?:\.([0-9]+))?$/u
 const canonicalTime = /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/u
 const canonicalInteger = /^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$/u
+const localDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Yekaterinburg',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+function localDateAt(value: Date): string {
+  return localDateFormatter.format(value)
+}
+
+function closeDayExpiresAt(now: Date, localDate: string): Date {
+  const nextMidnight =
+    Date.parse(`${localDate}T00:00:00+05:00`) + 24 * 60 * 60 * 1_000
+  return new Date(Math.min(now.getTime() + intentTtlMs, nextMidnight))
+}
 
 function goalFacts(day: TrackingDayGoalV1): readonly TrackingFactReadV1[] {
   return [
@@ -124,6 +146,15 @@ function fingerprint(
   ) {
     return scalarFingerprintForIntent(member, intent)
   }
+  if (
+    intent.intentKind.startsWith('correct_') ||
+    intent.intentKind === 'delete_record' ||
+    intent.intentKind === 'undo_record' ||
+    intent.intentKind === 'close_day' ||
+    intent.intentKind === 'weekly_task_result'
+  ) {
+    return trackingFingerprintForIntent(member, intent)
+  }
   return compositeFingerprintForIntent(member, intent)
 }
 
@@ -131,7 +162,8 @@ function preview(intent: StoredTelegramActionIntent): TelegramIntentOutcome {
   const value =
     intentValue(intent) ??
     scalarIntentValue(intent) ??
-    compositeIntentValue(intent)
+    compositeIntentValue(intent) ??
+    trackingIntentValue(intent)
   return value === null
     ? { kind: 'stale' }
     : {
@@ -142,6 +174,7 @@ function preview(intent: StoredTelegramActionIntent): TelegramIntentOutcome {
         value,
         unit: intent.unit,
         aggregation: intent.aggregation,
+        reason: intent.reason,
       }
 }
 
@@ -190,6 +223,14 @@ function offerInput(
     checklistItemId,
     checklistItemState,
     orVariantId,
+    factRecordId: null,
+    expectedRecordRevision: null,
+    flexiblePeriodId: null,
+    reason: null,
+    closePreviewSchemaVersion: null,
+    closePreviewHashVersion: null,
+    closePreviewHash: null,
+    closeUnresolvedCount: null,
     expiresAt: new Date(now.getTime() + intentTtlMs),
   } as const
   if (!ready) {
@@ -207,6 +248,14 @@ function offerInput(
     ratingValue: null,
     textValue: null,
     orVariantValue: null,
+    factRecordId: null,
+    expectedRecordRevision: null,
+    flexiblePeriodId: null,
+    reason: null,
+    closePreviewSchemaVersion: null,
+    closePreviewHashVersion: null,
+    closePreviewHash: null,
+    closeUnresolvedCount: null,
     commandFingerprint: null,
     title: goal.title,
     unit: null,
@@ -218,6 +267,102 @@ function offerInput(
     ...base,
     state: 'ready',
     commandFingerprint: fingerprint(member, candidate),
+  }
+}
+
+function trackingOfferInput(input: {
+  readonly member: MemberContext
+  readonly model: Extract<
+    TrackingTodayReadModelV1,
+    { readonly state: 'published' }
+  >
+  readonly goal: TrackingGoalReadV1 | null
+  readonly localDate: string
+  readonly kind: TelegramActionIntentKind
+  readonly factRecordId?: string | null
+  readonly expectedRecordRevision?: bigint | null
+  readonly flexiblePeriodId?: string | null
+  readonly booleanResult?: 'done' | 'not_done' | null
+  readonly textResult?: 'done' | 'not_done' | null
+  readonly checklistItemState?: 'done' | 'not_done' | null
+  readonly ready?: boolean
+  readonly now: Date
+}): TelegramActionIntentOffer {
+  const actionIntentId = randomUUID()
+  const base = {
+    actionIntentId,
+    semanticKey: createHash('sha256')
+      .update(
+        JSON.stringify({
+          memberId: input.member.memberId,
+          spaceId: input.member.spaceId,
+          publicationId: input.model.publicationId,
+          sourceFactsRevision: input.model.factsRevision.toString(10),
+          localDate: input.localDate,
+          kind: input.kind,
+          factRecordId: input.factRecordId ?? null,
+          expectedRecordRevision:
+            input.expectedRecordRevision?.toString(10) ?? null,
+          flexiblePeriodId: input.flexiblePeriodId ?? null,
+          booleanResult: input.booleanResult ?? null,
+          textResult: input.textResult ?? null,
+          checklistItemState: input.checklistItemState ?? null,
+        }),
+        'utf8',
+      )
+      .digest('hex'),
+    spaceId: input.member.spaceId,
+    memberId: input.member.memberId,
+    publicationId: input.model.publicationId,
+    planGoalSnapshotId: input.goal?.planGoalSnapshotId ?? null,
+    localDate: input.localDate,
+    sourceFactsRevision: input.model.factsRevision,
+    intentKind: input.kind,
+    checkpointId: null,
+    booleanResult: input.booleanResult ?? null,
+    textResult: input.textResult ?? null,
+    checklistItemId: null,
+    checklistItemState: input.checklistItemState ?? null,
+    orVariantId: null,
+    factRecordId: input.factRecordId ?? null,
+    expectedRecordRevision: input.expectedRecordRevision ?? null,
+    flexiblePeriodId: input.flexiblePeriodId ?? null,
+    reason: null,
+    closePreviewSchemaVersion: null,
+    closePreviewHashVersion: null,
+    closePreviewHash: null,
+    closeUnresolvedCount: null,
+    expiresAt:
+      input.kind === 'close_day'
+        ? closeDayExpiresAt(input.now, input.localDate)
+        : new Date(input.now.getTime() + intentTtlMs),
+  } as const
+  if (!(input.ready ?? false)) {
+    return { ...base, state: 'offered', commandFingerprint: null }
+  }
+  const candidate: StoredTelegramActionIntent = {
+    ...base,
+    commandId: actionIntentId,
+    currentFactsRevision: input.model.factsRevision,
+    activePublicationId: input.model.publicationId,
+    monthStatus: input.model.monthStatus,
+    state: 'ready',
+    quantityValue: null,
+    actualTimeValue: null,
+    ratingValue: null,
+    textValue: null,
+    orVariantValue: null,
+    commandFingerprint: null,
+    title: input.goal?.title ?? 'Закрыть день',
+    unit: null,
+    precision: null,
+    aggregation: null,
+    result: null,
+  }
+  return {
+    ...base,
+    state: 'ready',
+    commandFingerprint: trackingFingerprintForIntent(input.member, candidate),
   }
 }
 
@@ -247,10 +392,18 @@ function inputKind(
   ) {
     return 'or_variant'
   }
+  if (intent.intentKind === 'correct_quantity') return 'quantity'
+  if (intent.intentKind === 'correct_actual_time') return 'actual_time'
+  if (intent.intentKind === 'correct_rating') return 'rating'
+  if (intent.intentKind === 'correct_text') return 'text'
+  if (intent.intentKind === 'correct_or_variant') return 'or_variant'
   return null
 }
 
 function awaiting(intent: StoredTelegramActionIntent): TelegramIntentOutcome {
+  if (intent.state === 'awaiting_reason') {
+    return { kind: 'awaiting_reason', title: intent.title }
+  }
   const kind = inputKind(intent)
   if (kind === 'quantity') {
     return { kind: 'awaiting_quantity', title: intent.title }
@@ -265,15 +418,26 @@ function awaiting(intent: StoredTelegramActionIntent): TelegramIntentOutcome {
 }
 
 function hasRecord(expectation: TrackingFixedExpectationV1): boolean {
-  return expectation.facts.length > 0
+  return expectation.facts.some((fact) => fact.factKind !== 'fixed_not_done')
 }
 
 function finiteOutcome(error: unknown): TelegramIntentOutcome | null {
-  const direct = basicFactErrorOutcome(error)
+  const direct =
+    basicFactErrorOutcome(error) ?? trackingActionErrorOutcome(error)
   if (direct !== null) return direct
   return error instanceof DatabaseTransactionRollbackOnlyError
-    ? basicFactErrorOutcome(error.cause)
+    ? finiteOutcome(error.cause)
     : null
+}
+
+function isTrackingIntent(kind: TelegramActionIntentKind): boolean {
+  return (
+    kind.startsWith('correct_') ||
+    kind === 'delete_record' ||
+    kind === 'undo_record' ||
+    kind === 'close_day' ||
+    kind === 'weekly_task_result'
+  )
 }
 
 export class TelegramActionIntentService {
@@ -295,10 +459,11 @@ export class TelegramActionIntentService {
     ) {
       return Object.freeze([])
     }
+    const now = this.clock.now()
+    if (model.day.localDate !== localDateAt(now)) return Object.freeze([])
     const days = new Map(
       model.day.goals.map((value) => [value.planGoalSnapshotId, value]),
     )
-    const now = this.clock.now()
     const buttons: TelegramActionButton[] = []
     const addAction = async (input: {
       readonly goal: TrackingGoalReadV1
@@ -608,6 +773,178 @@ export class TelegramActionIntentService {
         }
       }
     }
+    const addTrackingAction = async (
+      offer: TelegramActionIntentOffer,
+      text: string,
+    ): Promise<void> => {
+      const intent = await this.intents.offer(offer, now)
+      buttons.push({ text, actionIntentId: intent.actionIntentId })
+    }
+    for (const goal of model.goals) {
+      const day = days.get(goal.planGoalSnapshotId)
+      if (
+        day === undefined ||
+        !day.writable ||
+        goal.viewerAccess === 'partner_read_only'
+      ) {
+        continue
+      }
+      const facts = new Map(
+        goalFacts(day).map((fact) => [fact.factRecordId, fact]),
+      )
+      for (const fact of facts.values()) {
+        if (fact.factKind === 'fixed_not_done') continue
+        const base = {
+          member,
+          model,
+          goal,
+          localDate: model.day.localDate,
+          factRecordId: fact.factRecordId,
+          expectedRecordRevision: fact.revision,
+          now,
+        } as const
+        const label = `Исправить ${goal.title}`
+        const storedKind = fact.value?.kind
+        if (storedKind === 'fixed_not_done') continue
+        const valueKind =
+          storedKind ??
+          (() => {
+            switch (fact.factKind) {
+              case 'boolean':
+              case 'weekly_task_result':
+                return 'boolean'
+              case 'quantity_add':
+              case 'quantity_latest':
+                return 'quantity'
+              case 'actual_time':
+                return 'actual_time'
+              case 'rating':
+                return 'rating'
+              case 'text':
+                return 'text'
+              case 'checklist_item':
+                return 'checklist_item'
+              case 'or_variant':
+                return 'or_variant'
+            }
+          })()
+        switch (valueKind) {
+          case 'boolean':
+            for (const result of ['done', 'not_done'] as const) {
+              await addTrackingAction(
+                trackingOfferInput({
+                  ...base,
+                  kind: 'correct_boolean',
+                  booleanResult: result,
+                }),
+                `${result === 'done' ? '✓' : '✕'} ${label}`,
+              )
+            }
+            break
+          case 'quantity':
+            await addTrackingAction(
+              trackingOfferInput({ ...base, kind: 'correct_quantity' }),
+              label,
+            )
+            break
+          case 'actual_time':
+            await addTrackingAction(
+              trackingOfferInput({ ...base, kind: 'correct_actual_time' }),
+              label,
+            )
+            break
+          case 'rating':
+            await addTrackingAction(
+              trackingOfferInput({ ...base, kind: 'correct_rating' }),
+              label,
+            )
+            break
+          case 'text':
+            for (const result of ['done', 'not_done'] as const) {
+              await addTrackingAction(
+                trackingOfferInput({
+                  ...base,
+                  kind: 'correct_text',
+                  textResult: result,
+                }),
+                `${result === 'done' ? '✓' : '✕'} ${label}`,
+              )
+            }
+            break
+          case 'checklist_item':
+            for (const state of ['done', 'not_done'] as const) {
+              await addTrackingAction(
+                trackingOfferInput({
+                  ...base,
+                  kind: 'correct_checklist_item',
+                  checklistItemState: state,
+                }),
+                `${state === 'done' ? '✓' : '✕'} ${label}`,
+              )
+            }
+            break
+          case 'or_variant':
+            await addTrackingAction(
+              trackingOfferInput({ ...base, kind: 'correct_or_variant' }),
+              label,
+            )
+            break
+        }
+        if (
+          fact.revisionKind === 'recorded' &&
+          goal.viewerAccess === 'personal_owner'
+        ) {
+          await addTrackingAction(
+            trackingOfferInput({ ...base, kind: 'delete_record' }),
+            `Удалить ${goal.title}`,
+          )
+        }
+        if (fact.recordedByMemberId === member.memberId) {
+          await addTrackingAction(
+            trackingOfferInput({ ...base, kind: 'undo_record', ready: true }),
+            `Отменить действие · ${goal.title}`,
+          )
+        }
+      }
+      for (const period of day.flexiblePeriods) {
+        if (
+          period.periodKind !== 'weekly_planned_task' ||
+          !period.eligibleOnDate ||
+          period.facts.some((fact) => fact.factKind === 'weekly_task_result')
+        ) {
+          continue
+        }
+        for (const result of ['done', 'not_done'] as const) {
+          await addTrackingAction(
+            trackingOfferInput({
+              member,
+              model,
+              goal,
+              localDate: model.day.localDate,
+              kind: 'weekly_task_result',
+              flexiblePeriodId: period.flexiblePeriodId,
+              booleanResult: result,
+              ready: true,
+              now,
+            }),
+            `${result === 'done' ? '✓' : '✕'} задача недели · ${goal.title}`,
+          )
+        }
+      }
+    }
+    if (model.day.closure.state === 'open') {
+      await addTrackingAction(
+        trackingOfferInput({
+          member,
+          model,
+          goal: null,
+          localDate: model.day.localDate,
+          kind: 'close_day',
+          now,
+        }),
+        'Закрыть день',
+      )
+    }
     return Object.freeze(buttons)
   }
 
@@ -615,8 +952,94 @@ export class TelegramActionIntentService {
     member: MemberContext,
     actionIntentId: string,
   ): Promise<TelegramIntentOutcome> {
-    return this.safe(async () =>
-      this.transaction.run(async () => {
+    return this.safe(async () => {
+      const probe = await this.transaction.run(() =>
+        this.intents.lockForMember({
+          actionIntentId,
+          spaceId: member.spaceId,
+          memberId: member.memberId,
+        }),
+      )
+      if (probe?.intentKind === 'close_day') {
+        const now = this.clock.now()
+        if (probe.state === 'completed' && probe.result !== null) {
+          return {
+            kind: 'completed',
+            title: probe.title,
+            result: probe.result,
+          }
+        }
+        if (
+          probe.expiresAt.getTime() <= now.getTime() ||
+          probe.localDate !== localDateAt(now)
+        ) {
+          await this.transaction.run(() =>
+            this.intents.markExpired(actionIntentId, now),
+          )
+          return { kind: 'expired' }
+        }
+        if (probe.state === 'ready') return preview(probe)
+        if (probe.state !== 'offered') return { kind: 'stale' }
+        const closePreview = await this.tracking.previewCloseDay.execute({
+          trustedActor: { kind: 'member', id: member.memberId },
+          publicationId: probe.publicationId,
+          localDate: probe.localDate,
+        })
+        if (closePreview.state !== 'ready') return { kind: 'stale' }
+        return this.transaction.run(async () => {
+          const current = await this.intents.lockForMember({
+            actionIntentId,
+            spaceId: member.spaceId,
+            memberId: member.memberId,
+          })
+          if (current === null) return { kind: 'not_found' }
+          if (current.state === 'completed' && current.result !== null) {
+            return {
+              kind: 'completed',
+              title: current.title,
+              result: current.result,
+            }
+          }
+          if (
+            current.expiresAt.getTime() <= now.getTime() ||
+            current.localDate !== localDateAt(now)
+          ) {
+            await this.intents.markExpired(actionIntentId, now)
+            return { kind: 'expired' }
+          }
+          if (
+            current.state !== 'offered' ||
+            current.currentFactsRevision !== closePreview.factsRevision
+          ) {
+            return { kind: 'stale' }
+          }
+          const candidate: StoredTelegramActionIntent = {
+            ...current,
+            state: 'ready',
+            sourceFactsRevision: closePreview.factsRevision,
+            closePreviewSchemaVersion: closePreview.schemaVersion,
+            closePreviewHashVersion: closePreview.previewHashVersion,
+            closePreviewHash: closePreview.previewHash,
+            closeUnresolvedCount: closePreview.unresolved.length,
+          }
+          const commandFingerprint = fingerprint(member, candidate)
+          if (commandFingerprint === null) return { kind: 'stale' }
+          const ready = await this.intents.prepareCloseDay({
+            actionIntentId,
+            spaceId: member.spaceId,
+            memberId: member.memberId,
+            sourceFactsRevision: closePreview.factsRevision,
+            previewSchemaVersion: closePreview.schemaVersion,
+            previewHashVersion: closePreview.previewHashVersion,
+            previewHash: closePreview.previewHash,
+            unresolvedCount: closePreview.unresolved.length,
+            commandFingerprint,
+            now,
+          })
+          return ready === null ? { kind: 'stale' } : preview(ready)
+        })
+      }
+      return this.transaction.run(async () => {
         const now = this.clock.now()
         const current = await this.intents.lockForMember({
           actionIntentId,
@@ -634,6 +1057,38 @@ export class TelegramActionIntentService {
         if (current.expiresAt.getTime() <= now.getTime()) {
           await this.intents.markExpired(actionIntentId, now)
           return { kind: 'expired' }
+        }
+        if (isTrackingIntent(current.intentKind)) {
+          if (current.state === 'ready') return preview(current)
+          if (
+            current.state === 'awaiting_value' ||
+            current.state === 'awaiting_reason'
+          ) {
+            return awaiting(current)
+          }
+          if (current.state !== 'offered') return { kind: 'stale' }
+          if (
+            current.intentKind === 'correct_boolean' ||
+            current.intentKind === 'correct_checklist_item' ||
+            current.intentKind === 'delete_record'
+          ) {
+            const awaitingReason = await this.intents.beginReason({
+              actionIntentId,
+              spaceId: member.spaceId,
+              memberId: member.memberId,
+              now,
+            })
+            return awaitingReason === null
+              ? { kind: 'stale' }
+              : awaiting(awaitingReason)
+          }
+          const selected = await this.intents.selectValue({
+            actionIntentId,
+            spaceId: member.spaceId,
+            memberId: member.memberId,
+            now,
+          })
+          return selected === null ? { kind: 'stale' } : awaiting(selected)
         }
         if (
           current.intentKind === 'boolean' ||
@@ -655,8 +1110,8 @@ export class TelegramActionIntentService {
           now,
         })
         return selected === null ? { kind: 'not_found' } : awaiting(selected)
-      }),
-    )
+      })
+    })
   }
 
   public acceptValue(
@@ -672,6 +1127,35 @@ export class TelegramActionIntentService {
           now,
         })
         if (intent === null) return null
+        if (intent.state === 'awaiting_reason') {
+          if (rawValue.trim().length === 0 || rawValue.length > 2_000) {
+            return { kind: 'invalid_reason', title: intent.title }
+          }
+          const candidate: StoredTelegramActionIntent = {
+            ...intent,
+            state: 'ready',
+            reason: rawValue,
+          }
+          const commandFingerprint = fingerprint(member, candidate)
+          if (commandFingerprint === null) return { kind: 'stale' }
+          const candidatePreview = preview(candidate)
+          if (
+            candidatePreview.kind !== 'preview' ||
+            telegramIntentPreviewText(candidatePreview).length >
+              telegramIntentMessageLimit
+          ) {
+            return { kind: 'invalid_reason', title: intent.title }
+          }
+          const ready = await this.intents.setReason({
+            actionIntentId: intent.actionIntentId,
+            spaceId: member.spaceId,
+            memberId: member.memberId,
+            reason: rawValue,
+            commandFingerprint,
+            now,
+          })
+          return ready === null ? { kind: 'stale' } : preview(ready)
+        }
         const value = rawValue.trim()
         const kind = inputKind(intent)
         let quantityValue: string | null = null
@@ -758,8 +1242,13 @@ export class TelegramActionIntentService {
                 ? { kind: 'invalid_quantity', title: intent.title }
                 : { kind: 'stale' }
         }
-        const commandFingerprint = fingerprint(member, candidate)
-        if (commandFingerprint === null) return { kind: 'stale' }
+        const needsReason = intent.intentKind.startsWith('correct_')
+        const commandFingerprint = needsReason
+          ? null
+          : fingerprint(member, candidate)
+        if (!needsReason && commandFingerprint === null) {
+          return { kind: 'stale' }
+        }
         const ready = await this.intents.setValue({
           actionIntentId: intent.actionIntentId,
           spaceId: member.spaceId,
@@ -770,9 +1259,14 @@ export class TelegramActionIntentService {
           textValue,
           orVariantValue,
           commandFingerprint,
+          nextState: needsReason ? 'awaiting_reason' : 'ready',
           now,
         })
-        return ready === null ? { kind: 'stale' } : preview(ready)
+        return ready === null
+          ? { kind: 'stale' }
+          : needsReason
+            ? awaiting(ready)
+            : preview(ready)
       }),
     )
   }
@@ -808,6 +1302,13 @@ export class TelegramActionIntentService {
           await this.intents.markExpired(actionIntentId, now)
           return { kind: 'expired' }
         }
+        if (
+          intent.intentKind === 'close_day' &&
+          intent.localDate !== localDateAt(now)
+        ) {
+          await this.intents.markExpired(actionIntentId, now)
+          return { kind: 'expired' }
+        }
         if (intent.monthStatus === 'closed') return { kind: 'blocked' }
         if (
           intent.activePublicationId !== intent.publicationId ||
@@ -825,7 +1326,13 @@ export class TelegramActionIntentService {
                 intent.intentKind === 'checkpoint_actual_time' ||
                 intent.intentKind === 'checkpoint_rating'
               ? await executeScalarFactIntent(this.tracking, member, intent)
-              : await executeCompositeFactIntent(this.tracking, member, intent)
+              : isTrackingIntent(intent.intentKind)
+                ? await executeTrackingIntent(this.tracking, member, intent)
+                : await executeCompositeFactIntent(
+                    this.tracking,
+                    member,
+                    intent,
+                  )
         if (outcome.kind !== 'completed') return outcome
         await this.intents.markCompleted({
           actionIntentId,

@@ -243,6 +243,10 @@ export class TelegramUpdateHandler {
           return `${outcome.title}\n\nВведите неотрицательное число с допустимой точностью.`
         case 'invalid_or_variant':
           return `${outcome.title}\n\nЗначение некорректно. Введите число с допустимой точностью.`
+        case 'awaiting_reason':
+          return `${outcome.title}\n\nВведите обязательную причину.`
+        case 'invalid_reason':
+          return `${outcome.title}\n\nПричина должна быть непустой и не длиннее 2000 символов.`
         case 'awaiting_scalar':
           return outcome.inputKind === 'actual_time'
             ? `${outcome.title}\n\nВведите время в формате ЧЧ:ММ.`

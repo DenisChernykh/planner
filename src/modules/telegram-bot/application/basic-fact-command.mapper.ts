@@ -55,7 +55,7 @@ export function commandForIntent(
   readonly payload: RecordFactPayload
 } | null {
   const value = intentValue(intent)
-  if (value === null) return null
+  if (value === null || intent.planGoalSnapshotId === null) return null
   return Object.freeze({
     commandId: intent.commandId,
     trustedActor: { kind: 'member' as const, id: member.memberId },

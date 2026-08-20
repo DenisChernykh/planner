@@ -2866,6 +2866,44 @@ preimage сохраняется для старых intent kinds; TTL, active se
 key, one awaiting input per member, completed replay и exact source
 `factsRevision` checks G02/G03 не изменяются.
 
+G05 сохраняет wire-format `pl1:s|c:<actionIntentId>` и расширяет тот же
+append-only intent contract конечными видами correction/delete/undo,
+`close_day` и `weekly_task_result`. Correction intent хранит opaque
+`factRecordId`, положительную ожидаемую revision, typed replacement value и
+обязательную bounded reason; delete хранит тот же target/revision и reason.
+Undo доступен в Today только для адресуемой записи, созданной текущим member,
+но окончательное право и правило last-own-action остаются в T06. Shared facts
+получают correction без delete, partner-read-only и system-authored actions не
+получают mutation buttons. `tracking-action.mapper` только строит canonical
+T05/T06/T08/T09 commands, выводит actor из resolved Telegram member и не
+дублирует product validators, ownership либо lifecycle.
+
+Correction с typed input проходит `offered → awaiting_value →
+awaiting_reason → ready`; Boolean/checklist correction и personal delete идут
+сразу в `awaiting_reason`. Reason обязан быть непустым после trim и содержать
+не более 2000 исходных символов; в command передаётся сохранённое значение.
+Weekly planned task предлагает первичный `done|not_done` только владельцу
+активного периода; повторное изменение идёт через обычную typed correction.
+Completed replay возвращает сохранённый `tracking.fact-record.v1`.
+
+CloseDay intent не содержит goal target. При выборе adapter сначала вне
+intent-lock transaction получает T08 preview, затем повторно блокирует intent
+и сверяет его state, TTL, текущую business date и `factsRevision` с preview.
+TTL дополнительно ограничен следующей полуночью `Asia/Yekaterinburg`. Только
+после этого сохраняются `tracking.close-day-preview.v1`, hash version, preview
+hash, unresolved count и canonical command fingerprint. Confirm передаёт эти
+данные в существующий T08 command; любое изменение фактов между preview и
+confirm даёт stale recovery через повторное открытие Today. Completed replay
+возвращает `tracking.day-close.v1`; закрытый день больше не предлагает сам
+CloseDay, но typed override, correction, Undo и weekly result остаются доступны
+до lifecycle deadlines соответствующих T05/T06/T08/T09 commands.
+
+Migration `20260811203000_telegram_tracking_action_intents` сохраняет старые
+G02–G04 rows и semantic keys, добавляет nullable opaque targets и metadata,
+`awaiting_reason`, finite shape constraints и immutable transition guards.
+Expired допускает как ещё не подготовленный, так и подготовленный CloseDay
+shape. HTTP/OpenAPI и публичные T05–T09 contracts не меняются.
+
 ### 14.2. Pilot и v1
 
 Pilot bot предоставляет Today, ввод/исправление, close day, progress и

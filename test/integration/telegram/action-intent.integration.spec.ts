@@ -40,6 +40,8 @@ const G03_ACTION_INTENT_MIGRATION =
   '20260811201000_telegram_scalar_action_intents'
 const G04_ACTION_INTENT_MIGRATION =
   '20260811202000_telegram_composite_action_intents'
+const G05_ACTION_INTENT_MIGRATION =
+  '20260811203000_telegram_tracking_action_intents'
 
 function deployMigrations(databaseUrl: string): void {
   const result = spawnSync(
@@ -649,6 +651,117 @@ describe('G03 populated G02 action-intent migration', () => {
         ],
       ),
     ).rejects.toThrow()
+
+    const beforeG05 = await pool.query<{
+      readonly intent_kind: string
+      readonly semantic_key: string
+      readonly state: string
+    }>(
+      `SELECT intent_kind, btrim(semantic_key) semantic_key, state
+         FROM telegram_action_intents
+        ORDER BY semantic_key`,
+    )
+    const g05MigrationClient = await pool.connect()
+    try {
+      await g05MigrationClient.query('BEGIN')
+      await g05MigrationClient.query(readMigration(G05_ACTION_INTENT_MIGRATION))
+      await g05MigrationClient.query('COMMIT')
+    } catch (error) {
+      await g05MigrationClient.query('ROLLBACK')
+      throw error
+    } finally {
+      g05MigrationClient.release()
+    }
+
+    const afterG05 = await pool.query<{
+      readonly close_preview_hash: string | null
+      readonly expected_record_revision: string | null
+      readonly fact_record_id: string | null
+      readonly flexible_period_id: string | null
+      readonly intent_kind: string
+      readonly reason: string | null
+      readonly semantic_key: string
+      readonly state: string
+    }>(
+      `SELECT close_preview_hash, expected_record_revision::text,
+              fact_record_id::text, flexible_period_id::text, intent_kind,
+              reason, btrim(semantic_key) semantic_key, state
+         FROM telegram_action_intents
+        ORDER BY semantic_key`,
+    )
+    expect(
+      afterG05.rows.map(({ intent_kind, semantic_key, state }) => ({
+        intent_kind,
+        semantic_key,
+        state,
+      })),
+    ).toEqual(beforeG05.rows)
+    expect(
+      afterG05.rows.every(
+        (row) =>
+          row.close_preview_hash === null &&
+          row.expected_record_revision === null &&
+          row.fact_record_id === null &&
+          row.flexible_period_id === null &&
+          row.reason === null,
+      ),
+    ).toBe(true)
+
+    await expect(
+      pool.query(
+        `INSERT INTO telegram_action_intents (
+           id, semantic_key, command_id, space_id, member_id,
+           publication_id, plan_goal_snapshot_id, local_date,
+           source_facts_revision, intent_kind, state, boolean_result,
+           expires_at, created_at, updated_at
+         ) VALUES (
+           $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+           $5::uuid, $6::uuid, DATE '2026-04-10', 0,
+           'correct_boolean', 'offered', 'done',
+           TIMESTAMPTZ '2026-04-10 08:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00'
+         )`,
+        [
+          randomUUID(),
+          'g05-correction-missing-target'.padEnd(64, '0').slice(0, 64),
+          spaceId,
+          firstMemberId,
+          populatedPublicationId,
+          populatedPlanGoalSnapshotId,
+        ],
+      ),
+    ).rejects.toThrow()
+
+    await expect(
+      pool.query(
+        `INSERT INTO telegram_action_intents (
+           id, semantic_key, command_id, space_id, member_id,
+           publication_id, local_date, source_facts_revision,
+           intent_kind, state, close_preview_schema_version,
+           close_preview_hash_version, close_preview_hash,
+           close_unresolved_count, command_fingerprint, rating_value,
+           expires_at, created_at, updated_at
+         ) VALUES (
+           $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+           $5::uuid, DATE '2026-04-10', 0, 'close_day', 'ready',
+           'tracking.close-day-preview.v1',
+           'tracking.close-day-preview-hash.v1', $6, 0, $7, 7,
+           TIMESTAMPTZ '2026-04-10 08:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00'
+         )`,
+        [
+          randomUUID(),
+          'g05-close-invalid-preview'.padEnd(64, '0').slice(0, 64),
+          spaceId,
+          firstMemberId,
+          populatedPublicationId,
+          'a'.repeat(64),
+          'f'.repeat(64),
+        ],
+      ),
+    ).rejects.toThrow()
   }, 120_000)
 })
 
@@ -846,6 +959,9 @@ describe('G02 semantic Telegram action intents', () => {
 
     const today = await tracking.getToday.execute({ trustedActor: actor })
     if (today.state !== 'published') throw new Error('published state missing')
+    clock.set(new Date('2026-04-10T19:00:00.000Z'))
+    await expect(service.offerTodayActions(member, today)).resolves.toEqual([])
+    clock.set(new Date('2026-04-10T07:00:00.000Z'))
     const vitaminGoal = today.goals.find((goal) => goal.title === 'Vitamin')
     if (vitaminGoal === undefined) throw new Error('Vitamin goal missing')
     const legacySemanticKey = createHash('sha256')
@@ -954,6 +1070,66 @@ describe('G02 semantic Telegram action intents', () => {
     if (firstConfirm.kind !== 'completed') {
       throw new Error('Vitamin confirmation did not complete')
     }
+    await expect(
+      pool.query(
+        `INSERT INTO telegram_action_intents (
+           id, semantic_key, command_id, space_id, member_id,
+           publication_id, plan_goal_snapshot_id, local_date,
+           source_facts_revision, intent_kind, state, fact_record_id,
+           expected_record_revision, reason, command_fingerprint,
+           expires_at, created_at, updated_at
+         ) VALUES (
+           $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+           $5::uuid, $6::uuid, DATE '2026-04-10', 1,
+           'correct_quantity', 'ready', $7::uuid, $8, $9, $10,
+           TIMESTAMPTZ '2026-04-10 08:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00'
+         )`,
+        [
+          randomUUID(),
+          'g05-correction-missing-value'.padEnd(64, '0').slice(0, 64),
+          spaceId,
+          firstMemberId,
+          publication.aggregateId,
+          vitaminGoal.planGoalSnapshotId,
+          firstConfirm.result.aggregateId,
+          firstConfirm.result.aggregateRevision,
+          'Значение отсутствует',
+          'e'.repeat(64),
+        ],
+      ),
+    ).rejects.toThrow()
+    await expect(
+      pool.query(
+        `INSERT INTO telegram_action_intents (
+           id, semantic_key, command_id, space_id, member_id,
+           publication_id, plan_goal_snapshot_id, local_date,
+           source_facts_revision, intent_kind, state, fact_record_id,
+           expected_record_revision, reason, command_fingerprint,
+           expires_at, created_at, updated_at
+         ) VALUES (
+           $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+           $5::uuid, $6::uuid, DATE '2026-04-10', 1,
+           'correct_quantity', 'expired', $7::uuid, $8, $9, $10,
+           TIMESTAMPTZ '2026-04-10 08:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00'
+         )`,
+        [
+          randomUUID(),
+          'g05-expired-correction-missing-value'.padEnd(64, '0').slice(0, 64),
+          spaceId,
+          firstMemberId,
+          publication.aggregateId,
+          vitaminGoal.planGoalSnapshotId,
+          firstConfirm.result.aggregateId,
+          firstConfirm.result.aggregateRevision,
+          'Подготовленная причина без значения',
+          'd'.repeat(64),
+        ],
+      ),
+    ).rejects.toThrow()
     await tracking.deleteRecord.execute({
       commandId: randomUUID(),
       trustedActor: actor,
@@ -1044,14 +1220,30 @@ describe('G02 semantic Telegram action intents', () => {
       (button) => button.text === 'Ввести Steps',
     )
     if (newSteps === undefined) throw new Error('Renewed Steps action missing')
-    await service.select(member, newSteps.actionIntentId)
-    await service.acceptQuantity(member, '7000')
+    const newStepsSelected = await service.select(
+      member,
+      newSteps.actionIntentId,
+    )
+    const newStepsAccepted = await service.acceptQuantity(member, '7000')
     const stepsCompleted = await service.confirm(
       member,
       newSteps.actionIntentId,
     )
     if (stepsCompleted.kind !== 'completed') {
-      throw new Error('Steps confirmation did not complete')
+      const debugIntent = await pool.query(
+        `SELECT intent.state, intent.source_facts_revision::text,
+                month.facts_revision::text current_facts_revision,
+                intent.command_fingerprint
+           FROM telegram_action_intents intent
+           JOIN plan_publications publication
+             ON publication.id = intent.publication_id
+           JOIN plan_months month ON month.id = publication.plan_month_id
+          WHERE intent.id = $1::uuid`,
+        [newSteps.actionIntentId],
+      )
+      throw new Error(
+        `Steps confirmation did not complete: ${JSON.stringify({ newStepsSelected, newStepsAccepted, stepsCompleted, debugIntent: debugIntent.rows })}`,
+      )
     }
     await tracking.deleteRecord.execute({
       commandId: randomUUID(),

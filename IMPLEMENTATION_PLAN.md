@@ -2038,14 +2038,14 @@ confirmation and existing composite tracking commands.
 **Files:**
 
 - Create: `src/modules/telegram-bot/application/tracking-action.mapper.ts`
-- Test: `test/e2e/telegram/correction-close-actions.e2e-spec.ts`
+- Test: `test/e2e/telegram/correction-close-actions.e2e.spec.ts`
 
-- [ ] Написать RED journey correction reason, own undo, partner-action denial,
+- [x] Написать RED journey correction reason, own undo, partner-action denial,
   CloseDay preview race and weekly task result.
-- [ ] Реализовать mapping to T05/T06/T08/T09 public contracts.
-- [ ] Проверить replay, expired actionIntent and closed-plan responses.
-- [ ] Запустить focused Telegram E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: close and correct plans from Telegram`.
+- [x] Реализовать mapping to T05/T06/T08/T09 public contracts.
+- [x] Проверить replay, expired actionIntent and closed-plan responses.
+- [x] Запустить focused Telegram E2E and `pnpm check:quick`.
+- [x] Commit: `feat: close and correct plans from Telegram`.
 
 ### N01 — Reminder schedules and due occurrences
 
