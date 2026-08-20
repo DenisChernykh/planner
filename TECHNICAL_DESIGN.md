@@ -2842,6 +2842,30 @@ checkpoint и progress semantics остаются в существующих T0
 tombstoned scalar records не предлагаются повторно до G05; flexible scalar и
 composite mappings остаются вне G03.
 
+G04 расширяет тот же bounded intent contract типами `text|checklist_item|
+or_variant` для fixed goal/checkpoint expectations и
+`composite_checklist_item|composite_or_variant` для eligible flexible periods.
+Checkpoint-варианты сохраняют обязательный stable `checkpointId`; checklist и
+OR дополнительно сохраняют stable item/variant ID. Эти идентификаторы входят в
+semantic key и canonical command fingerprint, но никогда не попадают в
+`pl1:s|c:<actionIntentId>` callback.
+
+Text action сначала фиксирует выбранный `done|not_done`, затем принимает
+исходный непустой текст и вызывает `tracking.record-text.v1`. Checklist action
+сразу становится `ready` для выбранного состояния и вызывает
+`tracking.record-checklist-item.v1`. OR action принимает canonical decimal с
+precision выбранного варианта и вызывает `tracking.record-or-variant.v1`;
+flexible checklist/OR используют `tracking.record-composite-occurrence.v1`.
+Partial progress предлагает только отсутствующие component IDs в текущем
+expectation или occurrence; correction/delete остаются G05.
+
+Migration `20260811202000_telegram_composite_action_intents` добавляет typed
+text/checklist/OR values, component identities и immutable transition guards.
+Существующие T01/T02 intent rows остаются byte-stable: legacy semantic-key
+preimage сохраняется для старых intent kinds; TTL, active semantic
+key, one awaiting input per member, completed replay и exact source
+`factsRevision` checks G02/G03 не изменяются.
+
 ### 14.2. Pilot и v1
 
 Pilot bot предоставляет Today, ввод/исправление, close day, progress и

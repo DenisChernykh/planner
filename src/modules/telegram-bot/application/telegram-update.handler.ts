@@ -22,6 +22,7 @@ import {
   renderProgress,
   renderToday,
   telegramConfirmation,
+  telegramIntentPreviewText,
   telegramMenu,
 } from './telegram-today.renderer'
 
@@ -234,6 +235,14 @@ export class TelegramUpdateHandler {
           return `${outcome.title}\n\nВведите неотрицательное число.`
         case 'invalid_quantity':
           return `${outcome.title}\n\nЗначение некорректно. Введите число с допустимой точностью.`
+        case 'awaiting_text':
+          return `${outcome.title}\n\nВведите непустой текст.`
+        case 'invalid_text':
+          return `${outcome.title}\n\nТекст пустой или слишком длинный для подтверждения. Повторите ввод.`
+        case 'awaiting_or_variant':
+          return `${outcome.title}\n\nВведите неотрицательное число с допустимой точностью.`
+        case 'invalid_or_variant':
+          return `${outcome.title}\n\nЗначение некорректно. Введите число с допустимой точностью.`
         case 'awaiting_scalar':
           return outcome.inputKind === 'actual_time'
             ? `${outcome.title}\n\nВведите время в формате ЧЧ:ММ.`
@@ -243,13 +252,7 @@ export class TelegramUpdateHandler {
             ? `${outcome.title}\n\nВремя некорректно. Используйте формат ЧЧ:ММ.`
             : `${outcome.title}\n\nОценка должна быть целым безопасным числом.`
         case 'preview': {
-          const value =
-            outcome.value.kind === 'boolean'
-              ? outcome.value.result === 'done'
-                ? 'выполнено'
-                : 'не выполнено'
-              : `${outcome.value.value}${outcome.unit === null ? '' : ` ${outcome.unit}`}`
-          return `${outcome.title}\nДата: ${outcome.localDate}\nЗначение: ${value}\n\nПодтвердить?`
+          return telegramIntentPreviewText(outcome)
         }
         case 'completed':
           return `${outcome.title}\n\nСохранено.`

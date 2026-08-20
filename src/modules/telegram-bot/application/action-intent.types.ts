@@ -8,6 +8,14 @@ export type TelegramActionIntentKind =
   | 'checkpoint_boolean'
   | 'checkpoint_actual_time'
   | 'checkpoint_rating'
+  | 'text'
+  | 'checkpoint_text'
+  | 'checklist_item'
+  | 'checkpoint_checklist_item'
+  | 'or_variant'
+  | 'checkpoint_or_variant'
+  | 'composite_checklist_item'
+  | 'composite_or_variant'
 export type TelegramActionIntentState =
   'offered' | 'awaiting_value' | 'ready' | 'completed' | 'expired'
 
@@ -16,6 +24,13 @@ export type TelegramActionIntentValue =
   | { readonly kind: 'quantity'; readonly value: string }
   | { readonly kind: 'actual_time'; readonly value: string }
   | { readonly kind: 'rating'; readonly value: number }
+  | {
+      readonly kind: 'text'
+      readonly text: string
+      readonly result: 'done' | 'not_done'
+    }
+  | { readonly kind: 'checklist_item'; readonly state: 'done' | 'not_done' }
+  | { readonly kind: 'or_variant'; readonly value: string }
 
 export type TelegramActionIntentOffer = {
   readonly actionIntentId: string
@@ -29,6 +44,10 @@ export type TelegramActionIntentOffer = {
   readonly intentKind: TelegramActionIntentKind
   readonly checkpointId: string | null
   readonly booleanResult: 'done' | 'not_done' | null
+  readonly textResult: 'done' | 'not_done' | null
+  readonly checklistItemId: string | null
+  readonly checklistItemState: 'done' | 'not_done' | null
+  readonly orVariantId: string | null
   readonly commandFingerprint: string | null
   readonly state: Extract<TelegramActionIntentState, 'offered' | 'ready'>
   readonly expiresAt: Date
@@ -50,9 +69,15 @@ export type StoredTelegramActionIntent = {
   readonly state: TelegramActionIntentState
   readonly checkpointId: string | null
   readonly booleanResult: 'done' | 'not_done' | null
+  readonly textResult: 'done' | 'not_done' | null
+  readonly checklistItemId: string | null
+  readonly checklistItemState: 'done' | 'not_done' | null
+  readonly orVariantId: string | null
   readonly quantityValue: string | null
   readonly actualTimeValue: string | null
   readonly ratingValue: bigint | null
+  readonly textValue: string | null
+  readonly orVariantValue: string | null
   readonly commandFingerprint: string | null
   readonly expiresAt: Date
   readonly title: string
@@ -90,6 +115,8 @@ export interface TelegramActionIntentPersistencePort {
     readonly quantityValue: string | null
     readonly actualTimeValue: string | null
     readonly ratingValue: bigint | null
+    readonly textValue: string | null
+    readonly orVariantValue: string | null
     readonly commandFingerprint: string
     readonly now: Date
   }): Promise<StoredTelegramActionIntent | null>
@@ -111,6 +138,10 @@ export type TelegramIntentOutcome =
   | { readonly kind: 'expired' }
   | { readonly kind: 'awaiting_quantity'; readonly title: string }
   | { readonly kind: 'invalid_quantity'; readonly title: string }
+  | { readonly kind: 'awaiting_text'; readonly title: string }
+  | { readonly kind: 'invalid_text'; readonly title: string }
+  | { readonly kind: 'awaiting_or_variant'; readonly title: string }
+  | { readonly kind: 'invalid_or_variant'; readonly title: string }
   | {
       readonly kind: 'awaiting_scalar'
       readonly title: string

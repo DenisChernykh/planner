@@ -20,8 +20,12 @@ export * from './record-weekly-task-result.command'
 export * from './tracking-application'
 export {
   canonicalRecordCheckpointPayload,
+  canonicalRecordChecklistItemPayload,
+  canonicalRecordCompositeOccurrencePayload,
   canonicalRecordFactPayload,
+  canonicalRecordOrVariantPayload,
   canonicalRecordRatingPayload,
+  canonicalRecordTextPayload,
   canonicalRecordTimePayload,
 } from './tracking-command.validation'
 export * from './tracking-errors'

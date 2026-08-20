@@ -26,6 +26,15 @@ import {
   scalarFingerprintForIntent,
   scalarIntentValue,
 } from './scalar-fact-command.mapper'
+import {
+  compositeFingerprintForIntent,
+  compositeIntentValue,
+  executeCompositeFactIntent,
+} from './composite-fact-command.mapper'
+import {
+  telegramIntentMessageLimit,
+  telegramIntentPreviewText,
+} from './telegram-today.renderer'
 import type {
   StoredTelegramActionIntent,
   TelegramActionButton,
@@ -56,6 +65,10 @@ function semanticKey(input: {
   readonly kind: TelegramActionIntentKind
   readonly checkpointId: string | null
   readonly booleanResult: 'done' | 'not_done' | null
+  readonly textResult: 'done' | 'not_done' | null
+  readonly checklistItemId: string | null
+  readonly checklistItemState: 'done' | 'not_done' | null
+  readonly orVariantId: string | null
 }): string {
   const preimage = {
     booleanResult: input.booleanResult,
@@ -67,15 +80,31 @@ function semanticKey(input: {
     publicationId: input.publicationId,
     spaceId: input.member.spaceId,
   }
+  const compositeKinds: readonly TelegramActionIntentKind[] = [
+    'text',
+    'checkpoint_text',
+    'checklist_item',
+    'checkpoint_checklist_item',
+    'or_variant',
+    'checkpoint_or_variant',
+    'composite_checklist_item',
+    'composite_or_variant',
+  ]
+  const payload =
+    input.kind === 'boolean' || input.kind === 'quantity'
+      ? preimage
+      : compositeKinds.includes(input.kind)
+        ? {
+            ...preimage,
+            checkpointId: input.checkpointId,
+            checklistItemId: input.checklistItemId,
+            checklistItemState: input.checklistItemState,
+            orVariantId: input.orVariantId,
+            textResult: input.textResult,
+          }
+        : { ...preimage, checkpointId: input.checkpointId }
   return createHash('sha256')
-    .update(
-      JSON.stringify(
-        input.kind === 'boolean' || input.kind === 'quantity'
-          ? preimage
-          : { ...preimage, checkpointId: input.checkpointId },
-      ),
-      'utf8',
-    )
+    .update(JSON.stringify(payload), 'utf8')
     .digest('hex')
 }
 
@@ -83,13 +112,26 @@ function fingerprint(
   member: MemberContext,
   intent: StoredTelegramActionIntent,
 ): string | null {
-  return intent.intentKind === 'boolean' || intent.intentKind === 'quantity'
-    ? fingerprintForIntent(member, intent)
-    : scalarFingerprintForIntent(member, intent)
+  if (intent.intentKind === 'boolean' || intent.intentKind === 'quantity') {
+    return fingerprintForIntent(member, intent)
+  }
+  if (
+    intent.intentKind === 'actual_time' ||
+    intent.intentKind === 'rating' ||
+    intent.intentKind === 'checkpoint_boolean' ||
+    intent.intentKind === 'checkpoint_actual_time' ||
+    intent.intentKind === 'checkpoint_rating'
+  ) {
+    return scalarFingerprintForIntent(member, intent)
+  }
+  return compositeFingerprintForIntent(member, intent)
 }
 
 function preview(intent: StoredTelegramActionIntent): TelegramIntentOutcome {
-  const value = intentValue(intent) ?? scalarIntentValue(intent)
+  const value =
+    intentValue(intent) ??
+    scalarIntentValue(intent) ??
+    compositeIntentValue(intent)
   return value === null
     ? { kind: 'stale' }
     : {
@@ -112,6 +154,11 @@ function offerInput(
   checkpointId: string | null,
   booleanResult: 'done' | 'not_done' | null,
   now: Date,
+  textResult: 'done' | 'not_done' | null = null,
+  checklistItemId: string | null = null,
+  checklistItemState: 'done' | 'not_done' | null = null,
+  orVariantId: string | null = null,
+  ready = booleanResult !== null || checklistItemState !== null,
 ): TelegramActionIntentOffer {
   const actionIntentId = randomUUID()
   const base = {
@@ -125,6 +172,10 @@ function offerInput(
       kind,
       checkpointId,
       booleanResult,
+      textResult,
+      checklistItemId,
+      checklistItemState,
+      orVariantId,
     }),
     spaceId: member.spaceId,
     memberId: member.memberId,
@@ -135,9 +186,13 @@ function offerInput(
     intentKind: kind,
     checkpointId,
     booleanResult,
+    textResult,
+    checklistItemId,
+    checklistItemState,
+    orVariantId,
     expiresAt: new Date(now.getTime() + intentTtlMs),
   } as const
-  if (booleanResult === null) {
+  if (!ready) {
     return { ...base, state: 'offered', commandFingerprint: null }
   }
   const candidate: StoredTelegramActionIntent = {
@@ -150,6 +205,8 @@ function offerInput(
     quantityValue: null,
     actualTimeValue: null,
     ratingValue: null,
+    textValue: null,
+    orVariantValue: null,
     commandFingerprint: null,
     title: goal.title,
     unit: null,
@@ -166,7 +223,7 @@ function offerInput(
 
 function inputKind(
   intent: StoredTelegramActionIntent,
-): 'quantity' | 'actual_time' | 'rating' | null {
+): 'quantity' | 'actual_time' | 'rating' | 'text' | 'or_variant' | null {
   if (intent.intentKind === 'quantity') return 'quantity'
   if (
     intent.intentKind === 'actual_time' ||
@@ -180,6 +237,16 @@ function inputKind(
   ) {
     return 'rating'
   }
+  if (intent.intentKind === 'text' || intent.intentKind === 'checkpoint_text') {
+    return 'text'
+  }
+  if (
+    intent.intentKind === 'or_variant' ||
+    intent.intentKind === 'checkpoint_or_variant' ||
+    intent.intentKind === 'composite_or_variant'
+  ) {
+    return 'or_variant'
+  }
   return null
 }
 
@@ -187,6 +254,10 @@ function awaiting(intent: StoredTelegramActionIntent): TelegramIntentOutcome {
   const kind = inputKind(intent)
   if (kind === 'quantity') {
     return { kind: 'awaiting_quantity', title: intent.title }
+  }
+  if (kind === 'text') return { kind: 'awaiting_text', title: intent.title }
+  if (kind === 'or_variant') {
+    return { kind: 'awaiting_or_variant', title: intent.title }
   }
   return kind === null
     ? { kind: 'stale' }
@@ -229,6 +300,61 @@ export class TelegramActionIntentService {
     )
     const now = this.clock.now()
     const buttons: TelegramActionButton[] = []
+    const addAction = async (input: {
+      readonly goal: TrackingGoalReadV1
+      readonly kind: TelegramActionIntentKind
+      readonly checkpointId: string | null
+      readonly booleanResult?: 'done' | 'not_done' | null
+      readonly textResult?: 'done' | 'not_done' | null
+      readonly checklistItemId?: string | null
+      readonly checklistItemState?: 'done' | 'not_done' | null
+      readonly orVariantId?: string | null
+      readonly ready?: boolean
+      readonly text: string
+    }): Promise<void> => {
+      const intent = await this.intents.offer(
+        offerInput(
+          member,
+          model,
+          input.goal,
+          model.day.localDate,
+          input.kind,
+          input.checkpointId,
+          input.booleanResult ?? null,
+          now,
+          input.textResult ?? null,
+          input.checklistItemId ?? null,
+          input.checklistItemState ?? null,
+          input.orVariantId ?? null,
+          input.ready ?? false,
+        ),
+        now,
+      )
+      buttons.push({ text: input.text, actionIntentId: intent.actionIntentId })
+    }
+    const hasFact = (
+      expectation: TrackingFixedExpectationV1,
+      factKind: TrackingFactReadV1['factKind'],
+      componentId?: string,
+    ): boolean =>
+      expectation.facts.some(
+        (fact) =>
+          fact.factKind === factKind &&
+          (componentId === undefined ||
+            fact.checklistItemId === componentId ||
+            fact.orVariantId === componentId),
+      )
+    const hasPeriodFact = (
+      period: TrackingDayGoalV1['flexiblePeriods'][number],
+      factKind: TrackingFactReadV1['factKind'],
+      componentId: string,
+    ): boolean =>
+      period.facts.some(
+        (fact) =>
+          fact.factKind === factKind &&
+          (fact.checklistItemId === componentId ||
+            fact.orVariantId === componentId),
+      )
     for (const goal of model.goals) {
       const day = days.get(goal.planGoalSnapshotId)
       if (
@@ -244,22 +370,13 @@ export class TelegramActionIntentService {
         if (measurement.kind === 'boolean') {
           if (facts.some((fact) => fact.factKind === 'boolean')) continue
           for (const result of ['done', 'not_done'] as const) {
-            const intent = await this.intents.offer(
-              offerInput(
-                member,
-                model,
-                goal,
-                model.day.localDate,
-                'boolean',
-                null,
-                result,
-                now,
-              ),
-              now,
-            )
-            buttons.push({
+            await addAction({
+              goal,
+              kind: 'boolean',
+              checkpointId: null,
+              booleanResult: result,
+              ready: true,
               text: `${result === 'done' ? '✓' : '✕'} ${goal.title}`,
-              actionIntentId: intent.actionIntentId,
             })
           }
         } else if (measurement.kind === 'quantity') {
@@ -269,22 +386,11 @@ export class TelegramActionIntentService {
           ) {
             continue
           }
-          const intent = await this.intents.offer(
-            offerInput(
-              member,
-              model,
-              goal,
-              model.day.localDate,
-              'quantity',
-              null,
-              null,
-              now,
-            ),
-            now,
-          )
-          buttons.push({
+          await addAction({
+            goal,
+            kind: 'quantity',
+            checkpointId: null,
             text: `Ввести ${goal.title}`,
-            actionIntentId: intent.actionIntentId,
           })
         } else if (
           (measurement.kind === 'actual_time' ||
@@ -293,23 +399,115 @@ export class TelegramActionIntentService {
             (value) => value.componentKind === 'goal' && !hasRecord(value),
           )
         ) {
-          const intent = await this.intents.offer(
-            offerInput(
-              member,
-              model,
-              goal,
-              model.day.localDate,
-              measurement.kind,
-              null,
-              null,
-              now,
-            ),
-            now,
-          )
-          buttons.push({
+          await addAction({
+            goal,
+            kind: measurement.kind,
+            checkpointId: null,
             text: `Ввести ${goal.title}`,
-            actionIntentId: intent.actionIntentId,
           })
+        } else if (measurement.kind === 'text') {
+          const expectation = day.fixedExpectations.find(
+            (value) => value.componentKind === 'goal',
+          )
+          if (expectation !== undefined && !hasFact(expectation, 'text')) {
+            for (const result of ['done', 'not_done'] as const) {
+              await addAction({
+                goal,
+                kind: 'text',
+                checkpointId: null,
+                textResult: result,
+                text: `${result === 'done' ? '✓' : '✕'} ${goal.title}`,
+              })
+            }
+          }
+        } else if (measurement.kind === 'checklist') {
+          for (const expectation of day.fixedExpectations) {
+            if (
+              expectation.componentKind !== 'checklist_item' ||
+              expectation.componentId === null ||
+              hasFact(expectation, 'checklist_item')
+            ) {
+              continue
+            }
+            const item = measurement.items.find(
+              (value) => value.itemId === expectation.componentId,
+            )
+            if (item === undefined) continue
+            for (const state of ['done', 'not_done'] as const) {
+              await addAction({
+                goal,
+                kind: 'checklist_item',
+                checkpointId: null,
+                checklistItemId: item.itemId,
+                checklistItemState: state,
+                ready: true,
+                text: `${state === 'done' ? '✓' : '✕'} ${goal.title} · ${item.label}`,
+              })
+            }
+          }
+        } else if (measurement.kind === 'any_of') {
+          const expectation = day.fixedExpectations.find(
+            (value) => value.componentKind === 'goal',
+          )
+          if (expectation !== undefined) {
+            for (const variant of measurement.variants) {
+              if (
+                variant.variantId === null ||
+                hasFact(expectation, 'or_variant', variant.variantId)
+              ) {
+                continue
+              }
+              await addAction({
+                goal,
+                kind: 'or_variant',
+                checkpointId: null,
+                orVariantId: variant.variantId,
+                text: `Ввести ${goal.title} · ${variant.label}`,
+              })
+            }
+          }
+        }
+        if (measurement.kind === 'checklist' || measurement.kind === 'any_of') {
+          for (const period of day.flexiblePeriods) {
+            if (!period.eligibleOnDate) continue
+            if (measurement.kind === 'checklist') {
+              for (const item of measurement.items) {
+                if (
+                  item.itemId === null ||
+                  hasPeriodFact(period, 'checklist_item', item.itemId)
+                ) {
+                  continue
+                }
+                for (const state of ['done', 'not_done'] as const) {
+                  await addAction({
+                    goal,
+                    kind: 'composite_checklist_item',
+                    checkpointId: null,
+                    checklistItemId: item.itemId,
+                    checklistItemState: state,
+                    ready: true,
+                    text: `${state === 'done' ? '✓' : '✕'} ${goal.title} · ${item.label}`,
+                  })
+                }
+              }
+            } else {
+              for (const variant of measurement.variants) {
+                if (
+                  variant.variantId === null ||
+                  hasPeriodFact(period, 'or_variant', variant.variantId)
+                ) {
+                  continue
+                }
+                await addAction({
+                  goal,
+                  kind: 'composite_or_variant',
+                  checkpointId: null,
+                  orVariantId: variant.variantId,
+                  text: `Ввести ${goal.title} · ${variant.label}`,
+                })
+              }
+            }
+          }
         }
         continue
       }
@@ -323,8 +521,7 @@ export class TelegramActionIntentService {
       for (const expectation of day.fixedExpectations) {
         if (
           expectation.componentKind !== 'checkpoint' ||
-          expectation.componentId === null ||
-          hasRecord(expectation)
+          expectation.componentId === null
         ) {
           continue
         }
@@ -333,37 +530,81 @@ export class TelegramActionIntentService {
         const satisfaction = checkpoint.satisfaction
         const kind = `checkpoint_${satisfaction.kind}` as const
         if (
-          kind !== 'checkpoint_boolean' &&
-          kind !== 'checkpoint_actual_time' &&
-          kind !== 'checkpoint_rating'
+          kind !== 'checkpoint_checklist' &&
+          kind !== 'checkpoint_any_of' &&
+          hasRecord(expectation)
         ) {
           continue
         }
-        const results =
-          kind === 'checkpoint_boolean'
-            ? (['done', 'not_done'] as const)
-            : ([null] as const)
-        for (const result of results) {
-          const intent = await this.intents.offer(
-            offerInput(
-              member,
-              model,
+        if (kind === 'checkpoint_boolean') {
+          for (const result of ['done', 'not_done'] as const) {
+            await addAction({
               goal,
-              model.day.localDate,
               kind,
-              expectation.componentId,
-              result,
-              now,
-            ),
-            now,
-          )
-          buttons.push({
-            text:
-              result === null
-                ? `Ввести ${goal.title} · ${checkpoint.name}`
-                : `${result === 'done' ? '✓' : '✕'} ${goal.title} · ${checkpoint.name}`,
-            actionIntentId: intent.actionIntentId,
+              checkpointId: expectation.componentId,
+              booleanResult: result,
+              ready: true,
+              text: `${result === 'done' ? '✓' : '✕'} ${goal.title} · ${checkpoint.name}`,
+            })
+          }
+        } else if (
+          kind === 'checkpoint_actual_time' ||
+          kind === 'checkpoint_rating'
+        ) {
+          await addAction({
+            goal,
+            kind,
+            checkpointId: expectation.componentId,
+            text: `Ввести ${goal.title} · ${checkpoint.name}`,
           })
+        } else if (kind === 'checkpoint_text') {
+          for (const result of ['done', 'not_done'] as const) {
+            await addAction({
+              goal,
+              kind,
+              checkpointId: expectation.componentId,
+              textResult: result,
+              text: `${result === 'done' ? '✓' : '✕'} ${goal.title} · ${checkpoint.name}`,
+            })
+          }
+        } else if (kind === 'checkpoint_checklist') {
+          if (measurement.kind !== 'checklist') continue
+          for (const item of measurement.items) {
+            if (
+              item.itemId === null ||
+              hasFact(expectation, 'checklist_item', item.itemId)
+            ) {
+              continue
+            }
+            for (const state of ['done', 'not_done'] as const) {
+              await addAction({
+                goal,
+                kind: 'checkpoint_checklist_item',
+                checkpointId: expectation.componentId,
+                checklistItemId: item.itemId,
+                checklistItemState: state,
+                ready: true,
+                text: `${state === 'done' ? '✓' : '✕'} ${goal.title} · ${checkpoint.name} · ${item.label}`,
+              })
+            }
+          }
+        } else if (kind === 'checkpoint_any_of') {
+          if (measurement.kind !== 'any_of') continue
+          for (const variant of measurement.variants) {
+            if (
+              variant.variantId === null ||
+              hasFact(expectation, 'or_variant', variant.variantId)
+            ) {
+              continue
+            }
+            await addAction({
+              goal,
+              kind: 'checkpoint_or_variant',
+              checkpointId: expectation.componentId,
+              orVariantId: variant.variantId,
+              text: `Ввести ${goal.title} · ${checkpoint.name} · ${variant.label}`,
+            })
+          }
         }
       }
     }
@@ -396,7 +637,10 @@ export class TelegramActionIntentService {
         }
         if (
           current.intentKind === 'boolean' ||
-          current.intentKind === 'checkpoint_boolean'
+          current.intentKind === 'checkpoint_boolean' ||
+          current.intentKind === 'checklist_item' ||
+          current.intentKind === 'checkpoint_checklist_item' ||
+          current.intentKind === 'composite_checklist_item'
         ) {
           return preview(current)
         }
@@ -433,6 +677,8 @@ export class TelegramActionIntentService {
         let quantityValue: string | null = null
         let actualTimeValue: string | null = null
         let ratingValue: bigint | null = null
+        let textValue: string | null = null
+        let orVariantValue: string | null = null
         if (kind === 'quantity') {
           const match = canonicalDecimal.exec(value)
           if (
@@ -471,6 +717,21 @@ export class TelegramActionIntentService {
               inputKind: kind,
             }
           }
+        } else if (kind === 'text') {
+          if (value.length === 0) {
+            return { kind: 'invalid_text', title: intent.title }
+          }
+          textValue = rawValue
+        } else if (kind === 'or_variant') {
+          const match = canonicalDecimal.exec(value)
+          if (
+            match === null ||
+            intent.precision === null ||
+            (match[1]?.length ?? 0) > intent.precision
+          ) {
+            return { kind: 'invalid_or_variant', title: intent.title }
+          }
+          orVariantValue = value
         } else {
           return { kind: 'stale' }
         }
@@ -479,7 +740,23 @@ export class TelegramActionIntentService {
           quantityValue,
           actualTimeValue,
           ratingValue,
+          textValue,
+          orVariantValue,
           state: 'ready',
+        }
+        const candidatePreview = preview(candidate)
+        if (
+          candidatePreview.kind !== 'preview' ||
+          telegramIntentPreviewText(candidatePreview).length >
+            telegramIntentMessageLimit
+        ) {
+          return kind === 'text'
+            ? { kind: 'invalid_text', title: intent.title }
+            : kind === 'or_variant'
+              ? { kind: 'invalid_or_variant', title: intent.title }
+              : kind === 'quantity'
+                ? { kind: 'invalid_quantity', title: intent.title }
+                : { kind: 'stale' }
         }
         const commandFingerprint = fingerprint(member, candidate)
         if (commandFingerprint === null) return { kind: 'stale' }
@@ -490,6 +767,8 @@ export class TelegramActionIntentService {
           quantityValue,
           actualTimeValue,
           ratingValue,
+          textValue,
+          orVariantValue,
           commandFingerprint,
           now,
         })
@@ -540,7 +819,13 @@ export class TelegramActionIntentService {
         const outcome =
           intent.intentKind === 'boolean' || intent.intentKind === 'quantity'
             ? await executeBasicFactIntent(this.tracking, member, intent)
-            : await executeScalarFactIntent(this.tracking, member, intent)
+            : intent.intentKind === 'actual_time' ||
+                intent.intentKind === 'rating' ||
+                intent.intentKind === 'checkpoint_boolean' ||
+                intent.intentKind === 'checkpoint_actual_time' ||
+                intent.intentKind === 'checkpoint_rating'
+              ? await executeScalarFactIntent(this.tracking, member, intent)
+              : await executeCompositeFactIntent(this.tracking, member, intent)
         if (outcome.kind !== 'completed') return outcome
         await this.intents.markCompleted({
           actionIntentId,

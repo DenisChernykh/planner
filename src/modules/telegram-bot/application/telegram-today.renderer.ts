@@ -9,10 +9,37 @@ import {
   TELEGRAM_CALLBACKS,
   type TelegramInlineKeyboard,
 } from './telegram-bot.types'
-import type { TelegramActionButton } from './action-intent.types'
+import type {
+  TelegramActionButton,
+  TelegramActionIntentValue,
+} from './action-intent.types'
 import { encodeTelegramIntentCallback } from './telegram-callback.codec'
 
 const messageLimit = 4_000
+export const telegramIntentMessageLimit = 4_096
+
+export function telegramIntentPreviewText(input: {
+  readonly title: string
+  readonly localDate: string
+  readonly value: TelegramActionIntentValue
+  readonly unit: string | null
+}): string {
+  const value = (() => {
+    if (
+      input.value.kind === 'boolean' ||
+      input.value.kind === 'checklist_item'
+    ) {
+      const result =
+        input.value.kind === 'boolean' ? input.value.result : input.value.state
+      return result === 'done' ? 'выполнено' : 'не выполнено'
+    }
+    if (input.value.kind === 'text') {
+      return `${input.value.result === 'done' ? 'выполнено' : 'не выполнено'}: ${input.value.text}`
+    }
+    return `${input.value.value}${input.unit === null ? '' : ` ${input.unit}`}`
+  })()
+  return `${input.title}\nДата: ${input.localDate}\nЗначение: ${value}\n\nПодтвердить?`
+}
 
 const dayStateLabels = Object.freeze({
   future: 'ещё не наступило',

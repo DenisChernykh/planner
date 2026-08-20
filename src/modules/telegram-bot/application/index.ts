@@ -1,6 +1,7 @@
 export * from './action-intent.service'
 export * from './action-intent.types'
 export * from './basic-fact-command.mapper'
+export * from './composite-fact-command.mapper'
 export * from './scalar-fact-command.mapper'
 export * from './telegram-bot.types'
 export * from './telegram-callback.codec'

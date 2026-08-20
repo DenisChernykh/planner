@@ -2021,12 +2021,12 @@ confirmation and existing composite tracking commands.
 - Create: `src/modules/telegram-bot/application/composite-fact-command.mapper.ts`
 - Test: `test/e2e/telegram/composite-fact-actions.e2e-spec.ts`
 
-- [ ] Написать RED table journey text/checklist/OR/composite including partial
+- [x] Написать RED table journey text/checklist/OR/composite including partial
   progress, validation and correction-before-confirm.
-- [ ] Реализовать thin mapping without goal evaluators or persistence access.
-- [ ] Проверить per-component opaque IDs and action expiry.
-- [ ] Запустить focused Telegram E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: map composite facts from Telegram`.
+- [x] Реализовать thin mapping without goal evaluators or persistence access.
+- [x] Проверить per-component opaque IDs and action expiry.
+- [x] Запустить focused Telegram E2E and `pnpm check:quick`.
+- [x] Commit: `feat: map composite facts from Telegram`.
 
 ### G05 — Telegram corrections and period closure
 

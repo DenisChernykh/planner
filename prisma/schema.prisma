@@ -111,9 +111,15 @@ model TelegramActionIntent {
   state                   String    @db.VarChar(24)
   checkpointId            String?   @map("checkpoint_id") @db.Uuid
   booleanResult           String?   @map("boolean_result") @db.VarChar(16)
+  textResult              String?   @map("text_result") @db.VarChar(16)
+  checklistItemId         String?   @map("checklist_item_id") @db.Uuid
+  checklistItemState      String?   @map("checklist_item_state") @db.VarChar(16)
+  orVariantId             String?   @map("or_variant_id") @db.Uuid
   quantityValue           String?   @map("quantity_value") @db.Text
   actualTimeValue         DateTime? @map("actual_time_value") @db.Time(0)
   ratingValue             BigInt?   @map("rating_value") @db.BigInt
+  textValue               String?   @map("text_value") @db.Text
+  orVariantValue          String?   @map("or_variant_value") @db.Text
   commandFingerprint      String?   @map("command_fingerprint") @db.Char(64)
   resultKind              String?   @map("result_kind") @db.VarChar(128)
   resultAggregateId       String?   @map("result_aggregate_id") @db.Uuid

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -13,7 +13,10 @@ import {
   createPlanningApplication,
   type DraftGoalConfigV1,
 } from '@/modules/planning'
-import { createTrackingApplication } from '@/modules/tracking'
+import {
+  canonicalRecordFactPayload,
+  createTrackingApplication,
+} from '@/modules/tracking'
 import {
   PrismaActionIntentRepository,
   TelegramActionIntentService,
@@ -23,6 +26,7 @@ import { PrismaClientProvider } from '@/platform/database/prisma-client.provider
 import { PrismaTransactionAdapter } from '@/platform/database/prisma-transaction.adapter'
 import { PrismaTransactionContext } from '@/platform/database/prisma-transaction.context'
 import { FakeProductClock } from '@/platform/time/fake-product-clock'
+import { commandFingerprint } from '@/shared/application/command-fingerprint'
 
 const POSTGRES_IMAGE =
   'postgres:18.4-trixie@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a'
@@ -34,6 +38,8 @@ const secondMemberId = '55555555-5555-4555-8555-555555555555'
 const G02_ACTION_INTENT_MIGRATION = '20260811200000_telegram_action_intents'
 const G03_ACTION_INTENT_MIGRATION =
   '20260811201000_telegram_scalar_action_intents'
+const G04_ACTION_INTENT_MIGRATION =
+  '20260811202000_telegram_composite_action_intents'
 
 function deployMigrations(databaseUrl: string): void {
   const result = spawnSync(
@@ -76,6 +82,8 @@ describe('G03 populated G02 action-intent migration', () => {
   let postgres: StartedPostgreSqlContainer
   let pool: Pool
   let provider: PrismaClientProvider
+  let populatedPublicationId: string
+  let populatedPlanGoalSnapshotId: string
 
   beforeAll(async () => {
     postgres = await new PostgreSqlContainer(POSTGRES_IMAGE)
@@ -190,6 +198,8 @@ describe('G03 populated G02 action-intent migration', () => {
     if (planGoalSnapshotId === undefined) {
       throw new Error('migration snapshot missing')
     }
+    populatedPublicationId = publication.aggregateId
+    populatedPlanGoalSnapshotId = planGoalSnapshotId
 
     const legacyRows = [
       {
@@ -429,6 +439,216 @@ describe('G03 populated G02 action-intent migration', () => {
         ['6'.repeat(64)],
       ),
     ).rejects.toThrow(/cannot be deleted/)
+
+    const g03TypedRows = [
+      {
+        key: 'g03-actual-time',
+        kind: 'actual_time',
+        checkpointId: null,
+        actualTime: '09:15',
+        rating: null,
+      },
+      {
+        key: 'g03-rating',
+        kind: 'rating',
+        checkpointId: null,
+        actualTime: null,
+        rating: 5,
+      },
+      {
+        key: 'g03-checkpoint-time',
+        kind: 'checkpoint_actual_time',
+        checkpointId: randomUUID(),
+        actualTime: '10:30',
+        rating: null,
+      },
+      {
+        key: 'g03-checkpoint-rating',
+        kind: 'checkpoint_rating',
+        checkpointId: randomUUID(),
+        actualTime: null,
+        rating: 7,
+      },
+    ] as const
+    for (const [index, row] of g03TypedRows.entries()) {
+      await pool.query(
+        `INSERT INTO telegram_action_intents (
+           id, semantic_key, command_id, space_id, member_id,
+           publication_id, plan_goal_snapshot_id, local_date,
+           source_facts_revision, intent_kind, state, checkpoint_id,
+           actual_time_value, rating_value, command_fingerprint,
+           expires_at, created_at, updated_at
+         ) VALUES (
+           $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+           $5::uuid, $6::uuid, DATE '2026-04-10', 0, $7, 'ready',
+           $8::uuid, $9::time, $10, $11,
+           TIMESTAMPTZ '2026-04-10 08:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00'
+         )`,
+        [
+          randomUUID(),
+          row.key.padEnd(64, String(index)).slice(0, 64),
+          spaceId,
+          firstMemberId,
+          populatedPublicationId,
+          populatedPlanGoalSnapshotId,
+          row.kind,
+          row.checkpointId,
+          row.actualTime,
+          row.rating,
+          `${String(index + 8)}`.repeat(64).slice(0, 64),
+        ],
+      )
+    }
+
+    const g04MigrationSql = readMigration(G04_ACTION_INTENT_MIGRATION)
+    const g04RollbackClient = await pool.connect()
+    try {
+      await g04RollbackClient.query('BEGIN')
+      await g04RollbackClient.query(g04MigrationSql)
+      await expect(g04RollbackClient.query('SELECT 1 / 0')).rejects.toThrow()
+      await g04RollbackClient.query('ROLLBACK')
+    } finally {
+      g04RollbackClient.release()
+    }
+    const rolledBackTextColumn = await pool.query<{ readonly exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'telegram_action_intents'
+            AND column_name = 'text_result'
+       ) exists`,
+    )
+    expect(rolledBackTextColumn.rows[0]?.exists).toBe(false)
+    const g04MigrationClient = await pool.connect()
+    try {
+      await g04MigrationClient.query('BEGIN')
+      await g04MigrationClient.query(g04MigrationSql)
+      await g04MigrationClient.query('COMMIT')
+    } catch (error) {
+      await g04MigrationClient.query('ROLLBACK')
+      throw error
+    } finally {
+      g04MigrationClient.release()
+    }
+    const preservedG03Rows = await pool.query<{
+      readonly intent_kind: string
+      readonly checkpoint_id: string | null
+      readonly actual_time_value: string | null
+      readonly rating_value: string | null
+    }>(
+      `SELECT intent_kind, checkpoint_id::text, actual_time_value::text,
+              rating_value::text
+         FROM telegram_action_intents
+        WHERE semantic_key LIKE 'g03-%'
+        ORDER BY semantic_key`,
+    )
+    expect(preservedG03Rows.rows).toHaveLength(4)
+    expect(preservedG03Rows.rows.map((row) => row.intent_kind)).toEqual([
+      'actual_time',
+      'checkpoint_rating',
+      'checkpoint_actual_time',
+      'rating',
+    ])
+
+    const textIntentId = randomUUID()
+    const textIntentKey = 'g04-text-intent'.padEnd(64, '0')
+    await pool.query(
+      `INSERT INTO telegram_action_intents (
+         id, semantic_key, command_id, space_id, member_id,
+         publication_id, plan_goal_snapshot_id, local_date,
+         source_facts_revision, intent_kind, state, text_result,
+         command_fingerprint, expires_at, created_at, updated_at
+       ) VALUES (
+         $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+         $5::uuid, $6::uuid, DATE '2026-04-10', 0,
+         'text', 'offered', 'done', NULL,
+         TIMESTAMPTZ '2026-04-10 08:00:00+00',
+         TIMESTAMPTZ '2026-04-10 07:00:00+00',
+         TIMESTAMPTZ '2026-04-10 07:00:00+00'
+       )`,
+      [
+        textIntentId,
+        textIntentKey,
+        spaceId,
+        firstMemberId,
+        populatedPublicationId,
+        populatedPlanGoalSnapshotId,
+      ],
+    )
+    await pool.query(
+      `UPDATE telegram_action_intents
+          SET state = 'awaiting_value', updated_at = updated_at
+        WHERE id = $1::uuid`,
+      [textIntentId],
+    )
+    await pool.query(
+      `UPDATE telegram_action_intents
+          SET state = 'ready', text_value = $2,
+              command_fingerprint = $3, updated_at = updated_at
+        WHERE id = $1::uuid`,
+      [textIntentId, '  first raw value  ', 'a'.repeat(64)],
+    )
+    await pool.query(
+      `UPDATE telegram_action_intents
+          SET state = 'awaiting_value', text_value = NULL,
+              command_fingerprint = NULL, updated_at = updated_at
+        WHERE id = $1::uuid`,
+      [textIntentId],
+    )
+    await pool.query(
+      `UPDATE telegram_action_intents
+          SET state = 'ready', text_value = $2,
+              command_fingerprint = $3, updated_at = updated_at
+        WHERE id = $1::uuid`,
+      [textIntentId, 'replacement', 'b'.repeat(64)],
+    )
+    await pool.query(
+      `UPDATE telegram_action_intents
+          SET state = 'expired', updated_at = updated_at
+        WHERE id = $1::uuid`,
+      [textIntentId],
+    )
+    const replacedText = await pool.query<{
+      readonly state: string
+      readonly text_value: string | null
+    }>(
+      `SELECT state, text_value
+         FROM telegram_action_intents
+        WHERE id = $1::uuid`,
+      [textIntentId],
+    )
+    expect(replacedText.rows[0]).toEqual({
+      state: 'expired',
+      text_value: 'replacement',
+    })
+
+    await expect(
+      pool.query(
+        `INSERT INTO telegram_action_intents (
+           id, semantic_key, command_id, space_id, member_id,
+           publication_id, plan_goal_snapshot_id, local_date,
+           source_facts_revision, intent_kind, state, checklist_item_state,
+           command_fingerprint, expires_at, created_at, updated_at
+         ) VALUES (
+           $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+           $5::uuid, $6::uuid, DATE '2026-04-10', 0,
+           'quantity', 'offered', 'done', NULL,
+           TIMESTAMPTZ '2026-04-10 08:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00',
+           TIMESTAMPTZ '2026-04-10 07:00:00+00'
+         )`,
+        [
+          randomUUID(),
+          'g04-invalid-state'.padEnd(64, '0'),
+          spaceId,
+          firstMemberId,
+          populatedPublicationId,
+          populatedPlanGoalSnapshotId,
+        ],
+      ),
+    ).rejects.toThrow()
   }, 120_000)
 })
 
@@ -625,9 +845,73 @@ describe('G02 semantic Telegram action intents', () => {
     })
 
     const today = await tracking.getToday.execute({ trustedActor: actor })
+    if (today.state !== 'published') throw new Error('published state missing')
+    const vitaminGoal = today.goals.find((goal) => goal.title === 'Vitamin')
+    if (vitaminGoal === undefined) throw new Error('Vitamin goal missing')
+    const legacySemanticKey = createHash('sha256')
+      .update(
+        JSON.stringify({
+          booleanResult: 'done',
+          factsRevision: today.factsRevision.toString(10),
+          goalId: vitaminGoal.planGoalSnapshotId,
+          kind: 'boolean',
+          localDate: today.day.localDate,
+          memberId: firstMemberId,
+          publicationId: publication.aggregateId,
+          spaceId,
+        }),
+        'utf8',
+      )
+      .digest('hex')
+    const legacyIntentId = randomUUID()
+    const legacyFingerprint = commandFingerprint(
+      {
+        commandType: 'tracking.record-fact.v1',
+        resultKind: 'tracking.fact-record.v1',
+        toCanonicalPayload: canonicalRecordFactPayload,
+      },
+      {
+        commandId: legacyIntentId,
+        trustedActor: { kind: 'member', id: firstMemberId },
+        payload: {
+          publicationId: publication.aggregateId,
+          planGoalSnapshotId: vitaminGoal.planGoalSnapshotId,
+          localDate: today.day.localDate,
+          value: { kind: 'boolean', result: 'done' },
+        },
+      },
+    )
+    await pool.query(
+      `INSERT INTO telegram_action_intents (
+         id, semantic_key, command_id, space_id, member_id,
+         publication_id, plan_goal_snapshot_id, local_date,
+         source_facts_revision, intent_kind, state, boolean_result,
+         command_fingerprint, expires_at, created_at, updated_at
+       ) VALUES (
+         $1::uuid, $2, $1::uuid, $3::uuid, $4::uuid,
+         $5::uuid, $6::uuid, $7::date, $8, 'boolean', 'ready', 'done',
+         $9, TIMESTAMPTZ '2026-04-10 08:00:00+00',
+         TIMESTAMPTZ '2026-04-10 07:00:00+00',
+         TIMESTAMPTZ '2026-04-10 07:00:00+00'
+       )`,
+      [
+        legacyIntentId,
+        legacySemanticKey,
+        spaceId,
+        firstMemberId,
+        publication.aggregateId,
+        vitaminGoal.planGoalSnapshotId,
+        today.day.localDate,
+        today.factsRevision,
+        legacyFingerprint,
+      ],
+    )
     const firstRender = await service.offerTodayActions(member, today)
     const secondRender = await service.offerTodayActions(member, today)
     expect(secondRender).toEqual(firstRender)
+    expect(
+      firstRender.find((button) => button.text === '✓ Vitamin')?.actionIntentId,
+    ).toBe(legacyIntentId)
     expect(
       firstRender.filter((button) =>
         button.text.includes('Routine checkpoint'),
