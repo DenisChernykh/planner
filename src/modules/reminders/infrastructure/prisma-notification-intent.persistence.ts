@@ -9,6 +9,7 @@ import type {
   ReminderIntentBuildResult,
   ReminderIntentPersistencePort,
 } from '../application/reminder.types'
+import { REMINDER_MAX_ATTEMPTS } from '../application/reminder.types'
 
 type OccurrenceRow = {
   readonly state: string
@@ -28,6 +29,8 @@ type ExistingIntentRow = {
 type AttemptRow = {
   readonly id: string
   readonly attempt_number: number
+  readonly state: string
+  readonly outcome: string | null
 }
 
 type PrismaClientLike = PrismaClient | Prisma.TransactionClient
@@ -107,6 +110,27 @@ export class PrismaNotificationIntentPersistence implements ReminderIntentPersis
       )
       if (existing[0] !== undefined) {
         const attempt = await latestAttempt(client, existing[0].id)
+        if (attempt?.state === 'terminal' && attempt.outcome === 'retryable') {
+          const total = await countAttempts(client, input.claim.occurrenceId)
+          if (total >= REMINDER_MAX_ATTEMPTS) stale()
+          const attemptId = await createAttempt(client, {
+            intentId: existing[0].id,
+            occurrenceId: input.claim.occurrenceId,
+            spaceId: occurrence.space_id,
+            recipientMemberId: input.claim.recipientMemberId,
+            attemptNumber: attempt.attempt_number + 1,
+            now: input.now,
+          })
+          return {
+            kind: 'prepared',
+            occurrenceId: input.claim.occurrenceId,
+            intentId: existing[0].id,
+            attemptId,
+            intentRevision: existing[0].intent_revision,
+            contentHash: existing[0].content_hash,
+            expiresAt: new Date(occurrence.expires_at.getTime()),
+          }
+        }
         const attemptId =
           attempt?.id ??
           (await createAttempt(client, {
@@ -188,7 +212,7 @@ async function latestAttempt(
   intentId: string,
 ): Promise<AttemptRow | undefined> {
   const rows = await client.$queryRaw<AttemptRow[]>(
-    Prisma.sql`SELECT id, attempt_number
+    Prisma.sql`SELECT id, attempt_number, state, outcome
                  FROM notification_attempts
                 WHERE intent_id = ${intentId}::uuid
                 ORDER BY attempt_number DESC
@@ -196,6 +220,18 @@ async function latestAttempt(
                 FOR UPDATE`,
   )
   return rows[0]
+}
+
+async function countAttempts(
+  client: PrismaClientLike,
+  occurrenceId: string,
+): Promise<number> {
+  const rows = await client.$queryRaw<{ readonly count: bigint }[]>(
+    Prisma.sql`SELECT COUNT(*)::bigint AS count
+                 FROM notification_attempts
+                WHERE occurrence_id = ${occurrenceId}::uuid`,
+  )
+  return Number(rows[0]?.count ?? 0n)
 }
 
 async function createAttempt(

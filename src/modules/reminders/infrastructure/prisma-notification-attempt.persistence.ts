@@ -6,6 +6,7 @@ import type {
   ReminderRenderedContentV1,
   TelegramAttemptOutcome,
 } from '../application/reminder.types'
+import { settleReminderAttempt } from '../application/reminder-retry.policy'
 
 type PrismaClientLike = PrismaClient | Prisma.TransactionClient
 
@@ -25,6 +26,7 @@ type AttemptRow = {
   readonly occurrence_lease_until: Date | null
   readonly occurrence_expires_at: Date
   readonly superseded: boolean
+  readonly next_attempt_at: Date | null
 }
 
 function terminalOutcome(
@@ -255,28 +257,7 @@ export class PrismaNotificationAttemptPersistence implements ReminderAttemptPers
     readonly now: Date
     readonly outcome: TelegramAttemptOutcome
   }): Promise<boolean> {
-    const changed = await this.database.withClient((client) => {
-      const outcome = input.outcome
-      return client.$executeRaw(
-        Prisma.sql`UPDATE notification_attempts attempt
-                      SET state = 'terminal', outcome = ${outcome.kind},
-                          outcome_reason = ${outcome.kind === 'accepted' ? null : outcome.reason},
-                          provider_retry_after_sec = ${outcome.kind === 'retryable' ? outcome.retryAfterSeconds : null},
-                          started_at = ${input.now}, completed_at = ${input.now},
-                          updated_at = ${input.now}
-                     FROM reminder_occurrences occurrence
-                    WHERE attempt.id = ${input.attemptId}::uuid
-                      AND attempt.occurrence_id = ${input.occurrenceId}::uuid
-                      AND attempt.state = 'prepared'
-                      AND occurrence.id = attempt.occurrence_id
-                      AND occurrence.state = 'claimed'
-                      AND occurrence.lease_owner = ${input.leaseOwner}
-                      AND occurrence.lease_until > ${input.now}
-                      AND occurrence.expires_at > ${input.now}
-                      AND occurrence.fencing_token = ${input.fencingToken}`,
-      )
-    })
-    return changed === 1
+    return this.complete(input, 'prepared')
   }
 
   public async completeDispatch(input: {
@@ -287,28 +268,88 @@ export class PrismaNotificationAttemptPersistence implements ReminderAttemptPers
     readonly now: Date
     readonly outcome: TelegramAttemptOutcome
   }): Promise<boolean> {
-    const changed = await this.database.withClient((client) => {
-      const outcome = input.outcome
-      return client.$executeRaw(
-        Prisma.sql`UPDATE notification_attempts attempt
-                      SET state = 'terminal', outcome = ${outcome.kind},
-                          outcome_reason = ${outcome.kind === 'accepted' ? null : outcome.reason},
-                          provider_retry_after_sec = ${outcome.kind === 'retryable' ? outcome.retryAfterSeconds : null},
-                          completed_at = ${input.now}, updated_at = ${input.now}
+    return this.complete(input, 'dispatching')
+  }
+
+  private async complete(
+    input: {
+      readonly attemptId: string
+      readonly occurrenceId: string
+      readonly leaseOwner: string
+      readonly fencingToken: bigint
+      readonly now: Date
+      readonly outcome: TelegramAttemptOutcome
+    },
+    expectedState: 'prepared' | 'dispatching',
+  ): Promise<boolean> {
+    return this.database.withClient(async (client) => {
+      const rows = await client.$queryRaw<
+        {
+          readonly expires_at: Date
+        }[]
+      >(
+        Prisma.sql`SELECT occurrence.expires_at
                      FROM reminder_occurrences occurrence
-                    WHERE attempt.id = ${input.attemptId}::uuid
-                      AND attempt.occurrence_id = ${input.occurrenceId}::uuid
-                      AND attempt.state = 'dispatching'
-                      AND attempt.fencing_token = ${input.fencingToken}
-                      AND occurrence.id = attempt.occurrence_id
+                     JOIN notification_attempts current_attempt
+                       ON current_attempt.occurrence_id = occurrence.id
+                      AND current_attempt.id = ${input.attemptId}::uuid
+                    WHERE occurrence.id = ${input.occurrenceId}::uuid
                       AND occurrence.state = 'claimed'
                       AND occurrence.lease_owner = ${input.leaseOwner}
                       AND occurrence.lease_until > ${input.now}
                       AND occurrence.expires_at > ${input.now}
-                      AND occurrence.fencing_token = ${input.fencingToken}`,
+                      AND current_attempt.state = ${expectedState}
+                      AND (${expectedState} = 'prepared' OR current_attempt.fencing_token = ${input.fencingToken})
+                      AND occurrence.fencing_token = ${input.fencingToken}
+                    FOR UPDATE OF occurrence, current_attempt`,
       )
+      const row = rows[0]
+      if (row === undefined) return false
+      const countRows = await client.$queryRaw<
+        {
+          readonly attempt_count: bigint
+        }[]
+      >(
+        Prisma.sql`SELECT COUNT(*)::bigint AS attempt_count
+                     FROM notification_attempts
+                    WHERE occurrence_id = ${input.occurrenceId}::uuid`,
+      )
+      const attemptCount = Number(countRows[0]?.attempt_count ?? 0n)
+
+      const decision = settleReminderAttempt({
+        outcome: input.outcome,
+        attemptsUsed: attemptCount,
+        now: input.now,
+        expiresAt: row.expires_at,
+      })
+      const persistedOutcome = decision.persistedOutcome
+      const changed = await client.$executeRaw(
+        Prisma.sql`UPDATE notification_attempts
+                      SET state = 'terminal', outcome = ${persistedOutcome.kind},
+                          outcome_reason = ${persistedOutcome.kind === 'accepted' ? null : persistedOutcome.reason},
+                          provider_retry_after_sec = ${persistedOutcome.kind === 'retryable' ? persistedOutcome.retryAfterSeconds : null},
+                          started_at = COALESCE(started_at, ${input.now}),
+                          completed_at = ${input.now},
+                          next_attempt_at = ${decision.nextAttemptAt},
+                          updated_at = ${input.now}
+                    WHERE id = ${input.attemptId}::uuid
+                      AND state = ${expectedState}`,
+      )
+      if (changed !== 1) return false
+      const occurrenceChanged = await client.$executeRaw(
+        Prisma.sql`UPDATE reminder_occurrences
+                      SET state = ${decision.occurrenceState},
+                          lease_owner = NULL, lease_until = NULL,
+                          updated_at = ${input.now}
+                    WHERE id = ${input.occurrenceId}::uuid
+                      AND state = 'claimed'
+                      AND fencing_token = ${input.fencingToken}`,
+      )
+      if (occurrenceChanged !== 1) {
+        throw new Error('Reminder occurrence completion lost its fence')
+      }
+      return true
     })
-    return changed === 1
   }
 
   private async lockAttempt(
@@ -334,6 +375,7 @@ export class PrismaNotificationAttemptPersistence implements ReminderAttemptPers
                         occurrence.lease_owner AS occurrence_lease_owner,
                         occurrence.lease_until AS occurrence_lease_until,
                         occurrence.expires_at AS occurrence_expires_at,
+                        attempt.next_attempt_at,
                         EXISTS (
                           SELECT 1
                             FROM notification_intents newer

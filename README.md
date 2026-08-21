@@ -28,3 +28,6 @@ Bot ingress является opt-in частью API process. По умолча�
 `TELEGRAM_INGRESS_MODE=get_updates` и секрет `TELEGRAM_BOT_TOKEN`; production
 режим остаётся заблокирован до отдельной deployment-задачи. Один process
 использует PostgreSQL offset и принимает только private messages и callbacks.
+
+Локальный `planner-worker` также использует `TELEGRAM_BOT_TOKEN` для отправки
+напоминаний; Compose не запускает worker без этого секрета.

@@ -1,6 +1,9 @@
 import { WorkspaceTelegramRecipientNotFoundError } from '@/modules/workspace/application/workspace-errors'
 import { DeliverReminderCommand } from '@/modules/reminders/application/deliver-reminder.command'
-import { ReminderIntentClaimStaleError } from '@/modules/reminders/application/reminder-errors'
+import {
+  ReminderDeliveryAbortedError,
+  ReminderIntentClaimStaleError,
+} from '@/modules/reminders/application/reminder-errors'
 import type {
   ReminderAttemptPersistencePort,
   ReminderOccurrenceClaim,
@@ -175,6 +178,38 @@ describe('DeliverReminderCommand', () => {
         },
       }),
     )
+    expect(transport.send.mock.calls).toHaveLength(0)
+  })
+
+  it('leaves the attempt prepared when shutdown arrives during recipient resolution', async () => {
+    const attempts = makeAttempt({
+      kind: 'prepared',
+      intentId: input.intentId,
+      recipientMemberId: claim.recipientMemberId,
+      content,
+    })
+    const controller = new AbortController()
+    const transport: jest.Mocked<ReminderDeliveryTransportPort> = {
+      send: jest.fn(),
+    }
+    const command = new DeliverReminderCommand(
+      attempts,
+      {
+        resolveTelegramRecipient: jest.fn(() => {
+          controller.abort()
+          return Promise.resolve(123456789n)
+        }),
+      },
+      transport,
+      { run: async <T>(operation: () => Promise<T>) => operation() },
+      { now: () => now, today: () => '2026-03-30' },
+    )
+
+    await expect(
+      command.execute({ ...input, signal: controller.signal }),
+    ).rejects.toBeInstanceOf(ReminderDeliveryAbortedError)
+    expect(attempts.beginDispatch.mock.calls).toHaveLength(0)
+    expect(attempts.completePrepared.mock.calls).toHaveLength(0)
     expect(transport.send.mock.calls).toHaveLength(0)
   })
 

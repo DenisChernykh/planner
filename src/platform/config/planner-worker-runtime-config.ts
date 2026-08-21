@@ -12,6 +12,11 @@ export type PlannerWorkerRuntimeConfig = {
   readonly database: DatabaseRuntimeConfig
   readonly observability: OpenTelemetryRuntimeConfig
   readonly intervalMs: number
+  readonly telegramBot: {
+    readonly token: string
+    readonly requestTimeoutMs: number
+    readonly responseBodyLimitBytes: number
+  }
   readonly runnerShutdownGraceMs: 5_000
   readonly shutdownGraceMs: 10_000
 }
@@ -20,6 +25,7 @@ type Environment = {
   readonly DATABASE_URL: string
   readonly DATABASE_POOL_MAX: number
   readonly PLANNER_WORKER_INTERVAL_MS: number
+  readonly TELEGRAM_BOT_TOKEN: string
   readonly OTEL_SDK_DISABLED: boolean
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string
 }
@@ -45,6 +51,13 @@ const schema = Joi.object<Environment>({
     .min(15_000)
     .max(60_000)
     .default(30_000),
+  TELEGRAM_BOT_TOKEN: Joi.string()
+    .min(20)
+    .max(256)
+    .custom((value: string, helpers) =>
+      /\p{Cc}/u.test(value) ? helpers.error('any.invalid') : value,
+    )
+    .required(),
   OTEL_SDK_DISABLED: Joi.boolean().default(true),
   OTEL_EXPORTER_OTLP_ENDPOINT: Joi.string()
     .trim()
@@ -85,6 +98,10 @@ export function buildPlannerWorkerRuntimeConfig(
       ...runtimeDefaults.observability,
     }),
     intervalMs: environment.PLANNER_WORKER_INTERVAL_MS,
+    telegramBot: Object.freeze({
+      token: environment.TELEGRAM_BOT_TOKEN,
+      ...runtimeDefaults.telegramBot,
+    }),
     runnerShutdownGraceMs: 5_000,
     shutdownGraceMs: 10_000,
   })

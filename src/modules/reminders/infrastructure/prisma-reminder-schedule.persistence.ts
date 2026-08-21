@@ -454,6 +454,18 @@ export class PrismaReminderSchedulePersistence implements ReminderSchedulePersis
                       AND expires_at > ${input.now}`,
       )
       await closeOrphanedDispatchingAttempts(client, input.now)
+      await client.$executeRaw(
+        Prisma.sql`UPDATE reminder_occurrences occurrence
+                      SET state = 'terminal', updated_at = ${input.now}
+                    WHERE occurrence.state = 'pending'
+                      AND EXISTS (
+                        SELECT 1
+                          FROM notification_attempts attempt
+                         WHERE attempt.occurrence_id = occurrence.id
+                           AND attempt.state = 'terminal'
+                           AND attempt.outcome IN ('accepted', 'terminal', 'ambiguous')
+                      )`,
+      )
 
       const due = await client.$queryRaw<SlotRow[]>(
         Prisma.sql`SELECT slot.id, slot.schedule_id, slot.slot_kind,
@@ -528,6 +540,33 @@ export class PrismaReminderSchedulePersistence implements ReminderSchedulePersis
            WHERE state = 'pending'
              AND due_at <= ${input.now}
              AND expires_at > ${input.now}
+             AND (
+               NOT EXISTS (
+                 SELECT 1
+                   FROM notification_attempts attempt
+                  WHERE attempt.occurrence_id = reminder_occurrences.id
+               )
+               OR EXISTS (
+                 SELECT 1
+                   FROM notification_attempts attempt
+                  WHERE attempt.id = (
+                    SELECT latest.id
+                      FROM notification_attempts latest
+                     WHERE latest.occurrence_id = reminder_occurrences.id
+                     ORDER BY latest.created_at DESC, latest.id DESC
+                     LIMIT 1
+                   )
+                    AND (
+                      attempt.state = 'prepared'
+                      OR (
+                        attempt.state = 'terminal'
+                        AND attempt.outcome = 'retryable'
+                        AND attempt.next_attempt_at IS NOT NULL
+                        AND attempt.next_attempt_at <= ${input.now}
+                      )
+                    )
+               )
+             )
            ORDER BY due_at ASC, id ASC
            LIMIT ${input.limit}
            FOR UPDATE SKIP LOCKED
@@ -599,7 +638,7 @@ export class PrismaReminderSchedulePersistence implements ReminderSchedulePersis
                       AND lease_until > ${input.now}
                       AND (
                         (${input.nextState} = 'expired' AND expires_at <= ${input.now})
-                        OR (${input.nextState} = 'cancelled' AND expires_at > ${input.now})
+                        OR (${input.nextState} IN ('cancelled', 'terminal') AND expires_at > ${input.now})
                       )`,
       ),
     )

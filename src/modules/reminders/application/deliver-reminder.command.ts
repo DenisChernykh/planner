@@ -3,6 +3,7 @@ import type { WorkspaceTelegramRecipientResolver } from '@/modules/workspace/app
 import { WorkspaceTelegramRecipientNotFoundError } from '@/modules/workspace/application/workspace-errors'
 
 import {
+  ReminderDeliveryAbortedError,
   ReminderClaimValidationError,
   ReminderIntentClaimStaleError,
 } from './reminder-errors'
@@ -87,6 +88,8 @@ export class DeliverReminderCommand {
       throw new ReminderIntentClaimStaleError()
     }
 
+    if (input.signal.aborted) throw new ReminderDeliveryAbortedError()
+
     const text = render(target.content)
     if (text.length === 0) {
       const outcome: Extract<
@@ -102,6 +105,7 @@ export class DeliverReminderCommand {
         target.recipientMemberId,
       )
     } catch (error: unknown) {
+      if (input.signal.aborted) throw new ReminderDeliveryAbortedError()
       const outcome: TelegramAttemptOutcome =
         error instanceof WorkspaceTelegramRecipientNotFoundError
           ? { kind: 'terminal', reason: 'provider_rejected' }
@@ -112,6 +116,10 @@ export class DeliverReminderCommand {
             }
       return this.completePrepared(input, outcome)
     }
+
+    // Recipient resolution can be asynchronous.  Do not turn a prepared
+    // attempt into dispatching after shutdown: recovery must be able to reuse it.
+    if (input.signal.aborted) throw new ReminderDeliveryAbortedError()
 
     const dispatch = await this.transaction.run(() =>
       this.attempts.beginDispatch({

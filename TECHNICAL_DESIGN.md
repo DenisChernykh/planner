@@ -2711,6 +2711,14 @@ side effect; система не обещает current-at-receipt или exactl
 между `dispatching` и фактической передачей запроса может дать безопасный
 пропуск, выбранный вместо риска дубля.
 
+Worker N05 фиксирует bounded retry policy: на один occurrence допускаются не
+более трёх provider attempts. Для явного retryable `429` используется
+`retry_after`; если provider его не прислал, а также для retryable `5xx`,
+используется задержка 30 секунд. Следующий attempt создаётся только если его
+`nextAttemptAt` строго раньше `expiresAt`; после этого occurrence получает
+terminal state. `nextAttemptAt` хранится на immutable terminal attempt, а
+новый attempt создаётся append-only после сохранённого retryable outcome.
+
 ### 13.4. Telegram outcome model
 
 | Outcome | Поведение |

@@ -10,7 +10,10 @@ describe('T10 planner-worker lifecycle', () => {
   afterEach(() => jest.useRealTimers())
 
   it('defaults to a 30 second interval and enforces the 15-60 second range', () => {
-    const base = { DATABASE_URL: 'postgresql://planner:test@db/planner' }
+    const base = {
+      DATABASE_URL: 'postgresql://planner:test@db/planner',
+      TELEGRAM_BOT_TOKEN: '123456789:planner-worker-token-value',
+    }
     expect(buildPlannerWorkerRuntimeConfig(base).intervalMs).toBe(30_000)
     expect(
       buildPlannerWorkerRuntimeConfig({
@@ -22,6 +25,14 @@ describe('T10 planner-worker lifecycle', () => {
       buildPlannerWorkerRuntimeConfig({
         ...base,
         PLANNER_WORKER_INTERVAL_MS: 60_001,
+      }),
+    ).toThrow(RuntimeConfigurationError)
+  })
+
+  it('requires a Telegram Bot API token for reminder delivery', () => {
+    expect(() =>
+      buildPlannerWorkerRuntimeConfig({
+        DATABASE_URL: 'postgresql://planner:test@db/planner',
       }),
     ).toThrow(RuntimeConfigurationError)
   })
@@ -121,6 +132,7 @@ describe('T10 planner-worker lifecycle', () => {
   it('admits termination before a blocked initial scan and skips readiness', async () => {
     const config = buildPlannerWorkerRuntimeConfig({
       DATABASE_URL: 'postgresql://planner:test@db/planner',
+      TELEGRAM_BOT_TOKEN: '123456789:planner-worker-token-value',
     })
     const databaseClosed = jest.fn()
     const observabilityClosed = jest.fn(() => Promise.resolve())
@@ -173,6 +185,7 @@ describe('T10 planner-worker lifecycle', () => {
     jest.useFakeTimers()
     const config = buildPlannerWorkerRuntimeConfig({
       DATABASE_URL: 'postgresql://planner:test@db/planner',
+      TELEGRAM_BOT_TOKEN: '123456789:planner-worker-token-value',
     })
     const observability = {
       close: () => Promise.resolve(),

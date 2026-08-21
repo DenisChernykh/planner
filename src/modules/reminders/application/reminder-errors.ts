@@ -36,6 +36,13 @@ export class ReminderIntentClaimStaleError extends Error {
   }
 }
 
+export class ReminderDeliveryAbortedError extends Error {
+  public constructor() {
+    super('Reminder delivery was aborted before dispatch')
+    this.name = 'ReminderDeliveryAbortedError'
+  }
+}
+
 export class ReminderIntentDependencyUnavailableError extends Error {
   public constructor(options?: { readonly cause?: unknown }) {
     super('Reminder intent dependency is unavailable', options)

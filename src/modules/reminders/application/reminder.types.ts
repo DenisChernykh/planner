@@ -17,6 +17,10 @@ export const REMINDER_DELIVERY_STATUS_SCHEMA_VERSION =
   'reminders.delivery-status.v1' as const
 export const REMINDER_CONTENT_SCHEMA_VERSION =
   'reminders.rendered-content.v1' as const
+export const REMINDER_WORKER_BATCH_LIMIT = 10 as const
+export const REMINDER_WORKER_LEASE_DURATION_MS = 120_000 as const
+export const REMINDER_MAX_ATTEMPTS = 3 as const
+export const REMINDER_RETRY_DELAY_MS = 30_000 as const
 
 export type ReminderSlotKind = 'morning' | 'day' | 'evening'
 
@@ -101,7 +105,7 @@ export type TransitionReminderOccurrenceClaimInput = {
   readonly occurrenceId: string
   readonly leaseOwner: string
   readonly fencingToken: bigint
-  readonly nextState: 'cancelled' | 'expired'
+  readonly nextState: 'cancelled' | 'expired' | 'terminal'
   readonly now: Date
 }
 

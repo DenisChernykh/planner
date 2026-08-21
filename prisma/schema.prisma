@@ -338,6 +338,7 @@ model NotificationAttempt {
   providerRetryAfterSec Int?      @map("provider_retry_after_sec")
   startedAt             DateTime? @map("started_at") @db.Timestamptz(3)
   completedAt           DateTime? @map("completed_at") @db.Timestamptz(3)
+  nextAttemptAt         DateTime? @map("next_attempt_at") @db.Timestamptz(3)
   createdAt             DateTime  @map("created_at") @db.Timestamptz(3)
   updatedAt             DateTime  @map("updated_at") @db.Timestamptz(3)
 
@@ -349,6 +350,7 @@ model NotificationAttempt {
   @@index([state, createdAt, id])
   @@index([occurrenceId, attemptNumber])
   @@index([spaceId, recipientMemberId, outcome, completedAt])
+  @@index([occurrenceId, nextAttemptAt, id])
   @@map("notification_attempts")
 }
 

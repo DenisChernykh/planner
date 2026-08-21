@@ -110,7 +110,7 @@ function persistInput(): PersistReminderIntentInput {
   }
 }
 
-describe('N03 notification attempt recovery on PostgreSQL', () => {
+describe('N05 notification attempt recovery on PostgreSQL', () => {
   let postgres: StartedPostgreSqlContainer
   let pool: Pool
   let provider: PrismaClientProvider
@@ -209,6 +209,12 @@ describe('N03 notification attempt recovery on PostgreSQL', () => {
     await pool.query(
       readFileSync(
         'prisma/migrations/20260811230000_notification_attempts/migration.sql',
+        'utf8',
+      ),
+    )
+    await pool.query(
+      readFileSync(
+        'prisma/migrations/20260811240000_reminder_worker_retry/migration.sql',
         'utf8',
       ),
     )
@@ -436,14 +442,42 @@ describe('N03 notification attempt recovery on PostgreSQL', () => {
       ),
     ).resolves.toBe(true)
     const row = await pool.query(
-      'SELECT state, outcome, provider_retry_after_sec FROM notification_attempts WHERE id = $1::uuid',
+      'SELECT state, outcome, provider_retry_after_sec, next_attempt_at FROM notification_attempts WHERE id = $1::uuid',
       [intent.attemptId],
     )
     expect(row.rows[0]).toEqual({
       state: 'terminal',
       outcome: 'retryable',
       provider_retry_after_sec: 7,
+      next_attempt_at: new Date('2026-03-30T05:00:07.000Z'),
     })
+    const occurrence = await pool.query(
+      'SELECT state, lease_owner, lease_until FROM reminder_occurrences WHERE id = $1::uuid',
+      [occurrenceId],
+    )
+    expect(occurrence.rows[0]).toEqual({
+      state: 'pending',
+      lease_owner: null,
+      lease_until: null,
+    })
+    await expect(
+      schedules.claimDueOccurrences({
+        now: new Date('2026-03-30T05:00:06.999Z'),
+        leaseOwner: 'worker-retry',
+        limit: 10,
+        leaseDurationMs: 60_000,
+      }),
+    ).resolves.toEqual([])
+    await expect(
+      schedules.claimDueOccurrences({
+        now: new Date('2026-03-30T05:00:07.000Z'),
+        leaseOwner: 'worker-retry',
+        limit: 10,
+        leaseDurationMs: 60_000,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ occurrenceId, fencingToken: 4n }),
+    ])
     await expect(
       pool.query(
         `UPDATE notification_attempts

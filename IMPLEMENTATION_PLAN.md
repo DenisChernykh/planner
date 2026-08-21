@@ -2172,14 +2172,15 @@ crash recovery.
 - Modify: `src/bootstrap/planner-worker/**`
 - Test: `test/integration/reminders/reminder-worker-pipeline.integration.spec.ts`
 - Test: `test/unit/bootstrap/reminder-worker-wiring.spec.ts`
+- Create: `prisma/migrations/20260811240000_reminder_worker_retry/migration.sql`
 
-- [ ] Написать fake-clock RED cases duplicate ticks, completion after claim,
+- [x] Написать fake-clock RED cases duplicate ticks, completion after claim,
   expiry, safe retry, orphaned prepared and orphaned dispatching.
-- [ ] Compose N01/N02/N03 through public contracts under REL-03 non-overlapping
+- [x] Compose N01/N02/N03 through public contracts under REL-03 non-overlapping
   runner; do not bypass repositories from bootstrap.
-- [ ] Проверить restart/fencing, bounded batch and graceful shutdown.
-- [ ] Запустить integration/wiring tests and `pnpm check:quick`.
-- [ ] Commit: `feat: run due reminder delivery pipeline`.
+- [x] Проверить restart/fencing, bounded batch and graceful shutdown.
+- [x] Запустить integration/wiring tests and `pnpm check:quick`.
+- [x] Commit: `feat: run due reminder delivery pipeline`.
 
 ### R01 — Pilot provisional report
 

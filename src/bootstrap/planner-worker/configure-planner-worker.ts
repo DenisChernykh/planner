@@ -1,10 +1,15 @@
 import { createPlanningLifecycleWorker } from '@/modules/planning'
+import { createTrackingApplication } from '@/modules/tracking'
+import { createRemindersApplication } from '@/modules/reminders'
+import { createWorkspaceMemberResolver } from '@/modules/workspace'
+import { createTelegramOutboundTransport } from '@/modules/telegram-bot'
 import type { PlannerWorkerRuntimeConfig } from '@/platform/config/planner-worker-runtime-config'
 import { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 import { PrismaTransactionAdapter } from '@/platform/database/prisma-transaction.adapter'
 import { PrismaTransactionContext } from '@/platform/database/prisma-transaction.context'
 import { PeriodicMaintenanceRunner } from '@/platform/maintenance/periodic-maintenance-runner'
 import { SystemProductClock } from '@/platform/time/system-product-clock'
+import { composePlannerWorkerTick } from './reminder-worker-wiring'
 
 import type { ObservabilityRuntime } from '@/platform/observability/observability.runtime'
 
@@ -48,6 +53,35 @@ export async function configurePlannerWorker(
     transaction,
     clock,
   })
+  const workspaceMembers = createWorkspaceMemberResolver(database)
+  const tracking = createTrackingApplication({
+    database,
+    transaction,
+    workspaceMembers,
+    clock,
+  })
+  const reminders = createRemindersApplication({
+    database,
+    transaction,
+    workspaceMembers,
+    clock,
+    today: {
+      getToday: (memberId) =>
+        tracking.getToday.execute({
+          trustedActor: { kind: 'member', id: memberId },
+        }),
+    },
+    telegramRecipientResolver: workspaceMembers,
+    deliveryTransport: createTelegramOutboundTransport(
+      config.telegramBot.token,
+      config.telegramBot,
+    ),
+  })
+  const reminderCycle = reminders.runDueReminders
+  if (reminderCycle === undefined) {
+    throw new Error('Planner worker reminders application is incomplete')
+  }
+  const tick = composePlannerWorkerTick(worker, reminderCycle)
   let runnerController: AbortController | undefined
   try {
     await database.connect(startupSignal)
@@ -55,13 +89,12 @@ export async function configurePlannerWorker(
     await new Promise<void>((resolve, reject) => {
       const onAbort = (): void => reject(startupAbortError(startupSignal))
       startupSignal.addEventListener('abort', onAbort, { once: true })
-      void worker
-        .tick()
+      void tick(startupSignal)
         .then(resolve, reject)
         .finally(() => startupSignal.removeEventListener('abort', onAbort))
     })
     runnerController = new AbortController()
-    const runner = new PeriodicMaintenanceRunner(async () => worker.tick(), {
+    const runner = new PeriodicMaintenanceRunner(tick, {
       delayMs: config.intervalMs,
       shutdownGraceMs: config.runnerShutdownGraceMs,
       runOnStart: false,

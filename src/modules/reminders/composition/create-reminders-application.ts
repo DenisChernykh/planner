@@ -12,6 +12,7 @@ import {
   GetDeliveryStatusQuery,
   GetReminderSettingsQuery,
   ReminderIntentDependencyUnavailableError,
+  RunDueRemindersCycle,
   SaveReminderScheduleCommand,
   type RemindersApplication,
   type ReminderTodayReadPort,
@@ -66,7 +67,7 @@ export function createRemindersApplication(dependencies: {
           dependencies.clock,
         )
       : undefined
-  return Object.freeze({
+  const application = {
     saveReminderSchedule: new SaveReminderScheduleCommand(
       executor,
       dependencies.workspaceMembers,
@@ -92,5 +93,17 @@ export function createRemindersApplication(dependencies: {
       dependencies.clock,
     ),
     ...(deliverReminder === undefined ? {} : { deliverReminder }),
+  }
+  return Object.freeze({
+    ...application,
+    ...(deliverReminder === undefined
+      ? {}
+      : {
+          runDueReminders: new RunDueRemindersCycle(
+            application.claimDueOccurrences,
+            application.buildReminderIntent,
+            deliverReminder,
+          ),
+        }),
   })
 }
