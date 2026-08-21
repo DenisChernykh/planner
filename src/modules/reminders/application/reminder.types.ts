@@ -12,6 +12,9 @@ import type {
 
 export const REMINDER_TIME_ZONE = 'Asia/Yekaterinburg' as const
 export const REMINDER_SCHEDULE_RESULT_KIND = 'reminders.schedule.v1' as const
+export const REMINDER_SETTINGS_SCHEMA_VERSION = 'reminders.settings.v1' as const
+export const REMINDER_DELIVERY_STATUS_SCHEMA_VERSION =
+  'reminders.delivery-status.v1' as const
 export const REMINDER_CONTENT_SCHEMA_VERSION =
   'reminders.rendered-content.v1' as const
 
@@ -48,6 +51,33 @@ export type SaveReminderSchedulePersistenceInput = ReminderCommandIdentity & {
 export type ReminderSchedulePersistenceResult = {
   readonly scheduleId: string
   readonly revision: bigint
+}
+
+export type ReminderSettingsReadModel = {
+  readonly scheduleId: string | null
+  readonly revision: bigint | null
+  readonly timeZone: typeof REMINDER_TIME_ZONE
+  readonly slots: ReminderSlotTimes
+}
+
+export type ReminderDeliveryStatus = 'available' | 'blocked' | 'connection_lost'
+
+export type ReminderDeliveryStatusReadModel = {
+  readonly status: ReminderDeliveryStatus
+}
+
+export type ReminderSettingsReadInput = {
+  readonly spaceId: string
+  readonly memberId: string
+}
+
+export interface ReminderSettingsReadPort {
+  getSettings(
+    input: ReminderSettingsReadInput,
+  ): Promise<ReminderSettingsReadModel>
+  getDeliveryStatus(
+    input: ReminderSettingsReadInput,
+  ): Promise<ReminderDeliveryStatusReadModel>
 }
 
 export type ClaimDueOccurrencesInput = {

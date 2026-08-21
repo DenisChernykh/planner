@@ -11,6 +11,8 @@ import {
   GoalDefinitionConflictProblemResponseDto,
   DraftConflictProblemResponseDto,
   DraftProblemConflictResponseDto,
+  ReminderScheduleRevisionConflictProblemResponseDto,
+  ReminderScheduleRevisionConflictResponseDto,
   ProblemFieldErrorResponseDto,
   ProblemConflictResponseDto,
   ProblemResponseDto,
@@ -65,6 +67,9 @@ export function ApiProblemResponses(
           }
           if (code === 'DRAFT_REVISION_CONFLICT') {
             return DraftConflictProblemResponseDto
+          }
+          if (code === 'REMINDER_SCHEDULE_REVISION_CONFLICT') {
+            return ReminderScheduleRevisionConflictProblemResponseDto
           }
           if (code === 'PUBLICATION_PREVIEW_CONFLICT') {
             return PublicationPreviewConflictProblemResponseDto
@@ -140,6 +145,8 @@ export function ApiProblemResponses(
       GoalDefinitionConflictProblemResponseDto,
       DraftProblemConflictResponseDto,
       DraftConflictProblemResponseDto,
+      ReminderScheduleRevisionConflictProblemResponseDto,
+      ReminderScheduleRevisionConflictResponseDto,
       ValidationProblemResponseDto,
       PublicationPreviewConflictResponseDto,
       PublicationPreviewConflictProblemResponseDto,
@@ -201,6 +208,15 @@ function problemExample(definition: RegisteredProblemDefinition): object {
     ...(definition.code === 'DRAFT_REVISION_CONFLICT'
       ? {
           conflict: { expectedRevision: '1', currentRevision: '2' },
+        }
+      : {}),
+    ...(definition.code === 'REMINDER_SCHEDULE_REVISION_CONFLICT'
+      ? {
+          conflict: {
+            expectedRevision: '1',
+            currentRevision: '2',
+            nextAction: 'reload-reminder-settings-and-retry',
+          },
         }
       : {}),
     ...(definition.code === 'PUBLICATION_PREVIEW_CONFLICT'

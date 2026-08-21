@@ -319,10 +319,16 @@ export class PrismaReminderSchedulePersistence implements ReminderSchedulePersis
         (input.expectedRevision === undefined ||
           input.expectedRevision !== existing.revision)
       ) {
-        throw new ReminderScheduleRevisionConflictError()
+        throw new ReminderScheduleRevisionConflictError(
+          input.expectedRevision ?? null,
+          existing.revision,
+        )
       }
       if (existing === undefined && input.expectedRevision !== undefined) {
-        throw new ReminderScheduleRevisionConflictError()
+        throw new ReminderScheduleRevisionConflictError(
+          input.expectedRevision,
+          null,
+        )
       }
 
       const scheduleId = existing?.id ?? randomUUID()

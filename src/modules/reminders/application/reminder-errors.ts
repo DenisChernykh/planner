@@ -1,5 +1,8 @@
 export class ReminderScheduleRevisionConflictError extends Error {
-  public constructor() {
+  public constructor(
+    public readonly expectedRevision: bigint | null = null,
+    public readonly currentRevision: bigint | null = null,
+  ) {
     super('Reminder schedule revision is stale')
     this.name = 'ReminderScheduleRevisionConflictError'
   }

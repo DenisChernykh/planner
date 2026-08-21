@@ -9,13 +9,17 @@ import {
   BuildReminderIntentCommand,
   DeliverReminderCommand,
   ClaimDueOccurrences,
+  GetDeliveryStatusQuery,
+  GetReminderSettingsQuery,
   ReminderIntentDependencyUnavailableError,
   SaveReminderScheduleCommand,
+  type RemindersApplication,
   type ReminderTodayReadPort,
 } from '../application'
 import {
   PrismaNotificationIntentPersistence,
   PrismaNotificationAttemptPersistence,
+  PrismaReminderSettingsReadPersistence,
   PrismaReminderSchedulePersistence,
 } from '../infrastructure'
 import type { ReminderIntentPersistencePort } from '../application/reminder.types'
@@ -24,13 +28,6 @@ import type {
   ReminderDeliveryTransportPort,
 } from '../application/reminder.types'
 import type { WorkspaceTelegramRecipientResolver } from '@/modules/workspace/application/workspace-member-resolver.port'
-
-export type RemindersApplication = {
-  readonly saveReminderSchedule: SaveReminderScheduleCommand
-  readonly claimDueOccurrences: ClaimDueOccurrences
-  readonly buildReminderIntent: BuildReminderIntentCommand
-  readonly deliverReminder?: DeliverReminderCommand
-}
 
 export function createRemindersApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -44,6 +41,7 @@ export function createRemindersApplication(dependencies: {
   const persistence = new PrismaReminderSchedulePersistence(
     dependencies.database,
   )
+  const reads = new PrismaReminderSettingsReadPersistence(dependencies.database)
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -73,6 +71,14 @@ export function createRemindersApplication(dependencies: {
       executor,
       dependencies.workspaceMembers,
       persistence,
+    ),
+    getReminderSettings: new GetReminderSettingsQuery(
+      dependencies.workspaceMembers,
+      reads,
+    ),
+    getDeliveryStatus: new GetDeliveryStatusQuery(
+      dependencies.workspaceMembers,
+      reads,
     ),
     claimDueOccurrences: new ClaimDueOccurrences(
       persistence,

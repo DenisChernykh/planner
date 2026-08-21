@@ -4,6 +4,8 @@ import { AUTH_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/auth/composition/auth-
 import { AuthModule } from '@/modules/auth/composition/auth.module'
 import { PlanningModule } from '@/modules/planning/composition/planning.module'
 import { PLANNING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/planning/composition/planning-http-problem.contribution'
+import { RemindersModule } from '@/modules/reminders/composition/reminders.module'
+import { REMINDERS_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/reminders/composition/reminders-http-problem.contribution'
 import { TrackingModule } from '@/modules/tracking/composition/tracking.module'
 import { TRACKING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/tracking/composition/tracking-http-problem.contribution'
 import { TelegramBotModule } from '@/modules/telegram-bot'
@@ -35,11 +37,13 @@ export class ApiModule {
           AUTH_HTTP_PROBLEM_CONTRIBUTION,
           PLANNING_HTTP_PROBLEM_CONTRIBUTION,
           TRACKING_HTTP_PROBLEM_CONTRIBUTION,
+          REMINDERS_HTTP_PROBLEM_CONTRIBUTION,
         ]),
         HealthModule,
         AuthModule,
         PlanningModule,
         TrackingModule.forRoot(trackingClock),
+        RemindersModule.forRoot(trackingClock),
         TelegramBotModule.forRoot(trackingClock),
       ],
     }

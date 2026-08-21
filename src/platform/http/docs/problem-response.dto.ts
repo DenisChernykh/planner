@@ -109,6 +109,36 @@ export class DraftConflictProblemResponseDto extends ProblemResponseDto {
   public readonly conflict!: DraftProblemConflictResponseDto
 }
 
+export class ReminderScheduleRevisionConflictResponseDto {
+  @ApiProperty({
+    type: String,
+    pattern: '^[1-9][0-9]*$',
+    nullable: true,
+  })
+  public readonly expectedRevision!: string | null
+
+  @ApiProperty({
+    type: String,
+    pattern: '^[1-9][0-9]*$',
+    nullable: true,
+  })
+  public readonly currentRevision!: string | null
+
+  @ApiProperty({ enum: ['reload-reminder-settings-and-retry'] })
+  public readonly nextAction!: 'reload-reminder-settings-and-retry'
+}
+
+export class ReminderScheduleRevisionConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['REMINDER_SCHEDULE_REVISION_CONFLICT'],
+    example: 'REMINDER_SCHEDULE_REVISION_CONFLICT',
+  })
+  declare public readonly code: 'REMINDER_SCHEDULE_REVISION_CONFLICT'
+
+  @ApiProperty({ type: () => ReminderScheduleRevisionConflictResponseDto })
+  public readonly conflict!: ReminderScheduleRevisionConflictResponseDto
+}
+
 export class TrackingFactTargetUnavailableConflictResponseDto {
   @ApiProperty({
     enum: [

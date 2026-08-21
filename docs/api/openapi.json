@@ -1390,6 +1390,7 @@
               "PLAN_PUBLICATION_NOT_FOUND",
               "PLAN_SEED_ALREADY_CONSUMED",
               "RATE_LIMIT_EXCEEDED",
+              "REMINDER_AUTHORIZATION_DENIED",
               "TRACKING_AUTHORIZATION_DENIED",
               "TRACKING_CLOSE_DAY_TARGET_NOT_FOUND",
               "TRACKING_FACT_TARGET_NOT_FOUND",
@@ -3002,6 +3003,186 @@
           "kind",
           "minimum",
           "maximum"
+        ],
+        "type": "object"
+      },
+      "ReminderDeliveryStatusResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              "reminders.delivery-status.v1"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "available",
+              "blocked",
+              "connection_lost"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ReminderScheduleMutationResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregateId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "aggregateRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "reminders.schedule.v1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "aggregateId",
+          "aggregateRevision"
+        ],
+        "type": "object"
+      },
+      "ReminderScheduleRevisionConflictProblemResponseDto": {
+        "properties": {
+          "code": {
+            "enum": [
+              "REMINDER_SCHEDULE_REVISION_CONFLICT"
+            ],
+            "example": "REMINDER_SCHEDULE_REVISION_CONFLICT",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/ReminderScheduleRevisionConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
+      "ReminderScheduleRevisionConflictResponseDto": {
+        "properties": {
+          "currentRevision": {
+            "nullable": true,
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "expectedRevision": {
+            "nullable": true,
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "nextAction": {
+            "enum": [
+              "reload-reminder-settings-and-retry"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "currentRevision",
+          "nextAction"
+        ],
+        "type": "object"
+      },
+      "ReminderSettingsResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "day": {
+            "nullable": true,
+            "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+            "type": "string"
+          },
+          "evening": {
+            "nullable": true,
+            "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+            "type": "string"
+          },
+          "morning": {
+            "nullable": true,
+            "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+            "type": "string"
+          },
+          "revision": {
+            "nullable": true,
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "scheduleId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "reminders.settings.v1"
+            ],
+            "type": "string"
+          },
+          "timeZone": {
+            "enum": [
+              "Asia/Yekaterinburg"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "scheduleId",
+          "revision",
+          "timeZone",
+          "morning",
+          "day",
+          "evening"
         ],
         "type": "object"
       },
@@ -11863,6 +12044,466 @@
         ]
       }
     },
+    "/reminders/delivery-status": {
+      "get": {
+        "operationId": "ReminderSettingsController_deliveryStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderDeliveryStatusResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "REMINDER_AUTHORIZATION_DENIED": {
+                    "summary": "Reminder authorization denied",
+                    "value": {
+                      "code": "REMINDER_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access these reminder settings.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Reminder authorization denied",
+                      "type": "https://planner.invalid/problems/reminder-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Reminder authorization denied"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read the current member Telegram delivery status.",
+        "tags": [
+          "reminders"
+        ]
+      }
+    },
+    "/reminders/settings": {
+      "get": {
+        "operationId": "ReminderSettingsController_settings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderSettingsResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "REMINDER_AUTHORIZATION_DENIED": {
+                    "summary": "Reminder authorization denied",
+                    "value": {
+                      "code": "REMINDER_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access these reminder settings.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Reminder authorization denied",
+                      "type": "https://planner.invalid/problems/reminder-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Reminder authorization denied"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read the current member reminder settings.",
+        "tags": [
+          "reminders"
+        ]
+      },
+      "post": {
+        "operationId": "ReminderSettingsController_saveSettings",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "day": {
+                    "nullable": true,
+                    "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+                    "type": "string"
+                  },
+                  "evening": {
+                    "nullable": true,
+                    "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  "morning": {
+                    "nullable": true,
+                    "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+                    "type": "string"
+                  },
+                  "timeZone": {
+                    "enum": [
+                      "Asia/Yekaterinburg"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "timeZone",
+                  "morning",
+                  "day",
+                  "evening"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderScheduleMutationResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "REMINDER_AUTHORIZATION_DENIED": {
+                    "summary": "Reminder authorization denied",
+                    "value": {
+                      "code": "REMINDER_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access these reminder settings.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Reminder authorization denied",
+                      "type": "https://planner.invalid/problems/reminder-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Reminder authorization denied"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "REMINDER_SCHEDULE_REVISION_CONFLICT": {
+                    "summary": "Reminder schedule revision conflict",
+                    "value": {
+                      "code": "REMINDER_SCHEDULE_REVISION_CONFLICT",
+                      "conflict": {
+                        "currentRevision": "2",
+                        "expectedRevision": "1",
+                        "nextAction": "reload-reminder-settings-and-retry"
+                      },
+                      "detail": "The reminder settings changed before this request was applied.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Reminder schedule revision conflict",
+                      "type": "https://planner.invalid/problems/reminder-schedule-revision-conflict"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ReminderScheduleRevisionConflictProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Reminder schedule revision conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Create or update the current member reminder settings.",
+        "tags": [
+          "reminders"
+        ]
+      }
+    },
     "/tracking/facts": {
       "post": {
         "operationId": "ScalarFactController_recordFact",
@@ -17181,6 +17822,10 @@
     {
       "description": "Tracking reads and channel-neutral fact mutations.",
       "name": "tracking"
+    },
+    {
+      "description": "Personal reminder settings and Telegram delivery status.",
+      "name": "reminders"
     }
   ]
 }

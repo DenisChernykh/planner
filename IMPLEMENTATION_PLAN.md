@@ -2150,13 +2150,13 @@ partner's settings.
 - Create: `src/modules/reminders/application/get-delivery-status.query.ts`
 - Test: `test/e2e/reminders/reminder-settings.e2e-spec.ts`
 
-- [ ] Написать RED cases per-member authorization, optional slots,
+- [x] Написать RED cases per-member authorization, optional slots,
   morning<day<evening, fixed timezone and blocked provider projection.
-- [ ] Implement HTTP command/query mapping and warning read model from terminal
+- [x] Implement HTTP command/query mapping and warning read model from terminal
   N03 outcomes.
-- [ ] Add OpenAPI/Problem Details and verify partner settings are not exposed.
-- [ ] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: manage reminder settings over HTTP`.
+- [x] Add OpenAPI/Problem Details and verify partner settings are not exposed.
+- [x] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
+- [x] Commit: `feat: manage reminder settings over HTTP`.
 
 ### N05 — Reminder worker pipeline
 
