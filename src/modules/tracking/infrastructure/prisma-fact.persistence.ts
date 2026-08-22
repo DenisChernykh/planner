@@ -53,6 +53,7 @@ type TargetRow = {
   readonly plan_month_id: string
   readonly facts_revision: bigint
   readonly status: string
+  readonly lifecycle_mode: 'ordinary' | 'reopened'
   readonly active_publication_id: string | null
   readonly month_start: string
   readonly month_end: string
@@ -82,6 +83,7 @@ type MutationTargetRow = {
   readonly plan_month_id: string
   readonly facts_revision: bigint
   readonly status: string
+  readonly lifecycle_mode: 'ordinary' | 'reopened'
   readonly active_publication_id: string | null
   readonly publication_id: string
   readonly plan_goal_snapshot_id: string
@@ -102,6 +104,7 @@ type UndoTargetRow = {
   readonly plan_month_id: string
   readonly facts_revision: bigint
   readonly status: string
+  readonly lifecycle_mode: 'ordinary' | 'reopened'
   readonly active_publication_id: string | null
   readonly publication_id: string
   readonly plan_goal_snapshot_id: string
@@ -704,6 +707,9 @@ export class PrismaFactPersistence implements FactPersistencePort {
       if (target.status === 'closed') {
         throw new FactTargetUnavailableError('closed')
       }
+      if (target.lifecycle_mode === 'reopened') {
+        throw new FactTargetUnavailableError('closed')
+      }
       if (
         target.active_publication_id !== input.publicationId ||
         !['published', 'grace'].includes(target.status) ||
@@ -1066,6 +1072,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
                record.current_revision_id::text,
                revision.revision_number, revision.revision_kind,
                record.plan_month_id::text, month.facts_revision, month.status,
+               COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') lifecycle_mode,
                month.active_publication_id::text,
                record.publication_id::text,
                record.plan_goal_snapshot_id::text,
@@ -1093,7 +1100,8 @@ export class PrismaFactPersistence implements FactPersistencePort {
       }
       if (
         target.status === 'closed' ||
-        input.currentLocalDate > target.correction_deadline
+        (target.lifecycle_mode !== 'reopened' &&
+          input.currentLocalDate > target.correction_deadline)
       ) {
         throw new FactTargetUnavailableError('closed')
       }
@@ -1242,6 +1250,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
                record.current_revision_id::text,
                revision.revision_number, record.plan_month_id::text,
                month.facts_revision, month.status,
+               COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') lifecycle_mode,
                month.active_publication_id::text,
                record.publication_id::text,
                record.plan_goal_snapshot_id::text,
@@ -1265,6 +1274,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
       }
       if (
         target.status === 'closed' ||
+        target.lifecycle_mode === 'reopened' ||
         input.currentLocalDate > target.correction_deadline
       ) {
         throw new FactTargetUnavailableError('closed')
@@ -1813,6 +1823,7 @@ export class PrismaFactPersistence implements FactPersistencePort {
   ): Promise<TargetRow> {
     const rows = await client.$queryRaw<TargetRow[]>`
       SELECT month.id::text plan_month_id, month.facts_revision, month.status,
+             COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') lifecycle_mode,
              month.active_publication_id::text,
              month.month_start::text,
              (month.month_start + INTERVAL '1 month - 1 day')::date::text month_end,

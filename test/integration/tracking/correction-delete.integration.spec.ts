@@ -391,6 +391,127 @@ describe('T05 corrections and tombstones in real PostgreSQL', () => {
     })
   })
 
+  it('keeps T05 correction available after an L02 reopen beyond the ordinary deadline', async () => {
+    await resetPair()
+    const fixture = await publishedFixture()
+    const first = await recordPersonal(fixture)
+    const graceAt = new Date('2026-05-01T06:00:00.000Z')
+    const closeAt = new Date('2026-05-04T06:00:00.000Z')
+    const graceCommandId = randomUUID()
+    const closeCommandId = randomUUID()
+    const graceActionId = randomUUID()
+    const closeActionId = randomUUID()
+    const reportId = randomUUID()
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(
+        `INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+         VALUES ($1::uuid, 'month_grace_started', 'system',
+           'system:planner-worker', NULL, 'planner-worker', $2::uuid, NULL,
+           'planning.start-month-grace.v1', $3::uuid, 2, 3, $4)`,
+        [graceActionId, fixture.planMonthId, graceCommandId, graceAt],
+      )
+      await client.query(
+        `UPDATE plan_months
+            SET status = 'grace', revision = 3, updated_at = $2
+          WHERE id = $1::uuid`,
+        [fixture.planMonthId, graceAt],
+      )
+      await client.query(
+        `INSERT INTO command_receipts
+          (actor_scope, command_type, command_id, fingerprint, result_kind,
+           aggregate_id, aggregate_revision, completed_at)
+         VALUES ('system:planner-worker', 'planning.start-month-grace.v1',
+           $1::uuid, repeat('1', 64), 'planning.plan-month.v1', $2::uuid, 3, $3)`,
+        [graceCommandId, fixture.planMonthId, graceAt],
+      )
+      await client.query('SET CONSTRAINTS ALL IMMEDIATE')
+      await client.query('SET CONSTRAINTS ALL DEFERRED')
+      await client.query(
+        `INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+         VALUES ($1::uuid, 'month_closed', 'system',
+           'system:planner-worker', NULL, 'planner-worker', $2::uuid, NULL,
+           'planning.close-month.v1', $3::uuid, 3, 4, $4)`,
+        [closeActionId, fixture.planMonthId, closeCommandId, closeAt],
+      )
+      await client.query(
+        `INSERT INTO report_revisions
+          (id, plan_month_id, publication_id, revision,
+           publication_snapshot_hash, source_facts_revision, formula_version,
+           payload, payload_checksum, status, created_at,
+           created_by_system_actor_id)
+         SELECT $1::uuid, month.id, month.active_publication_id, 1,
+                publication.preview_hash, month.facts_revision,
+                'planner.report.v1', '{}'::jsonb, repeat('c', 64), 'original',
+                $2, 'planner-worker'
+           FROM plan_months month
+           JOIN plan_publications publication
+             ON publication.id = month.active_publication_id
+          WHERE month.id = $3::uuid`,
+        [reportId, closeAt, fixture.planMonthId],
+      )
+      await client.query(
+        `UPDATE plan_months
+            SET status = 'closed', revision = 4, updated_at = $2
+          WHERE id = $1::uuid`,
+        [fixture.planMonthId, closeAt],
+      )
+      await client.query(
+        `INSERT INTO command_receipts
+          (actor_scope, command_type, command_id, fingerprint, result_kind,
+           aggregate_id, aggregate_revision, completed_at)
+         VALUES ('system:planner-worker', 'planning.close-month.v1',
+           $1::uuid, repeat('2', 64), 'planning.report-revision.v1', $2::uuid, 1, $3)`,
+        [closeCommandId, reportId, closeAt],
+      )
+      await client.query('COMMIT')
+    } catch (error: unknown) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+
+    clock.set(new Date('2026-06-01T20:00:00.123Z'))
+    await expect(
+      planning.reopenMonth.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        expectedRevision: 4n,
+        payload: {
+          planMonthId: fixture.planMonthId,
+          reason: 'Проверка исправления после закрытия.',
+        },
+      }),
+    ).resolves.toMatchObject({ aggregateRevision: 5n })
+
+    await expect(
+      tracking.correctRecord.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        expectedRevision: first.aggregateRevision,
+        payload: {
+          factRecordId: first.aggregateId,
+          value: {
+            kind: 'text',
+            text: 'Исправлено после reopen',
+            result: 'done',
+          },
+          reason: 'Уточнили запись после повторного открытия.',
+        },
+      }),
+    ).resolves.toMatchObject({ aggregateRevision: 2n })
+  })
+
   it('lets the partner correct shared fact with reason and forbids shared delete', async () => {
     await resetPair()
     const fixture = await publishedFixture()

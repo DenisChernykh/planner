@@ -42,6 +42,7 @@ const scheduledPlanMonthId = '88888888-8888-4888-8888-888888888888'
 const foreignSpaceId = '99999999-9999-4999-8999-999999999991'
 const foreignMemberId = '99999999-9999-4999-8999-999999999992'
 const foreignPlanMonthId = '99999999-9999-4999-8999-999999999993'
+const reopenPlanMonthId = '99999999-9999-4999-8999-999999999994'
 const sessionKeySecret = Buffer.alloc(32, 71)
 const csrfSecret = Buffer.alloc(32, 72)
 
@@ -292,6 +293,31 @@ describe('P07 authenticated atomic publication HTTP', () => {
   ): Promise<Response> {
     return fetch(
       `${baseUrl}/planning/drafts/${options.selectedPlanMonthId ?? planMonthId}/publish`,
+      {
+        method: 'POST',
+        headers: {
+          cookie: options.selectedCookie ?? cookie,
+          origin: options.selectedOrigin ?? origin,
+          'x-csrf-token': options.selectedCsrf ?? csrfToken,
+          'content-type': options.contentType ?? 'application/json',
+        },
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+      },
+    )
+  }
+
+  async function reopen(
+    body: Record<string, unknown> | string,
+    options: {
+      readonly selectedCookie?: string
+      readonly selectedOrigin?: string
+      readonly selectedCsrf?: string
+      readonly contentType?: string
+      readonly selectedPlanMonthId?: string
+    } = {},
+  ): Promise<Response> {
+    return fetch(
+      `${baseUrl}/planning/months/${options.selectedPlanMonthId ?? planMonthId}/reopen`,
       {
         method: 'POST',
         headers: {
@@ -596,7 +622,10 @@ describe('P07 authenticated atomic publication HTTP', () => {
     }
 
     await admin.query(
-      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_p07_lifecycle_update',
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+    )
+    await admin.query(
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_lifecycle_effect_consistent',
     )
     await admin.query(
       'ALTER TABLE plan_months DISABLE TRIGGER plan_months_require_publication_pointer',
@@ -647,7 +676,10 @@ describe('P07 authenticated atomic publication HTTP', () => {
         'ALTER TABLE plan_months ENABLE TRIGGER plan_months_require_publication_pointer',
       )
       await admin.query(
-        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_p07_lifecycle_update',
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_lifecycle_effect_consistent',
+      )
+      await admin.query(
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l02_lifecycle_update',
       )
     }
 
@@ -667,7 +699,10 @@ describe('P07 authenticated atomic publication HTTP', () => {
       [scheduledPublicationId],
     )
     await admin.query(
-      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_p07_lifecycle_update',
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+    )
+    await admin.query(
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_lifecycle_effect_consistent',
     )
     await admin.query(
       'ALTER TABLE plan_publications DISABLE TRIGGER plan_publications_reject_update_delete',
@@ -721,12 +756,18 @@ describe('P07 authenticated atomic publication HTTP', () => {
         'ALTER TABLE plan_publications ENABLE TRIGGER plan_publications_reject_update_delete',
       )
       await admin.query(
-        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_p07_lifecycle_update',
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_lifecycle_effect_consistent',
+      )
+      await admin.query(
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l02_lifecycle_update',
       )
     }
 
     await admin.query(
-      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_p07_lifecycle_update',
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+    )
+    await admin.query(
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_lifecycle_effect_consistent',
     )
     await admin.query(
       'ALTER TABLE plan_months DISABLE TRIGGER plan_months_require_publication_pointer',
@@ -750,7 +791,10 @@ describe('P07 authenticated atomic publication HTTP', () => {
         'ALTER TABLE plan_months ENABLE TRIGGER plan_months_require_publication_pointer',
       )
       await admin.query(
-        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_p07_lifecycle_update',
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_lifecycle_effect_consistent',
+      )
+      await admin.query(
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l02_lifecycle_update',
       )
     }
 
@@ -1093,6 +1137,27 @@ describe('P07 authenticated atomic publication HTTP', () => {
     expect(
       document.paths['/planning/months/active']?.['get']?.security,
     ).toEqual([{ sessionCookie: [] }])
+    expect(
+      document.paths['/planning/months/{planMonthId}/reopen']?.['post']
+        ?.security,
+    ).toEqual([{ sessionCookie: [], csrfToken: [] }])
+    expect(
+      Object.keys(
+        document.paths['/planning/months/{planMonthId}/reopen']?.['post']
+          ?.responses ?? {},
+      ).sort(),
+    ).toEqual([
+      '200',
+      '400',
+      '401',
+      '403',
+      '404',
+      '409',
+      '413',
+      '415',
+      '422',
+      '503',
+    ])
     for (const name of [
       'PublishMonthRequestV1',
       'PlanPublicationResultResponseV1',
@@ -1100,8 +1165,300 @@ describe('P07 authenticated atomic publication HTTP', () => {
       'PublicationPreviewConflictProblemResponseDto',
       'PlanPublicationBlockedProblemResponseDto',
       'PlanMonthAlreadyPublishedProblemResponseDto',
+      'ReopenMonthRequestV1',
+      'PlanMonthMutationResponseV1',
+      'PlanMonthRevisionConflictProblemResponseDto',
+      'PlanMonthReopenConflictProblemResponseDto',
     ])
       expect(document.components.schemas[name]).toBeDefined()
+  })
+
+  it('protects the reasoned reopen boundary with CSRF, member authorization and finite conflicts', async () => {
+    const month = (await state(planMonthId))[0]
+    const body = {
+      commandId: randomUUID(),
+      expectedRevision: month?.['month_revision'],
+      reason: 'Проверка HTTP-контракта закрытого месяца.',
+    }
+    const missingReason = await reopen({
+      commandId: body.commandId,
+      expectedRevision: body.expectedRevision,
+    })
+    expect(missingReason.status).toBe(422)
+    expect(await json(missingReason)).toMatchObject({
+      code: 'VALIDATION_FAILED',
+    })
+
+    const noCsrf = await reopen(body, { selectedCsrf: '' })
+    expect(noCsrf.status).toBe(403)
+
+    const outsider = await reopen(body, {
+      selectedCookie: outsiderCookie,
+      selectedCsrf: outsiderCsrfToken,
+    })
+    expect(outsider.status).toBe(403)
+    expect(await json(outsider)).toMatchObject({
+      code: 'PLANNING_AUTHORIZATION_DENIED',
+    })
+
+    const conflict = await reopen(body)
+    expect(conflict.status).toBe(409)
+    expect(await json(conflict)).toMatchObject({
+      code: 'PLAN_MONTH_REOPEN_CONFLICT',
+      conflict: {
+        reason: 'not_closed',
+        currentStatus: 'published',
+      },
+    })
+  })
+
+  it('reopens a closed report over HTTP with replay, fingerprint and stale-CAS semantics', async () => {
+    await admin.query(
+      `INSERT INTO plan_months
+         (id, space_id, month_start, status, revision, created_at, updated_at)
+       VALUES ($1::uuid, $2::uuid, $3::date, 'draft', 1, now(), now())`,
+      [reopenPlanMonthId, spaceId, `${monthAtOffset(-1)}-01`],
+    )
+    await admin.query(
+      `INSERT INTO plan_drafts
+         (plan_month_id, focus, revision, created_at, updated_at)
+       VALUES ($1::uuid, 'L02 HTTP reopen', 1, now(), now())`,
+      [reopenPlanMonthId],
+    )
+    const reopenPublicationId = randomUUID()
+    const publishCommandId = randomUUID()
+    const publishAt = new Date(`${monthAtOffset(-1)}-01T00:00:00.000Z`)
+    const publishClient = await admin.connect()
+    try {
+      await publishClient.query('BEGIN')
+      await publishClient.query(
+        `INSERT INTO plan_publications
+          (id, space_id, plan_month_id, publication_revision,
+           source_draft_revision, source_plan_month_revision, focus,
+           activation_mode, active_local_date, late_publication, time_zone,
+           source_preview_schema_version, preview_hash_version, preview_hash,
+           calendar_formula_version, evaluation_formula_version,
+           score_formula_version, published_by_member_id, published_at)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 1, 1, 1, 'L02 HTTP reopen',
+           'immediate', $4::date, false, 'Asia/Yekaterinburg',
+           'planner.publication-preview.v1',
+           'planner.publication-preview-hash.v1', repeat('a', 64),
+           'planner.calendar-targets.v1', 'planner.goal-evaluation.v1',
+           'planner.score-coverage.v1', $5::uuid, $6)`,
+        [
+          reopenPublicationId,
+          spaceId,
+          reopenPlanMonthId,
+          `${monthAtOffset(-1)}-01`,
+          memberId,
+          publishAt,
+        ],
+      )
+      const publishActionId = randomUUID()
+      await publishClient.query(
+        `INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+         VALUES ($1::uuid, 'month_published', 'member', $2, $3::uuid, NULL,
+           $4::uuid, NULL, 'planning.publish-month.v1', $5::uuid, 1, 2, $6)`,
+        [
+          publishActionId,
+          `member:${memberId}`,
+          memberId,
+          reopenPlanMonthId,
+          publishCommandId,
+          publishAt,
+        ],
+      )
+      await publishClient.query(
+        `INSERT INTO planning_publication_changes
+          (action_id, publication_id, change_kind, confirmed_draft_revision,
+           confirmed_preview_schema_version, confirmed_preview_hash_version,
+           confirmed_preview_hash, before_active_publication_id,
+           after_active_publication_id)
+         VALUES ($1::uuid, $2::uuid, 'published', 1,
+           'planner.publication-preview.v1',
+           'planner.publication-preview-hash.v1', repeat('a', 64), NULL,
+           $2::uuid)`,
+        [publishActionId, reopenPublicationId],
+      )
+      await publishClient.query(
+        `UPDATE plan_months
+            SET status = 'published', active_publication_id = $2::uuid,
+                revision = 2, updated_at = $3
+          WHERE id = $1::uuid`,
+        [reopenPlanMonthId, reopenPublicationId, publishAt],
+      )
+      await publishClient.query(
+        `INSERT INTO command_receipts
+          (actor_scope, command_type, command_id, fingerprint, result_kind,
+           aggregate_id, aggregate_revision, completed_at)
+         VALUES ($1, 'planning.publish-month.v1', $2::uuid, repeat('0', 64),
+           'planning.plan-publication.v1', $3::uuid, 1, $4)`,
+        [
+          `member:${memberId}`,
+          publishCommandId,
+          reopenPublicationId,
+          publishAt,
+        ],
+      )
+      await publishClient.query('COMMIT')
+    } catch (error: unknown) {
+      await publishClient.query('ROLLBACK')
+      throw error
+    } finally {
+      publishClient.release()
+    }
+
+    const graceAt = new Date(Date.now() + 1_000)
+    const closeAt = new Date(graceAt.getTime() + 1_000)
+    const graceCommandId = randomUUID()
+    const closeCommandId = randomUUID()
+    const reportId = randomUUID()
+    const client = await admin.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(
+        `INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+         VALUES ($1::uuid, 'month_grace_started', 'system',
+           'system:planner-worker', NULL, 'planner-worker', $2::uuid, NULL,
+           'planning.start-month-grace.v1', $3::uuid, 2, 3, $4)`,
+        [randomUUID(), reopenPlanMonthId, graceCommandId, graceAt],
+      )
+      await client.query(
+        `UPDATE plan_months
+            SET status = 'grace', revision = 3, updated_at = $2
+          WHERE id = $1::uuid`,
+        [reopenPlanMonthId, graceAt],
+      )
+      await client.query(
+        `INSERT INTO command_receipts
+          (actor_scope, command_type, command_id, fingerprint, result_kind,
+           aggregate_id, aggregate_revision, completed_at)
+         VALUES ('system:planner-worker', 'planning.start-month-grace.v1',
+           $1::uuid, repeat('1', 64), 'planning.plan-month.v1', $2::uuid, 3, $3)`,
+        [graceCommandId, reopenPlanMonthId, graceAt],
+      )
+      await client.query('SET CONSTRAINTS ALL IMMEDIATE')
+      await client.query('SET CONSTRAINTS ALL DEFERRED')
+      await client.query(
+        `INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+         VALUES ($1::uuid, 'month_closed', 'system',
+           'system:planner-worker', NULL, 'planner-worker', $2::uuid, NULL,
+           'planning.close-month.v1', $3::uuid, 3, 4, $4)`,
+        [randomUUID(), reopenPlanMonthId, closeCommandId, closeAt],
+      )
+      await client.query(
+        `INSERT INTO report_revisions
+          (id, plan_month_id, publication_id, revision,
+           publication_snapshot_hash, source_facts_revision, formula_version,
+           payload, payload_checksum, status, created_at,
+           created_by_system_actor_id)
+         SELECT $1::uuid, month.id, month.active_publication_id, 1,
+                publication.preview_hash, month.facts_revision,
+                'planner.report.v1', '{}'::jsonb, repeat('c', 64), 'original',
+                $2, 'planner-worker'
+           FROM plan_months month
+           JOIN plan_publications publication
+             ON publication.id = month.active_publication_id
+          WHERE month.id = $3::uuid`,
+        [reportId, closeAt, reopenPlanMonthId],
+      )
+      await client.query(
+        `UPDATE plan_months
+            SET status = 'closed', revision = 4, updated_at = $2
+          WHERE id = $1::uuid`,
+        [reopenPlanMonthId, closeAt],
+      )
+      await client.query(
+        `INSERT INTO command_receipts
+          (actor_scope, command_type, command_id, fingerprint, result_kind,
+           aggregate_id, aggregate_revision, completed_at)
+         VALUES ('system:planner-worker', 'planning.close-month.v1',
+           $1::uuid, repeat('2', 64), 'planning.report-revision.v1', $2::uuid, 1, $3)`,
+        [closeCommandId, reportId, closeAt],
+      )
+      await client.query('COMMIT')
+    } catch (error: unknown) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+
+    const reportBefore = await admin.query(
+      'SELECT * FROM report_revisions WHERE id = $1::uuid',
+      [reportId],
+    )
+    const commandId = randomUUID()
+    const body = {
+      commandId,
+      expectedRevision: '4',
+      reason: 'Уточняем факты после сверки закрытого отчёта.',
+    }
+    const success = await reopen(body, {
+      selectedPlanMonthId: reopenPlanMonthId,
+    })
+    expect(success.status).toBe(200)
+    const receipt = await json(success)
+    expect(receipt).toEqual({
+      kind: 'planning.plan-month.v1',
+      aggregateId: reopenPlanMonthId,
+      aggregateRevision: '5',
+    })
+    const replay = await reopen(body, {
+      selectedPlanMonthId: reopenPlanMonthId,
+    })
+    expect(replay.status).toBe(200)
+    expect(await json(replay)).toEqual(receipt)
+
+    const fingerprint = await reopen(
+      { ...body, reason: 'Другой fingerprint.' },
+      { selectedPlanMonthId: reopenPlanMonthId },
+    )
+    expect(fingerprint.status).toBe(409)
+    expect(await json(fingerprint)).toMatchObject({
+      code: 'COMMAND_FINGERPRINT_CONFLICT',
+    })
+    const stale = await reopen(
+      { ...body, commandId: randomUUID() },
+      { selectedPlanMonthId: reopenPlanMonthId },
+    )
+    expect(stale.status).toBe(409)
+    expect(await json(stale)).toMatchObject({
+      code: 'PLAN_MONTH_REVISION_CONFLICT',
+      conflict: { expectedRevision: '4', currentRevision: '5' },
+    })
+    expect(
+      (
+        await admin.query(
+          `SELECT status, lifecycle_mode, revision::text
+             FROM plan_months WHERE id = $1::uuid`,
+          [reopenPlanMonthId],
+        )
+      ).rows,
+    ).toEqual([{ status: 'grace', lifecycle_mode: 'reopened', revision: '5' }])
+    expect(
+      (
+        await admin.query(
+          'SELECT * FROM report_revisions WHERE id = $1::uuid',
+          [reportId],
+        )
+      ).rows,
+    ).toEqual(reportBefore.rows)
+    expect(reopenPublicationId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    )
   })
 
   it('fails closed through Redis and PostgreSQL outages, then retries the same zero-write blocked command after recovery', async () => {

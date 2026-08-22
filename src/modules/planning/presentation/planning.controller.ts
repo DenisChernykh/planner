@@ -65,6 +65,9 @@ import {
   PLANNING_AUTHORIZATION_DENIED_PROBLEM,
   PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
   PLAN_SEED_ALREADY_CONSUMED_PROBLEM,
+  PLAN_MONTH_NOT_FOUND_PROBLEM,
+  PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
+  PLAN_MONTH_REOPEN_CONFLICT_PROBLEM,
 } from './planning-problem.definitions'
 import {
   CopyGoalDefinitionRequestDto,
@@ -113,6 +116,11 @@ import {
   type PlanPublicationResultResponse,
   type PublishedSnapshotResponse,
 } from './publication.response'
+import { ReopenMonthRequestDto } from './month-lifecycle.dto'
+import {
+  toPlanMonthMutationResponse,
+  type PlanMonthMutationResponse,
+} from './month-lifecycle.response'
 
 const uuidSchema = {
   type: 'string' as const,
@@ -857,6 +865,8 @@ export class PlanningMonthController {
   public constructor(
     @Inject(PLANNING_APPLICATION)
     private readonly planning: PlanningApplication,
+    @Inject(WORKSPACE_MEMBER_RESOLVER)
+    private readonly workspaceMembers: WorkspaceMemberResolver,
   ) {}
 
   @Get('active')
@@ -873,6 +883,58 @@ export class PlanningMonthController {
     })
     if (value === null) throw new ActivePlanMonthNotFoundError()
     return toPublishedSnapshotResponse(value)
+  }
+
+  @Post(':planMonthId/reopen')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Reopen a closed monthly plan for audited corrections.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiBody({
+    required: true,
+    schema: { $ref: '#/components/schemas/ReopenMonthRequestV1' },
+  })
+  @ApiOkResponse({
+    schema: { $ref: '#/components/schemas/PlanMonthMutationResponseV1' },
+  })
+  @ApiProblemResponses(
+    ...mutationProblems,
+    PLAN_MONTH_NOT_FOUND_PROBLEM,
+    PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
+    PLAN_MONTH_REOPEN_CONFLICT_PROBLEM,
+  )
+  public async reopen(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PlanMonthPathDto,
+    @Body() body: ReopenMonthRequestDto,
+  ): Promise<PlanMonthMutationResponse> {
+    return toPlanMonthMutationResponse(
+      await this.planning.reopenMonth.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: { planMonthId: path.planMonthId, reason: body.reason },
+      }),
+    )
+  }
+
+  private async actor(
+    principal: AuthenticatedPrincipal,
+  ): Promise<{ readonly kind: 'member'; readonly id: string }> {
+    try {
+      const member = await this.workspaceMembers.resolveUser(principal.userId)
+      return { kind: 'member', id: member.memberId }
+    } catch (error: unknown) {
+      if (error instanceof WorkspaceMemberNotFoundError) {
+        throw new PlanningAuthorizationDeniedError()
+      }
+      if (error instanceof WorkspaceDependencyUnavailableError) {
+        throw new PlanningDependencyUnavailableError({ cause: error })
+      }
+      throw new PlanningDependencyUnavailableError({ cause: error })
+    }
   }
 }
 

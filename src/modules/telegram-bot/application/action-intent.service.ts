@@ -784,7 +784,7 @@ export class TelegramActionIntentService {
       const day = days.get(goal.planGoalSnapshotId)
       if (
         day === undefined ||
-        !day.writable ||
+        !(day.correctionWritable ?? day.writable) ||
         goal.viewerAccess === 'partner_read_only'
       ) {
         continue
@@ -899,40 +899,48 @@ export class TelegramActionIntentService {
             `Удалить ${goal.title}`,
           )
         }
-        if (fact.recordedByMemberId === member.memberId) {
+        if (
+          model.lifecycleMode !== 'reopened' &&
+          fact.recordedByMemberId === member.memberId
+        ) {
           await addTrackingAction(
             trackingOfferInput({ ...base, kind: 'undo_record', ready: true }),
             `Отменить действие · ${goal.title}`,
           )
         }
       }
-      for (const period of day.flexiblePeriods) {
-        if (
-          period.periodKind !== 'weekly_planned_task' ||
-          !period.eligibleOnDate ||
-          period.facts.some((fact) => fact.factKind === 'weekly_task_result')
-        ) {
-          continue
-        }
-        for (const result of ['done', 'not_done'] as const) {
-          await addTrackingAction(
-            trackingOfferInput({
-              member,
-              model,
-              goal,
-              localDate: model.day.localDate,
-              kind: 'weekly_task_result',
-              flexiblePeriodId: period.flexiblePeriodId,
-              booleanResult: result,
-              ready: true,
-              now,
-            }),
-            `${result === 'done' ? '✓' : '✕'} задача недели · ${goal.title}`,
-          )
+      if (model.lifecycleMode !== 'reopened') {
+        for (const period of day.flexiblePeriods) {
+          if (
+            period.periodKind !== 'weekly_planned_task' ||
+            !period.eligibleOnDate ||
+            period.facts.some((fact) => fact.factKind === 'weekly_task_result')
+          ) {
+            continue
+          }
+          for (const result of ['done', 'not_done'] as const) {
+            await addTrackingAction(
+              trackingOfferInput({
+                member,
+                model,
+                goal,
+                localDate: model.day.localDate,
+                kind: 'weekly_task_result',
+                flexiblePeriodId: period.flexiblePeriodId,
+                booleanResult: result,
+                ready: true,
+                now,
+              }),
+              `${result === 'done' ? '✓' : '✕'} задача недели · ${goal.title}`,
+            )
+          }
         }
       }
     }
-    if (model.day.closure.state === 'open') {
+    if (
+      model.lifecycleMode !== 'reopened' &&
+      model.day.closure.state === 'open'
+    ) {
       await addTrackingAction(
         trackingOfferInput({
           member,

@@ -35,11 +35,13 @@ import { GetPublishedSnapshotQuery } from '../application/get-published-snapshot
 import { GetActiveMonthQuery } from '../application/get-active-month.query'
 import { CancelPublicationCommand } from '../application/cancel-publication.command'
 import { RepublishMonthCommand } from '../application/republish-month.command'
+import { ReopenMonthCommand } from '../application/reopen-month.command'
 import { PrismaPlanDraftPersistence } from '../infrastructure/prisma-plan-draft.persistence'
 import { PrismaDraftGoalPersistence } from '../infrastructure/prisma-draft-goal.persistence'
 import { PrismaGoalCatalogPersistence } from '../infrastructure/prisma-goal-catalog.persistence'
 import { PrismaPublicationPersistence } from '../infrastructure/prisma-publication.persistence'
 import { PrismaSeedOwnerBinding } from '../infrastructure/prisma-seed-owner-binding'
+import { PrismaReopenMonthPersistence } from '../infrastructure/prisma-reopen-month.persistence'
 
 export function createPlanningApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -52,6 +54,7 @@ export function createPlanningApplication(dependencies: {
   const catalog = new PrismaGoalCatalogPersistence(dependencies.database)
   const publications = new PrismaPublicationPersistence(dependencies.database)
   const seedOwnerBindings = new PrismaSeedOwnerBinding(dependencies.database)
+  const reopenedMonths = new PrismaReopenMonthPersistence(dependencies.database)
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -103,6 +106,11 @@ export function createPlanningApplication(dependencies: {
       executor,
       dependencies.workspaceMembers,
       publications,
+    ),
+    reopenMonth: new ReopenMonthCommand(
+      executor,
+      dependencies.workspaceMembers,
+      reopenedMonths,
     ),
     getPublishedSnapshot: new GetPublishedSnapshotQuery(
       dependencies.workspaceMembers,

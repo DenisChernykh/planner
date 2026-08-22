@@ -277,6 +277,60 @@ describe('reminder relevance policy', () => {
     ).toBeNull()
   })
 
+  it('suppresses an old occurrence after L02 reopens the month', async () => {
+    const clock = new FakeProductClock(new Date('2026-03-30T07:00:00.000Z'))
+    const claim = {
+      occurrenceId: 'abababab-abab-4aba-8aba-abababababab',
+      recipientMemberId: memberId,
+      localDate: '2026-03-30',
+      slotKind: 'morning' as const,
+      dueAt: new Date('2026-03-30T06:59:00.000Z'),
+      expiresAt: new Date('2026-03-30T07:05:00.000Z'),
+      fencingToken: 2n,
+    }
+    let persisted:
+      Parameters<ReminderIntentPersistencePort['persistIntent']>[0] | undefined
+    const persistence: ReminderIntentPersistencePort = {
+      persistIntent: (input) => {
+        persisted = input
+        return Promise.resolve({
+          kind: 'suppressed',
+          occurrenceId: input.claim.occurrenceId,
+          reason: input.suppressionReason,
+        })
+      },
+    }
+    const transaction: DatabaseTransactionPort = {
+      run: (operation) => operation(),
+    }
+    const result = await new BuildReminderIntentCommand(
+      {
+        getToday: () =>
+          Promise.resolve(
+            read({
+              monthStatus: 'grace',
+              lifecycleMode: 'reopened',
+              phase: 'grace',
+            }),
+          ),
+      },
+      persistence,
+      transaction,
+      clock,
+    ).execute({ claim, leaseOwner: 'worker-l02' })
+
+    expect(result).toEqual({
+      kind: 'suppressed',
+      occurrenceId: claim.occurrenceId,
+      reason: 'inactive_lifecycle',
+    })
+    expect(persisted).toMatchObject({
+      content: null,
+      suppressionReason: 'inactive_lifecycle',
+      source: { lifecycleMode: 'reopened', monthStatus: 'grace' },
+    })
+  })
+
   it('does not persist when the claim expires during the authoritative reread', async () => {
     const clock = new FakeProductClock(new Date('2026-03-30T07:00:00.000Z'))
     const claim = {

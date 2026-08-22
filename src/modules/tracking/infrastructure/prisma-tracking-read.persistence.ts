@@ -70,6 +70,7 @@ export type TrackingReadObserver = (
 type HeaderRow = {
   readonly plan_month_id: string
   readonly status: string
+  readonly lifecycle_mode: 'ordinary' | 'reopened'
   readonly lifecycle_revision: bigint
   readonly facts_revision: bigint
   readonly active_publication_id: string | null
@@ -701,6 +702,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
   ): Promise<HeaderRow | undefined> {
     const rows = await client.$queryRaw<HeaderRow[]>`
       SELECT month.id::text plan_month_id, month.status,
+             COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') lifecycle_mode,
              month.revision lifecycle_revision,
              month.facts_revision,
              month.active_publication_id::text,
@@ -1048,6 +1050,18 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
           input.queryLocalDate >= header.active_local_date &&
           isWithinTrackingCorrectionDeadline(input.queryLocalDate, monthEnd) &&
           ['active', 'grace'].includes(effectivePhase)
+        const correctionWritable =
+          applicable &&
+          (header.lifecycle_mode === 'reopened' || writeSupported) &&
+          goal.viewerAccess !== 'partner_read_only' &&
+          date <= input.queryLocalDate &&
+          input.queryLocalDate >= header.active_local_date &&
+          (header.lifecycle_mode === 'reopened' ||
+            isWithinTrackingCorrectionDeadline(
+              input.queryLocalDate,
+              monthEnd,
+            )) &&
+          ['active', 'grace'].includes(effectivePhase)
         const state =
           fixedRows.length === 0
             ? stateFromFlexible(
@@ -1067,6 +1081,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
           planGoalSnapshotId: goal.row.plan_goal_snapshot_id,
           applicable,
           writable,
+          correctionWritable,
           state,
           coverage,
           progress: current,
@@ -1117,6 +1132,7 @@ export class PrismaTrackingReadPersistence implements TrackingReadPersistencePor
       lifecycleRevision: header.lifecycle_revision,
       factsRevision: header.facts_revision,
       monthStatus: header.status,
+      lifecycleMode: header.lifecycle_mode,
       phase: effectivePhase,
       publicationId: header.publication_id,
       publicationRevision: header.publication_revision,

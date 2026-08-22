@@ -2272,12 +2272,12 @@ only and disables ordinary calendar auto-close without resuming old reminders.
 - Test: `test/integration/reporting/reopen-month.integration.spec.ts`
 - Test: `test/e2e/reporting/reopen-month.e2e-spec.ts`
 
-- [ ] Написать RED cases missing reason, unauthorized reopen, config mutation,
+- [x] Написать RED cases missing reason, unauthorized reopen, config mutation,
   old deadline tick and correction.
-- [ ] Реализовать reopened lifecycle mode preserving all report revisions.
-- [ ] Проверить no old reminder revival and no system auto-close.
-- [ ] Запустить integration/E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: reopen closed monthly plans`.
+- [x] Реализовать reopened lifecycle mode preserving all report revisions.
+- [x] Проверить no old reminder revival and no system auto-close.
+- [x] Запустить integration/E2E and `pnpm check:quick`.
+- [x] Commit: `feat: reopen closed monthly plans`.
 
 ### L03 — Explicit RecloseMonth
 

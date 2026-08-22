@@ -47,6 +47,7 @@ type HeaderRow = {
   readonly plan_month_id: string
   readonly facts_revision: bigint
   readonly status: string
+  readonly lifecycle_mode: 'ordinary' | 'reopened'
   readonly active_publication_id: string | null
   readonly month_start: string
   readonly month_end: string
@@ -151,6 +152,7 @@ function validateTarget(
   }
   if (
     header.status === 'closed' ||
+    header.lifecycle_mode === 'reopened' ||
     input.currentLocalDate > header.correction_deadline
   ) {
     throw new CloseDayTargetUnavailableError('closed')
@@ -351,7 +353,9 @@ export class PrismaCloseDayPersistence implements CloseDayPersistencePort {
     const suffix = lock ? ' FOR UPDATE OF month' : ''
     const rows = await client.$queryRawUnsafe<HeaderRow[]>(
       `SELECT month.id::text plan_month_id, month.facts_revision,
-              month.status, month.active_publication_id::text,
+              month.status,
+              COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') lifecycle_mode,
+              month.active_publication_id::text,
               month.month_start::text,
               (month.month_start + INTERVAL '1 month - 1 day')::date::text
                 month_end,

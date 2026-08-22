@@ -129,3 +129,27 @@ export const ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM = defineProblemDefinition({
   title: 'Active plan month not found',
   detail: 'There is no active published plan for the current local date.',
 })
+
+export const PLAN_MONTH_NOT_FOUND_PROBLEM = defineProblemDefinition({
+  slug: 'plan-month-not-found',
+  code: 'PLAN_MONTH_NOT_FOUND',
+  status: 404,
+  title: 'Plan month not found',
+  detail: 'The requested plan month was not found.',
+})
+
+export const PLAN_MONTH_REVISION_CONFLICT_PROBLEM = defineProblemDefinition({
+  slug: 'plan-month-revision-conflict',
+  code: 'PLAN_MONTH_REVISION_CONFLICT',
+  status: 409,
+  title: 'Plan month revision conflict',
+  detail: 'The plan month changed before this request was applied.',
+})
+
+export const PLAN_MONTH_REOPEN_CONFLICT_PROBLEM = defineProblemDefinition({
+  slug: 'plan-month-reopen-conflict',
+  code: 'PLAN_MONTH_REOPEN_CONFLICT',
+  status: 409,
+  title: 'Plan month cannot be reopened',
+  detail: 'The plan month is not currently eligible for reopening.',
+})

@@ -22,6 +22,9 @@ import {
   PublicationPreviewConflictError,
   PlanningAuthorizationDeniedError,
   PlanningDependencyUnavailableError,
+  PlanMonthNotFoundError,
+  PlanMonthRevisionConflictError,
+  PlanMonthReopenConflictError,
 } from '../application/planning-errors'
 import {
   DRAFT_GOAL_NOT_FOUND_PROBLEM,
@@ -40,6 +43,9 @@ import {
   PLAN_PUBLICATION_BLOCKED_PROBLEM,
   PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
   PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
+  PLAN_MONTH_NOT_FOUND_PROBLEM,
+  PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
+  PLAN_MONTH_REOPEN_CONFLICT_PROBLEM,
 } from '../presentation/planning-problem.definitions'
 
 const bodyIssue = Object.freeze({
@@ -67,6 +73,9 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
       PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
       ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM,
+      PLAN_MONTH_NOT_FOUND_PROBLEM,
+      PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
+      PLAN_MONTH_REOPEN_CONFLICT_PROBLEM,
     ]),
     mappedCodes: Object.freeze([
       'PLANNING_AUTHORIZATION_DENIED',
@@ -85,6 +94,9 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       'PLAN_MONTH_ALREADY_PUBLISHED',
       'PLAN_PUBLICATION_NOT_FOUND',
       'ACTIVE_PLAN_MONTH_NOT_FOUND',
+      'PLAN_MONTH_NOT_FOUND',
+      'PLAN_MONTH_REVISION_CONFLICT',
+      'PLAN_MONTH_REOPEN_CONFLICT',
       'VALIDATION_FAILED',
       'DEPENDENCY_UNAVAILABLE',
     ]),
@@ -175,6 +187,30 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       }
       if (error instanceof ActivePlanMonthNotFoundError) {
         return { code: 'ACTIVE_PLAN_MONTH_NOT_FOUND' }
+      }
+      if (error instanceof PlanMonthNotFoundError) {
+        return { code: 'PLAN_MONTH_NOT_FOUND' }
+      }
+      if (error instanceof PlanMonthRevisionConflictError) {
+        return {
+          code: 'PLAN_MONTH_REVISION_CONFLICT',
+          conflict: {
+            expectedRevision: error.expectedRevision.toString(10),
+            currentRevision: error.currentRevision.toString(10),
+            nextAction: 'reload-month-and-retry',
+          },
+        }
+      }
+      if (error instanceof PlanMonthReopenConflictError) {
+        return {
+          code: 'PLAN_MONTH_REOPEN_CONFLICT',
+          conflict: {
+            reason: error.reason,
+            currentRevision: error.currentRevision.toString(10),
+            currentStatus: error.currentStatus,
+            nextAction: 'reload-month',
+          },
+        }
       }
       if (error instanceof PlanningDependencyUnavailableError) {
         return { code: 'DEPENDENCY_UNAVAILABLE' }

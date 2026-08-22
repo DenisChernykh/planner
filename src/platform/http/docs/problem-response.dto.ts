@@ -109,6 +109,47 @@ export class DraftConflictProblemResponseDto extends ProblemResponseDto {
   public readonly conflict!: DraftProblemConflictResponseDto
 }
 
+export class PlanMonthRevisionConflictResponseDto {
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$', example: '1' })
+  public readonly expectedRevision!: string
+
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$', example: '2' })
+  public readonly currentRevision!: string
+
+  @ApiProperty({ enum: ['reload-month-and-retry'] })
+  public readonly nextAction!: 'reload-month-and-retry'
+}
+
+export class PlanMonthRevisionConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({ enum: ['PLAN_MONTH_REVISION_CONFLICT'] })
+  declare public readonly code: 'PLAN_MONTH_REVISION_CONFLICT'
+
+  @ApiProperty({ type: () => PlanMonthRevisionConflictResponseDto })
+  public readonly conflict!: PlanMonthRevisionConflictResponseDto
+}
+
+export class PlanMonthReopenConflictResponseDto {
+  @ApiProperty({ enum: ['not_closed', 'already_reopened'] })
+  public readonly reason!: 'not_closed' | 'already_reopened'
+
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$', example: '3' })
+  public readonly currentRevision!: string
+
+  @ApiProperty({ enum: ['draft', 'published', 'grace', 'closed'] })
+  public readonly currentStatus!: 'draft' | 'published' | 'grace' | 'closed'
+
+  @ApiProperty({ enum: ['reload-month'] })
+  public readonly nextAction!: 'reload-month'
+}
+
+export class PlanMonthReopenConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({ enum: ['PLAN_MONTH_REOPEN_CONFLICT'] })
+  declare public readonly code: 'PLAN_MONTH_REOPEN_CONFLICT'
+
+  @ApiProperty({ type: () => PlanMonthReopenConflictResponseDto })
+  public readonly conflict!: PlanMonthReopenConflictResponseDto
+}
+
 export class ReminderScheduleRevisionConflictResponseDto {
   @ApiProperty({
     type: String,

@@ -31,6 +31,8 @@ export type ProblemConflict =
   | TrackingExistingDayCloseProblemConflict
   | TrackingWeeklyTaskTargetProblemConflict
   | ReminderScheduleRevisionProblemConflict
+  | PlanMonthRevisionProblemConflict
+  | PlanMonthReopenProblemConflict
 
 export interface TrackingFactTargetUnavailableProblemConflict {
   readonly reason:
@@ -84,6 +86,19 @@ export interface ReminderScheduleRevisionProblemConflict {
   readonly expectedRevision: string | null
   readonly currentRevision: string | null
   readonly nextAction: 'reload-reminder-settings-and-retry'
+}
+
+export interface PlanMonthRevisionProblemConflict {
+  readonly expectedRevision: string
+  readonly currentRevision: string
+  readonly nextAction: 'reload-month-and-retry'
+}
+
+export interface PlanMonthReopenProblemConflict {
+  readonly reason: 'not_closed' | 'already_reopened'
+  readonly currentRevision: string
+  readonly currentStatus: 'draft' | 'published' | 'grace' | 'closed'
+  readonly nextAction: 'reload-month'
 }
 
 export interface PublicationPreviewProblemConflict {

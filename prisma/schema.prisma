@@ -150,6 +150,7 @@ model PlanMonth {
   spaceId             String   @map("space_id") @db.Uuid
   monthStart          DateTime @map("month_start") @db.Date
   status              String   @db.VarChar(16)
+  lifecycleMode       String   @default("ordinary") @map("lifecycle_mode") @db.VarChar(16)
   revision            BigInt   @db.BigInt
   factsRevision       BigInt   @default(0) @map("facts_revision") @db.BigInt
   createdAt           DateTime @map("created_at") @db.Timestamptz(3)
@@ -225,6 +226,7 @@ model PlanningActionGroup {
   goalDefinition    GoalDefinition?            @relation(fields: [goalDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   commandReceipt    CommandReceipt             @relation(fields: [actorScope, commandType, commandId], references: [actorScope, commandType, commandId], onDelete: Restrict, onUpdate: Restrict)
   focusChange       PlanningMonthFocusChange?
+  reopenChange      PlanningMonthReopenChange?
   goalCatalogChange PlanningGoalCatalogChange?
   draftGoalChange   PlanningDraftGoalChange?
   publicationChange PlanningPublicationChange?
@@ -388,6 +390,15 @@ model PlanningMonthFocusChange {
   action PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@map("planning_month_focus_changes")
+}
+
+model PlanningMonthReopenChange {
+  actionId String @id @map("action_id") @db.Uuid
+  reason   String @db.Text
+
+  action PlanningActionGroup @relation(fields: [actionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@map("planning_month_reopen_changes")
 }
 
 model GoalDefinition {

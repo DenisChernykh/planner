@@ -72,6 +72,8 @@ export type TrackingDayGoalV1 = {
   readonly planGoalSnapshotId: string
   readonly applicable: boolean
   readonly writable: boolean
+  /** Existing T05 records can still be corrected or deleted after L02 reopen. */
+  readonly correctionWritable?: boolean
   readonly state: TrackingDayStateV1
   readonly coverage: { readonly filled: string; readonly applicable: string }
   readonly progress: GoalProgressResult
@@ -129,6 +131,7 @@ export type TrackingPublishedReadV1 = TrackingReadBaseV1 & {
   readonly lifecycleRevision: bigint
   readonly factsRevision: bigint
   readonly monthStatus: 'published' | 'grace' | 'closed'
+  readonly lifecycleMode?: 'ordinary' | 'reopened'
   readonly phase: TrackingMonthPhaseV1
   readonly publicationId: string
   readonly publicationRevision: bigint

@@ -151,6 +151,26 @@ export class PlanMonthRevisionConflictError extends Error {
   }
 }
 
+export class PlanMonthNotFoundError extends Error {
+  public constructor() {
+    super('Plan month was not found')
+    this.name = 'PlanMonthNotFoundError'
+  }
+}
+
+export type PlanMonthReopenConflictReason = 'not_closed' | 'already_reopened'
+
+export class PlanMonthReopenConflictError extends Error {
+  public constructor(
+    public readonly reason: PlanMonthReopenConflictReason,
+    public readonly currentRevision: bigint,
+    public readonly currentStatus: 'draft' | 'published' | 'grace' | 'closed',
+  ) {
+    super(`Plan month cannot be reopened: ${reason}`)
+    this.name = 'PlanMonthReopenConflictError'
+  }
+}
+
 export type PlanPublicationCancellationConflictReason =
   'not_active' | 'month_started' | 'facts_exist'
 

@@ -11,6 +11,8 @@ import {
   GoalDefinitionConflictProblemResponseDto,
   DraftConflictProblemResponseDto,
   DraftProblemConflictResponseDto,
+  PlanMonthRevisionConflictProblemResponseDto,
+  PlanMonthReopenConflictProblemResponseDto,
   ReminderScheduleRevisionConflictProblemResponseDto,
   ReminderScheduleRevisionConflictResponseDto,
   ProblemFieldErrorResponseDto,
@@ -67,6 +69,12 @@ export function ApiProblemResponses(
           }
           if (code === 'DRAFT_REVISION_CONFLICT') {
             return DraftConflictProblemResponseDto
+          }
+          if (code === 'PLAN_MONTH_REVISION_CONFLICT') {
+            return PlanMonthRevisionConflictProblemResponseDto
+          }
+          if (code === 'PLAN_MONTH_REOPEN_CONFLICT') {
+            return PlanMonthReopenConflictProblemResponseDto
           }
           if (code === 'REMINDER_SCHEDULE_REVISION_CONFLICT') {
             return ReminderScheduleRevisionConflictProblemResponseDto
@@ -145,6 +153,8 @@ export function ApiProblemResponses(
       GoalDefinitionConflictProblemResponseDto,
       DraftProblemConflictResponseDto,
       DraftConflictProblemResponseDto,
+      PlanMonthRevisionConflictProblemResponseDto,
+      PlanMonthReopenConflictProblemResponseDto,
       ReminderScheduleRevisionConflictProblemResponseDto,
       ReminderScheduleRevisionConflictResponseDto,
       ValidationProblemResponseDto,
@@ -208,6 +218,25 @@ function problemExample(definition: RegisteredProblemDefinition): object {
     ...(definition.code === 'DRAFT_REVISION_CONFLICT'
       ? {
           conflict: { expectedRevision: '1', currentRevision: '2' },
+        }
+      : {}),
+    ...(definition.code === 'PLAN_MONTH_REVISION_CONFLICT'
+      ? {
+          conflict: {
+            expectedRevision: '1',
+            currentRevision: '2',
+            nextAction: 'reload-month-and-retry',
+          },
+        }
+      : {}),
+    ...(definition.code === 'PLAN_MONTH_REOPEN_CONFLICT'
+      ? {
+          conflict: {
+            reason: 'not_closed',
+            currentRevision: '3',
+            currentStatus: 'grace',
+            nextAction: 'reload-month',
+          },
         }
       : {}),
     ...(definition.code === 'REMINDER_SCHEDULE_REVISION_CONFLICT'

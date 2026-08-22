@@ -1321,6 +1321,27 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
       'previewHash',
     ],
   )
+  schemas['ReopenMonthRequestV1'] = object(
+    {
+      commandId: uuid,
+      expectedRevision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+      reason: {
+        type: 'string',
+        minLength: 1,
+        maxLength: 2_000,
+        pattern: '^[\\s\\S]*\\S[\\s\\S]*$',
+      },
+    },
+    ['commandId', 'expectedRevision', 'reason'],
+  )
+  schemas['PlanMonthMutationResponseV1'] = object(
+    {
+      kind: { type: 'string', enum: ['planning.plan-month.v1'] },
+      aggregateId: uuid,
+      aggregateRevision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+    },
+    ['kind', 'aggregateId', 'aggregateRevision'],
+  )
   schemas['PlanPublicationResultResponseV1'] = object(
     {
       kind: { type: 'string', enum: ['planning.plan-publication.v1'] },

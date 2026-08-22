@@ -42,6 +42,7 @@ type MonthRow = {
   readonly space_id: string
   readonly facts_revision: bigint
   readonly status: string
+  readonly lifecycle_mode: 'ordinary' | 'reopened'
   readonly active_publication_id: string | null
   readonly active_local_date: string
 }
@@ -80,6 +81,7 @@ type DueMonthRow = {
   readonly facts_revision: bigint
   readonly month_start: string
   readonly status: 'published' | 'grace'
+  readonly lifecycle_mode: 'ordinary' | 'reopened'
 }
 
 function localDateAt(value: Date): string {
@@ -151,6 +153,7 @@ export class PrismaDueLifecycleRepository
            AND snapshot.config #>> '{measurement,kind}' = 'boolean'
            AND month.active_publication_id = publication.id
            AND month.status IN ('published', 'grace')
+           AND COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') = 'ordinary'
            AND period.period_end < ${input.currentLocalDate}::date
            AND (record.id IS NULL OR revision.revision_kind = 'tombstoned')
          GROUP BY period.publication_id, period.period_start, period.period_end
@@ -180,6 +183,7 @@ export class PrismaDueLifecycleRepository
       const months = await client.$queryRaw<MonthRow[]>`
         SELECT month.id::text plan_month_id, month.space_id::text,
                month.facts_revision, month.status,
+               COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') lifecycle_mode,
                month.active_publication_id::text,
                publication.active_local_date::text
           FROM plan_publications publication
@@ -191,7 +195,8 @@ export class PrismaDueLifecycleRepository
       if (
         month === undefined ||
         month.active_publication_id !== input.publicationId ||
-        !['published', 'grace'].includes(month.status)
+        !['published', 'grace'].includes(month.status) ||
+        month.lifecycle_mode !== 'ordinary'
       ) {
         throw new CloseWeekNoWorkError()
       }
@@ -352,6 +357,7 @@ export class PrismaDueLifecycleRepository
         SELECT month.id::text plan_month_id, month.revision
           FROM plan_months month
          WHERE month.status = 'published'
+           AND COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') = 'ordinary'
            AND month.active_publication_id IS NOT NULL
            AND month.month_start + INTERVAL '1 month'
                  <= ${input.currentLocalDate}::date
@@ -443,6 +449,7 @@ export class PrismaDueLifecycleRepository
         SELECT month.id::text plan_month_id
           FROM plan_months month
          WHERE month.status = 'grace'
+           AND COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') = 'ordinary'
            AND month.active_publication_id IS NOT NULL
            AND month.month_start + INTERVAL '1 month' + INTERVAL '3 days'
                  <= ${input.currentLocalDate}::date
@@ -474,7 +481,8 @@ export class PrismaDueLifecycleRepository
                month.revision month_revision,
                month.facts_revision,
                month.month_start::text,
-               month.status
+               month.status,
+               COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') lifecycle_mode
           FROM plan_months month
           JOIN plan_publications publication
             ON publication.id = month.active_publication_id
@@ -485,6 +493,7 @@ export class PrismaDueLifecycleRepository
       if (
         month === undefined ||
         month.status !== 'grace' ||
+        month.lifecycle_mode !== 'ordinary' ||
         month.publication_id === undefined
       ) {
         throw new CloseMonthNoWorkError()
@@ -548,6 +557,7 @@ export class PrismaDueLifecycleRepository
          WHERE id = ${month.plan_month_id}::uuid
            AND revision = ${month.month_revision}
            AND status = 'grace'
+           AND COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') = 'ordinary'
       `
       if (updated !== 1) throw new Error('CloseMonth lifecycle CAS failed')
       const actionId = randomUUID()
