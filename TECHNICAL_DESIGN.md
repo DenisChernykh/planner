@@ -2611,6 +2611,16 @@ active query определяется только текущим month pointer.
 query по active publication и facts. Warehouse, OLAP pipeline и event ledger не
 нужны.
 
+R02 публикует session-only `GET /reporting/months/{targetMonth}`. Query принимает
+только trusted member actor и canonical `YYYY-MM`; space/member/publication IDs и
+as-of date не приходят из HTTP. Product clock задаёт `Asia/Yekaterinburg`
+business date, а report source и heatmap/quantity/time/rating series строятся из
+одного repeatable-read snapshot. Ответ содержит `current` либо `preliminary`
+status, три раздельные personal/shared sections и не содержит completed-v1
+analytics (streak, distributions, pace, forecast, comparisons или correlations).
+Draft, pre-activation, closed и отсутствующий active publication не выдаются
+этим route; closed immutable revisions принадлежат CloseMonth slice.
+
 ### 12.2. Closed
 
 Closed report читается из immutable report revision. Payload содержит три

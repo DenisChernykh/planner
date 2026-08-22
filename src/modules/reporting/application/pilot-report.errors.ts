@@ -32,3 +32,17 @@ export class PilotReportDependencyUnavailableError extends Error {
     this.name = 'PilotReportDependencyUnavailableError'
   }
 }
+
+export class PilotReportAuthorizationDeniedError extends Error {
+  public constructor() {
+    super('Pilot report operation is not authorized')
+    this.name = 'PilotReportAuthorizationDeniedError'
+  }
+}
+
+export class PilotReportQueryValidationError extends Error {
+  public constructor() {
+    super('Pilot report query is invalid')
+    this.name = 'PilotReportQueryValidationError'
+  }
+}

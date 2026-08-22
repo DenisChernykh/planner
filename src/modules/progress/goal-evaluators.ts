@@ -1935,6 +1935,19 @@ function evaluateValue(
   }
 }
 
+/**
+ * Evaluates one already materialized fact against the published measurement.
+ * Reporting and tracking read models use this pure primitive so they cannot
+ * drift into separate satisfaction rules.
+ */
+export function isGoalFactSatisfied(
+  measurement: EvaluationMeasurementV1,
+  value: GoalFactValueV1 | undefined,
+  satisfaction: EvaluationCheckpointSatisfactionV1 | null = null,
+): boolean {
+  return evaluateValue(measurement, value, satisfaction).satisfied
+}
+
 function unavailable(
   reason: 'informational' | 'no_applicable_units',
 ): EvaluationMetric {

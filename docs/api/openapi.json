@@ -1176,6 +1176,42 @@
         ],
         "type": "object"
       },
+      "PilotReportReadResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              "reporting.pilot-report-read.v1"
+            ],
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/ReportingPilotSectionV1"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ReportingPilotSourceV1"
+          },
+          "status": {
+            "enum": [
+              "current",
+              "preliminary"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "status",
+          "source",
+          "sections"
+        ],
+        "type": "object"
+      },
       "PlanMonthAlreadyPublishedProblemResponseDto": {
         "properties": {
           "code": {
@@ -1391,6 +1427,10 @@
               "PLAN_SEED_ALREADY_CONSUMED",
               "RATE_LIMIT_EXCEEDED",
               "REMINDER_AUTHORIZATION_DENIED",
+              "REPORTING_AUTHORIZATION_DENIED",
+              "REPORTING_NOT_FOUND",
+              "REPORTING_QUERY_INVALID",
+              "REPORTING_SOURCE_CHANGED",
               "TRACKING_AUTHORIZATION_DENIED",
               "TRACKING_CLOSE_DAY_TARGET_NOT_FOUND",
               "TRACKING_FACT_TARGET_NOT_FOUND",
@@ -3183,6 +3223,1542 @@
           "morning",
           "day",
           "evening"
+        ],
+        "type": "object"
+      },
+      "ReportingActualTimeSeriesPointV1": {
+        "additionalProperties": false,
+        "properties": {
+          "componentId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "localDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "localDate",
+          "componentId",
+          "value"
+        ],
+        "type": "object"
+      },
+      "ReportingAggregateMetricV1": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ReportingAvailableAggregateMetricV1"
+          },
+          {
+            "$ref": "#/components/schemas/ReportingUnavailableAggregateMetricV1"
+          }
+        ]
+      },
+      "ReportingAvailableAggregateMetricV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "basisPoints": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "exact": {
+            "$ref": "#/components/schemas/ReportingExactRatioV1"
+          }
+        },
+        "required": [
+          "available",
+          "exact",
+          "basisPoints"
+        ],
+        "type": "object"
+      },
+      "ReportingAvailableMetricV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "basisPoints": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "exact": {
+            "$ref": "#/components/schemas/ReportingExactRatioV1"
+          }
+        },
+        "required": [
+          "available",
+          "exact",
+          "basisPoints"
+        ],
+        "type": "object"
+      },
+      "ReportingCheckpointSatisfactionV1": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "boolean"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "quantity"
+                ],
+                "type": "string"
+              },
+              "target": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "target"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "end": {
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "actual_time"
+                ],
+                "type": "string"
+              },
+              "start": {
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "start",
+              "end"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "rating"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "text"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "checklist"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "any_of"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ReportingEvaluationMeasurementV1": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "boolean"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "aggregation": {
+                "enum": [
+                  "add",
+                  "latest"
+                ],
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "quantity"
+                ],
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "targeted",
+                  "informational"
+                ],
+                "type": "string"
+              },
+              "precision": {
+                "enum": [
+                  0,
+                  1,
+                  2,
+                  3
+                ],
+                "type": "integer"
+              },
+              "target": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "enum": [
+                      null
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "mode",
+              "precision",
+              "aggregation",
+              "target"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "end": {
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "actual_time"
+                ],
+                "type": "string"
+              },
+              "start": {
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "start",
+              "end"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "rating"
+                ],
+                "type": "string"
+              },
+              "maximum": {
+                "type": "integer"
+              },
+              "minimum": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind",
+              "minimum",
+              "maximum"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "text"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "itemId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "itemId"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "checklist"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "items"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "any_of"
+                ],
+                "type": "string"
+              },
+              "variants": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "precision": {
+                      "enum": [
+                        0,
+                        1,
+                        2,
+                        3
+                      ],
+                      "type": "integer"
+                    },
+                    "target": {
+                      "type": "string"
+                    },
+                    "variantId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "variantId",
+                    "precision",
+                    "target"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "kind",
+              "variants"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ReportingExactRatioV1": {
+        "additionalProperties": false,
+        "properties": {
+          "denominator": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "numerator": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "numerator",
+          "denominator"
+        ],
+        "type": "object"
+      },
+      "ReportingFactTargetFixedV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "units": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "componentId": {
+                  "nullable": true,
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "fact": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ReportingGoalFactValueV1"
+                    },
+                    {
+                      "enum": [
+                        null
+                      ]
+                    }
+                  ]
+                },
+                "localDate": {
+                  "format": "date",
+                  "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                  "type": "string"
+                },
+                "target": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "measurement": {
+                      "$ref": "#/components/schemas/ReportingEvaluationMeasurementV1"
+                    },
+                    "satisfaction": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/ReportingCheckpointSatisfactionV1"
+                        },
+                        {
+                          "enum": [
+                            null
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "measurement",
+                    "satisfaction"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "localDate",
+                "componentId",
+                "fact",
+                "target"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "kind",
+          "units"
+        ],
+        "type": "object"
+      },
+      "ReportingFactTargetFlexibleV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "flexible"
+            ],
+            "type": "string"
+          },
+          "periods": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "fact": {
+                  "$ref": "#/components/schemas/ReportingExactRatioV1"
+                },
+                "periodEnd": {
+                  "format": "date",
+                  "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                  "type": "string"
+                },
+                "periodStart": {
+                  "format": "date",
+                  "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "periodStart",
+                "periodEnd",
+                "fact",
+                "target"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "kind",
+          "periods"
+        ],
+        "type": "object"
+      },
+      "ReportingFactTargetInformationalQuantityV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "fact": {
+            "items": {
+              "$ref": "#/components/schemas/ReportingGoalEvaluationFactV1"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "informational_quantity"
+            ],
+            "type": "string"
+          },
+          "measurement": {
+            "additionalProperties": false,
+            "properties": {
+              "aggregation": {
+                "enum": [
+                  "add",
+                  "latest"
+                ],
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "quantity"
+                ],
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "informational"
+                ],
+                "type": "string"
+              },
+              "precision": {
+                "enum": [
+                  0,
+                  1,
+                  2,
+                  3
+                ],
+                "type": "integer"
+              },
+              "target": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "mode",
+              "precision",
+              "aggregation",
+              "target"
+            ],
+            "type": "object"
+          },
+          "target": {
+            "enum": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "available",
+          "kind",
+          "fact",
+          "measurement",
+          "target"
+        ],
+        "type": "object"
+      },
+      "ReportingFactTargetNotApplicableV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              false
+            ],
+            "type": "boolean"
+          },
+          "fact": {
+            "enum": [
+              null
+            ]
+          },
+          "kind": {
+            "enum": [
+              "not_applicable"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "no_applicable_units"
+            ],
+            "type": "string"
+          },
+          "target": {
+            "enum": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "available",
+          "kind",
+          "fact",
+          "target",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "ReportingFactTargetV1": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ReportingFactTargetFixedV1"
+          },
+          {
+            "$ref": "#/components/schemas/ReportingFactTargetFlexibleV1"
+          },
+          {
+            "$ref": "#/components/schemas/ReportingFactTargetWeeklyTaskV1"
+          },
+          {
+            "$ref": "#/components/schemas/ReportingFactTargetInformationalQuantityV1"
+          },
+          {
+            "$ref": "#/components/schemas/ReportingFactTargetNotApplicableV1"
+          }
+        ]
+      },
+      "ReportingFactTargetWeeklyTaskV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "weekly_planned_task"
+            ],
+            "type": "string"
+          },
+          "periods": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "fact": {
+                  "enum": [
+                    "done",
+                    "not_done",
+                    "no_data"
+                  ],
+                  "type": "string"
+                },
+                "periodEnd": {
+                  "format": "date",
+                  "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                  "type": "string"
+                },
+                "periodStart": {
+                  "format": "date",
+                  "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                  "type": "string"
+                },
+                "target": {
+                  "enum": [
+                    "done"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "periodStart",
+                "periodEnd",
+                "fact",
+                "target"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "kind",
+          "periods"
+        ],
+        "type": "object"
+      },
+      "ReportingGoalEvaluationFactV1": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "expectationDate": {
+                "format": "date",
+                "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "fixed"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ReportingGoalFactValueV1"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "expectationDate",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "checkpoints": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "checkpointId": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "$ref": "#/components/schemas/ReportingGoalFactValueV1"
+                    }
+                  },
+                  "required": [
+                    "checkpointId",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "expectationDate": {
+                "format": "date",
+                "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "fixed_checkpoints"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "expectationDate",
+              "checkpoints"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "quota_occurrence"
+                ],
+                "type": "string"
+              },
+              "localDate": {
+                "format": "date",
+                "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                "type": "string"
+              },
+              "value": {
+                "$ref": "#/components/schemas/ReportingGoalFactValueV1"
+              }
+            },
+            "required": [
+              "kind",
+              "localDate",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "weekly_planned_task"
+                ],
+                "type": "string"
+              },
+              "periodEnd": {
+                "format": "date",
+                "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                "type": "string"
+              },
+              "periodStart": {
+                "format": "date",
+                "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+                "type": "string"
+              },
+              "result": {
+                "enum": [
+                  "done",
+                  "not_done"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "periodStart",
+              "periodEnd",
+              "result"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ReportingGoalFactValueV1": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "boolean"
+                ],
+                "type": "string"
+              },
+              "result": {
+                "enum": [
+                  "done",
+                  "not_done"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "result"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "not_done"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "contributions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "contributionId": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "contributionId",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "quantity_add"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "contributions"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "quantity_latest"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "actual_time"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "rating"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "text"
+                ],
+                "type": "string"
+              },
+              "result": {
+                "enum": [
+                  "done",
+                  "not_done"
+                ],
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "text",
+              "result"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "itemId": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "enum": [
+                        "done",
+                        "not_done"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "itemId",
+                    "state"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "checklist"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "items"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "any_of"
+                ],
+                "type": "string"
+              },
+              "variants": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    },
+                    "variantId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "variantId",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "kind",
+              "variants"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ReportingGoalSeriesV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actualTime": {
+            "oneOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReportingActualTimeSeriesPointV1"
+                },
+                "type": "array"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "cumulativeQuantity": {
+            "oneOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReportingQuantitySeriesPointV1"
+                },
+                "type": "array"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "heatmap": {
+            "items": {
+              "$ref": "#/components/schemas/ReportingHeatmapPointV1"
+            },
+            "maxItems": 31,
+            "type": "array"
+          },
+          "rating": {
+            "oneOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReportingRatingSeriesPointV1"
+                },
+                "type": "array"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "heatmap",
+          "cumulativeQuantity",
+          "actualTime",
+          "rating"
+        ],
+        "type": "object"
+      },
+      "ReportingHeatmapPointV1": {
+        "additionalProperties": false,
+        "properties": {
+          "localDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "done",
+              "not_done",
+              "no_data",
+              "not_applicable"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "localDate",
+          "state"
+        ],
+        "type": "object"
+      },
+      "ReportingMetricV1": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ReportingAvailableMetricV1"
+          },
+          {
+            "$ref": "#/components/schemas/ReportingUnavailableMetricV1"
+          }
+        ]
+      },
+      "ReportingPilotGoalV1": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "additionalProperties": false,
+            "properties": {
+              "applicable": {
+                "pattern": "^(?:0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "filled": {
+                "pattern": "^(?:0|[1-9][0-9]*)$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "filled",
+              "applicable"
+            ],
+            "type": "object"
+          },
+          "displayOrder": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "factTarget": {
+            "$ref": "#/components/schemas/ReportingFactTargetV1"
+          },
+          "goalScore": {
+            "$ref": "#/components/schemas/ReportingMetricV1"
+          },
+          "overperformance": {
+            "$ref": "#/components/schemas/ReportingMetricV1"
+          },
+          "planGoalSnapshotId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "progressPercent": {
+            "$ref": "#/components/schemas/ReportingMetricV1"
+          },
+          "series": {
+            "$ref": "#/components/schemas/ReportingGoalSeriesV1"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "planGoalSnapshotId",
+          "title",
+          "displayOrder",
+          "goalScore",
+          "progressPercent",
+          "factTarget",
+          "coverage",
+          "overperformance",
+          "series"
+        ],
+        "type": "object"
+      },
+      "ReportingPilotSectionV1": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/ReportingAggregateMetricV1"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/ReportingPilotGoalV1"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "personal",
+              "shared"
+            ],
+            "type": "string"
+          },
+          "monthScore": {
+            "$ref": "#/components/schemas/ReportingAggregateMetricV1"
+          },
+          "ownerMemberId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "ownerMemberId",
+          "monthScore",
+          "coverage",
+          "goals"
+        ],
+        "type": "object"
+      },
+      "ReportingPilotSourceV1": {
+        "additionalProperties": false,
+        "properties": {
+          "asOfLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "factsRevision": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "formulaVersions": {
+            "additionalProperties": false,
+            "properties": {
+              "calendar": {
+                "enum": [
+                  "planner.calendar-targets.v1"
+                ],
+                "type": "string"
+              },
+              "evaluation": {
+                "enum": [
+                  "planner.goal-evaluation.v1"
+                ],
+                "type": "string"
+              },
+              "scoreCoverage": {
+                "enum": [
+                  "planner.score-coverage.v1"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "calendar",
+              "evaluation",
+              "scoreCoverage"
+            ],
+            "type": "object"
+          },
+          "planMonthId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "publicationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "publicationRevision": {
+            "pattern": "^(?:0|[1-9][0-9]*)$",
+            "type": "string"
+          },
+          "spaceId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spaceId",
+          "planMonthId",
+          "publicationId",
+          "publicationRevision",
+          "factsRevision",
+          "asOfLocalDate",
+          "formulaVersions"
+        ],
+        "type": "object"
+      },
+      "ReportingQuantitySeriesPointV1": {
+        "additionalProperties": false,
+        "properties": {
+          "componentId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "localDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "localDate",
+          "componentId",
+          "value"
+        ],
+        "type": "object"
+      },
+      "ReportingRatingSeriesPointV1": {
+        "additionalProperties": false,
+        "properties": {
+          "componentId": {
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "localDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "value": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "localDate",
+          "componentId",
+          "value"
+        ],
+        "type": "object"
+      },
+      "ReportingUnavailableAggregateMetricV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              false
+            ],
+            "type": "boolean"
+          },
+          "basisPoints": {
+            "enum": [
+              null
+            ]
+          },
+          "exact": {
+            "enum": [
+              null
+            ]
+          },
+          "reason": {
+            "enum": [
+              "no_scored_goals",
+              "no_fixed_units"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "exact",
+          "basisPoints",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "ReportingUnavailableMetricV1": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "enum": [
+              false
+            ],
+            "type": "boolean"
+          },
+          "basisPoints": {
+            "enum": [
+              null
+            ]
+          },
+          "exact": {
+            "enum": [
+              null
+            ]
+          },
+          "reason": {
+            "enum": [
+              "informational",
+              "no_applicable_units"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "exact",
+          "basisPoints",
+          "reason"
         ],
         "type": "object"
       },
@@ -12504,6 +14080,187 @@
         ]
       }
     },
+    "/reporting/months/{targetMonth}": {
+      "get": {
+        "operationId": "ReportingController_month",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "targetMonth",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotReportReadResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "REPORTING_QUERY_INVALID": {
+                    "summary": "Reporting query invalid",
+                    "value": {
+                      "code": "REPORTING_QUERY_INVALID",
+                      "detail": "The requested report query is invalid.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Reporting query invalid",
+                      "type": "https://planner.invalid/problems/reporting-query-invalid"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Reporting query invalid"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "REPORTING_AUTHORIZATION_DENIED": {
+                    "summary": "Reporting authorization denied",
+                    "value": {
+                      "code": "REPORTING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this report.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Reporting authorization denied",
+                      "type": "https://planner.invalid/problems/reporting-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Reporting authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "REPORTING_NOT_FOUND": {
+                    "summary": "Pilot report not found",
+                    "value": {
+                      "code": "REPORTING_NOT_FOUND",
+                      "detail": "The requested active or preliminary report was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Pilot report not found",
+                      "type": "https://planner.invalid/problems/reporting-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Pilot report not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "REPORTING_SOURCE_CHANGED": {
+                    "summary": "Pilot report source changed",
+                    "value": {
+                      "code": "REPORTING_SOURCE_CHANGED",
+                      "detail": "The report source changed while it was being read.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Pilot report source changed",
+                      "type": "https://planner.invalid/problems/reporting-source-changed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Pilot report source changed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read the current pilot report for a month.",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
     "/tracking/facts": {
       "post": {
         "operationId": "ScalarFactController_recordFact",
@@ -17826,6 +19583,10 @@
     {
       "description": "Personal reminder settings and Telegram delivery status.",
       "name": "reminders"
+    },
+    {
+      "description": "Current and preliminary pilot report read models.",
+      "name": "reporting"
     }
   ]
 }

@@ -6,6 +6,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import { ApiModule } from '@/bootstrap/api/api.module'
 import { PLANNING_OPENAPI_CONTRIBUTION } from '@/modules/planning/composition'
 import { REMINDERS_OPENAPI_CONTRIBUTION } from '@/modules/reminders/composition'
+import { REPORTING_OPENAPI_CONTRIBUTION } from '@/modules/reporting/composition'
 import { TRACKING_OPENAPI_CONTRIBUTION } from '@/modules/tracking/composition'
 import { createOpenApiDocument } from '@/platform/http/docs/openapi-document'
 import { canonicalizeJson } from '@/platform/http/docs/openapi-normalizer'
@@ -29,6 +30,7 @@ export async function generateOpenApiArtifact(): Promise<string> {
           PLANNING_OPENAPI_CONTRIBUTION,
           TRACKING_OPENAPI_CONTRIBUTION,
           REMINDERS_OPENAPI_CONTRIBUTION,
+          REPORTING_OPENAPI_CONTRIBUTION,
         ],
       ),
     )

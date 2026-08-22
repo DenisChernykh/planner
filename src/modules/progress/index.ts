@@ -27,6 +27,7 @@ export {
   GOAL_EVALUATION_FORMULA_VERSION,
   GoalEvaluationInputError,
   evaluateGoalProgress,
+  isGoalFactSatisfied,
   type EvaluateGoalProgressInput,
   type EvaluationCheckpointSatisfactionV1,
   type EvaluationCheckpointV1,

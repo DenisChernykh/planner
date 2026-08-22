@@ -2199,12 +2199,12 @@ overperformance. Series/read API добавляются отдельно в R02.
 **Produces:** deterministic `CalculatePilotReport` result; payload intentionally
 omits streak, weekday/category, forecast, comparisons and correlations.
 
-- [ ] Написать RED fixture personal/shared separation and 100/50/130 = 83.33%.
-- [ ] Реализовать deterministic calculator from immutable
+- [x] Написать RED fixture personal/shared separation and 100/50/130 = 83.33%.
+- [x] Реализовать deterministic calculator from immutable
   publication+facts+formulaVersion.
-- [ ] Проверить no-data/not-applicable denominators and raw overperformance.
-- [ ] Запустить unit/integration and `pnpm check:quick`.
-- [ ] Commit: `feat: calculate pilot monthly results`.
+- [x] Проверить no-data/not-applicable denominators and raw overperformance.
+- [x] Запустить unit/integration and `pnpm check:quick`.
+- [x] Commit: `feat: calculate pilot monthly results`.
 
 ### R02 — Pilot report series and HTTP read model
 
@@ -2222,12 +2222,12 @@ cumulative quantity, actual time and rating trends through OpenAPI.
 
 **Produces:** `BuildPilotReportQuery`; no completed-v1 analytics fields.
 
-- [ ] Написать RED E2E fixture for heatmap/cumulative/time/rating and exact
+- [x] Написать RED E2E fixture for heatmap/cumulative/time/rating and exact
   personal/shared separation.
-- [ ] Реализовать bounded query and deterministic series mapper over R01.
-- [ ] Добавить OpenAPI response and assert forbidden completed-v1 fields absent.
-- [ ] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
-- [ ] Commit: `feat: expose pilot report series`.
+- [x] Реализовать bounded query and deterministic series mapper over R01.
+- [x] Добавить OpenAPI response and assert forbidden completed-v1 fields absent.
+- [x] Запустить E2E/OpenAPI drift and `pnpm check:quick`.
+- [x] Commit: `feat: expose pilot report series`.
 
 ### L01 — Grace and atomic CloseMonth
 

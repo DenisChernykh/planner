@@ -124,7 +124,12 @@ describe('R01 pilot report on PostgreSQL', () => {
       workspaceMembers: members,
       clock,
     })
-    reporting = createReportingApplication({ database: provider, transaction })
+    reporting = createReportingApplication({
+      database: provider,
+      transaction,
+      workspaceMembers: members,
+      clock,
+    })
   })
 
   afterAll(async () => {
