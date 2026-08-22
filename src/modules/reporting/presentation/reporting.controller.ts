@@ -64,7 +64,7 @@ export class ReportingController {
   ) {}
 
   @Get('months/:targetMonth')
-  @ApiOperation({ summary: 'Read the current pilot report for a month.' })
+  @ApiOperation({ summary: 'Read the pilot report for a month.' })
   @ApiParam({
     name: 'targetMonth',
     required: true,

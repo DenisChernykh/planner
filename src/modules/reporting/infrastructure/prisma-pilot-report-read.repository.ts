@@ -10,6 +10,7 @@ import type {
 import { TrackingProgressSourceInvalidError } from '@/modules/tracking'
 import type { Prisma, PrismaClient } from '@/generated/prisma/client'
 import type { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
+import { reportPayloadChecksum } from '@/shared/application/report-payload-integrity'
 
 import {
   PilotReportSourceChangedError,
@@ -23,6 +24,7 @@ import type {
   CalculatePilotReportInput,
   PilotReportMonthSourceInput,
   PilotReportMonthSourceV1,
+  PilotReportReadModelV1,
   PilotReportSourceGoalV1,
   PilotReportSourceV1,
 } from '../application/pilot-report.types'
@@ -74,6 +76,41 @@ function freeze<T>(value: T): T {
 
 type DatabaseClient = PrismaClient | Prisma.TransactionClient
 
+function restoreStoredReport(value: unknown): PilotReportReadModelV1 {
+  if (value === null || typeof value !== 'object') {
+    throw new PilotReportSourceInvalidError()
+  }
+  const payload = value as Record<string, unknown>
+  const sourceValue = payload.source
+  if (
+    sourceValue === null ||
+    typeof sourceValue !== 'object' ||
+    payload.status !== 'closed'
+  ) {
+    throw new PilotReportSourceInvalidError()
+  }
+  const source = sourceValue as Record<string, unknown>
+  if (
+    typeof source.publicationRevision !== 'string' ||
+    typeof source.factsRevision !== 'string'
+  ) {
+    throw new PilotReportSourceInvalidError()
+  }
+  try {
+    return freeze({
+      ...payload,
+      status: 'closed' as const,
+      source: {
+        ...source,
+        publicationRevision: BigInt(source.publicationRevision),
+        factsRevision: BigInt(source.factsRevision),
+      },
+    }) as PilotReportReadModelV1
+  } catch (error: unknown) {
+    throw new PilotReportSourceInvalidError({ cause: error })
+  }
+}
+
 export class PrismaPilotReportReadRepository
   implements PilotReportReadPort, PilotReportMonthReadPort
 {
@@ -97,23 +134,52 @@ export class PrismaPilotReportReadRepository
       const rows = await client.$queryRaw<
         {
           readonly publication_id: string
-          readonly lifecycle_status: 'published' | 'grace'
+          readonly publication_snapshot_hash: string
+          readonly lifecycle_status: 'published' | 'grace' | 'closed'
           readonly active_local_date: string
+          readonly report_payload: Prisma.JsonValue
+          readonly report_publication_snapshot_hash: string | null
+          readonly report_payload_checksum: string | null
         }[]
       >`
         SELECT publication.id::text publication_id,
+               publication.preview_hash publication_snapshot_hash,
                month.status lifecycle_status,
-               publication.active_local_date::text active_local_date
+               publication.active_local_date::text active_local_date,
+               revision.payload report_payload,
+               revision.publication_snapshot_hash report_publication_snapshot_hash,
+               revision.payload_checksum report_payload_checksum
           FROM plan_months month
           JOIN plan_publications publication
             ON publication.id = month.active_publication_id
+          LEFT JOIN report_revisions revision
+            ON revision.plan_month_id = month.id
+           AND revision.status = 'original'
          WHERE month.space_id = ${input.spaceId}::uuid
            AND month.month_start = ${`${input.targetMonth}-01`}::date
-           AND month.status IN ('published', 'grace')
+           AND month.status IN ('published', 'grace', 'closed')
       `
       if (rows.length > 1) throw new PilotReportSourceInvalidError()
       const row = rows[0]
       if (row === undefined) return null
+      if (row.lifecycle_status === 'closed') {
+        if (
+          row.report_payload === null ||
+          row.report_publication_snapshot_hash !==
+            row.publication_snapshot_hash ||
+          row.report_payload_checksum === null ||
+          !/^[0-9a-f]{64}$/.test(row.report_payload_checksum) ||
+          reportPayloadChecksum(row.report_payload) !==
+            row.report_payload_checksum
+        ) {
+          throw new PilotReportSourceInvalidError()
+        }
+        return freeze({
+          storedReport: restoreStoredReport(row.report_payload),
+          lifecycleStatus: 'closed' as const,
+          activeLocalDate: row.active_local_date,
+        })
+      }
       const source = await this.loadForPublication(client, {
         spaceId: input.spaceId,
         publicationId: row.publication_id,

@@ -137,6 +137,9 @@ export class BuildPilotReportQuery {
       if (monthSource === null || monthSource.activeLocalDate > asOfLocalDate) {
         throw new PilotReportSourceNotFoundError()
       }
+      if (monthSource.lifecycleStatus === 'closed') {
+        return monthSource.storedReport
+      }
       const report = calculatePilotReport(
         {
           spaceId: member.spaceId,

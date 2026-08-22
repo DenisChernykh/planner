@@ -1,5 +1,6 @@
 export * from './calculate-pilot-report.use-case'
 export * from './build-pilot-report.query'
+export * from './build-pilot-report-revision'
 export * from './pilot-series.builder'
 export * from './pilot-report.errors'
 export * from './pilot-report-read.port'

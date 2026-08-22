@@ -2250,14 +2250,14 @@ facts and report.
 **Produces:** report revision with publication hash, factsRevision,
 formulaVersion and payload checksum.
 
-- [ ] Написать RED cases grace start, day-4 auto close, worker downtime catch-up
+- [x] Написать RED cases grace start, day-4 auto close, worker downtime catch-up
   and correction/close race.
-- [ ] Реализовать lock/CAS → stable facts snapshot → report append → lifecycle
+- [x] Реализовать lock/CAS → stable facts snapshot → report append → lifecycle
   transition in one transaction.
-- [ ] Wire due CloseMonth into planner-worker and verify config lock plus record
+- [x] Wire due CloseMonth into planner-worker and verify config lock plus record
   lock after ordinary grace.
-- [ ] Запустить integration/E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: close monthly plans with immutable reports`.
+- [x] Запустить integration/E2E and `pnpm check:quick`.
+- [x] Commit: `feat: close monthly plans with immutable reports`.
 
 ### L02 — Reasoned reopen
 

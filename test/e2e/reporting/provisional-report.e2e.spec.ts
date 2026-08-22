@@ -18,8 +18,13 @@ import { IssueSessionUseCase } from '@/modules/auth/application/issue-session.us
 import { NodeAuthCryptoAdapter } from '@/modules/auth/infrastructure/node-auth-crypto.adapter'
 import { PrismaLocalUserRepository } from '@/modules/auth/infrastructure/prisma-local-user.repository'
 import { RedisSessionStore } from '@/modules/auth/infrastructure/redis-session.store'
-import { createPlanningApplication } from '@/modules/planning'
+import {
+  createPlanningApplication,
+  createPlanningLifecycleWorker,
+} from '@/modules/planning'
+import { createReportingApplication } from '@/modules/reporting'
 import { createTrackingApplication } from '@/modules/tracking'
+import { PrismaDueLifecycleRepository } from '@/modules/planning/infrastructure/due-lifecycle.repository'
 import { PrismaWorkspaceMemberResolver } from '@/modules/workspace/infrastructure/prisma-workspace-member.resolver'
 import { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 import { PrismaTransactionAdapter } from '@/platform/database/prisma-transaction.adapter'
@@ -94,6 +99,8 @@ describe('R02 provisional report HTTP read model', () => {
   let outsiderCookie: string
   let targetMonth: string
   let today: string
+  let clock: FakeProductClock
+  let closeWorker: ReturnType<typeof createPlanningLifecycleWorker>
 
   beforeAll(async () => {
     ;[postgres, redis] = await Promise.all([
@@ -136,7 +143,7 @@ describe('R02 provisional report HTTP read model', () => {
     const members = new PrismaWorkspaceMemberResolver(provider)
     today = ekbToday()
     targetMonth = today.slice(0, 7)
-    const clock = new FakeProductClock(new Date(`${today}T07:00:00.000+05:00`))
+    clock = new FakeProductClock(new Date(`${today}T07:00:00.000+05:00`))
     const planning = createPlanningApplication({
       database: provider,
       transaction,
@@ -144,6 +151,12 @@ describe('R02 provisional report HTTP read model', () => {
       clock,
     })
     const tracking = createTrackingApplication({
+      database: provider,
+      transaction,
+      workspaceMembers: members,
+      clock,
+    })
+    const reporting = createReportingApplication({
       database: provider,
       transaction,
       workspaceMembers: members,
@@ -170,6 +183,13 @@ describe('R02 provisional report HTTP read model', () => {
         previewHashVersion: preview.previewHashVersion,
         previewHash: preview.previewHash,
       },
+    })
+    closeWorker = createPlanningLifecycleWorker({
+      database: provider,
+      transaction,
+      lifecycle: new PrismaDueLifecycleRepository(provider),
+      clock,
+      closeMonthReport: reporting.buildCloseMonthReport,
     })
     const rows = await pool.query<{
       readonly id: string
@@ -483,6 +503,34 @@ describe('R02 provisional report HTTP read model', () => {
       throw new Error('actual-time point missing')
     firstTimePoint['value'] = 830
     expect(responseValidator.validateResponse(200, swapped)).toBeDefined()
+  })
+
+  it('serves the immutable closed report after the worker catches up', async () => {
+    const [yearToken, monthToken] = targetMonth.split('-')
+    const year = Number(yearToken)
+    const month = Number(monthToken)
+    const nextMonthDate = new Date(Date.UTC(year, month, 1))
+    const nextMonth = `${nextMonthDate.getUTCFullYear()}-${String(
+      nextMonthDate.getUTCMonth() + 1,
+    ).padStart(2, '0')}`
+    clock.set(new Date(`${nextMonth}-04T07:00:00.000+05:00`))
+    await closeWorker.tick()
+
+    const response = await fetch(`${baseUrl}/reporting/months/${targetMonth}`, {
+      headers: { cookie: firstCookie },
+    })
+    expect(response.status).toBe(200)
+    const value = await body(response)
+    expect(value).toMatchObject({
+      schemaVersion: 'reporting.pilot-report-read.v1',
+      status: 'closed',
+    })
+    const revisions = await pool.query<{ readonly count: string }>(
+      `SELECT count(*)::text count
+         FROM report_revisions
+        WHERE status = 'original'`,
+    )
+    expect(revisions.rows).toEqual([{ count: '1' }])
   })
 
   it('enforces session, month validation, membership and exact member separation', async () => {

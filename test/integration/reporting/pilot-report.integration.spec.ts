@@ -9,6 +9,7 @@ import { Pool } from 'pg'
 
 import {
   createPlanningApplication,
+  createPlanningLifecycleWorker,
   type PlanningApplication,
 } from '@/modules/planning'
 import {
@@ -22,6 +23,7 @@ import {
   type TrackingApplication,
 } from '@/modules/tracking'
 import { PrismaWorkspaceMemberResolver } from '@/modules/workspace/infrastructure/prisma-workspace-member.resolver'
+import { PrismaDueLifecycleRepository } from '@/modules/planning/infrastructure/due-lifecycle.repository'
 import { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 import { PrismaTransactionAdapter } from '@/platform/database/prisma-transaction.adapter'
 import { PrismaTransactionContext } from '@/platform/database/prisma-transaction.context'
@@ -92,6 +94,7 @@ describe('R01 pilot report on PostgreSQL', () => {
   let pool: Pool
   let provider: PrismaClientProvider
   let transaction: PrismaTransactionAdapter
+  let workspaceMembers: PrismaWorkspaceMemberResolver
   let clock: FakeProductClock
   let planning: PlanningApplication
   let tracking: TrackingApplication
@@ -110,24 +113,24 @@ describe('R01 pilot report on PostgreSQL', () => {
     provider = new PrismaClientProvider(config, context)
     await provider.connect(AbortSignal.timeout(2_000))
     transaction = new PrismaTransactionAdapter(provider, context, config)
-    const members = new PrismaWorkspaceMemberResolver(provider)
+    workspaceMembers = new PrismaWorkspaceMemberResolver(provider)
     clock = new FakeProductClock(new Date('2026-03-30T18:00:00.123Z'))
     planning = createPlanningApplication({
       database: provider,
       transaction,
-      workspaceMembers: members,
+      workspaceMembers,
       clock,
     })
     tracking = createTrackingApplication({
       database: provider,
       transaction,
-      workspaceMembers: members,
+      workspaceMembers,
       clock,
     })
     reporting = createReportingApplication({
       database: provider,
       transaction,
-      workspaceMembers: members,
+      workspaceMembers,
       clock,
     })
   })
@@ -463,5 +466,215 @@ describe('R01 pilot report on PostgreSQL', () => {
         asOfLocalDate: '2026-04-10',
       }),
     ).rejects.toBeInstanceOf(PilotReportSourceInvalidError)
+  })
+
+  it('closes after ordinary grace and serves the immutable report revision', async () => {
+    await resetPair()
+    const fixture = await publishedFixture()
+    const recorded = await record(fixture, 'complete', {
+      kind: 'quantity',
+      value: '100',
+    })
+    clock.set(new Date('2026-05-01T00:00:00.123Z'))
+    const lifecycle = new PrismaDueLifecycleRepository(provider)
+    const worker = createPlanningLifecycleWorker({
+      database: provider,
+      transaction,
+      lifecycle,
+      clock,
+      closeMonthReport: reporting.buildCloseMonthReport,
+    })
+
+    await expect(
+      pool.query(
+        `UPDATE plan_months
+            SET status = 'grace', revision = revision + 1,
+                updated_at = '2026-04-01T00:00:00.000Z'
+          WHERE id = $1::uuid`,
+        [fixture.planMonthId],
+      ),
+    ).rejects.toThrow()
+
+    await worker.tick()
+    await expect(
+      pool.query<{ readonly status: string }>(
+        `SELECT status FROM plan_months WHERE id = $1::uuid`,
+        [fixture.planMonthId],
+      ),
+    ).resolves.toMatchObject({ rows: [{ status: 'grace' }] })
+
+    clock.set(new Date('2026-05-03T18:59:59.999Z'))
+    await worker.tick()
+    await expect(
+      pool.query<{ readonly status: string }>(
+        `SELECT status FROM plan_months WHERE id = $1::uuid`,
+        [fixture.planMonthId],
+      ),
+    ).resolves.toMatchObject({ rows: [{ status: 'grace' }] })
+
+    clock.set(new Date('2026-05-04T00:00:00.123Z'))
+
+    await worker.tick()
+
+    const lifecycleRow = await pool.query<{
+      status: string
+      revision: string
+      facts_revision: string
+    }>(
+      `SELECT status, revision::text, facts_revision::text
+         FROM plan_months WHERE id = $1::uuid`,
+      [fixture.planMonthId],
+    )
+    expect(lifecycleRow.rows).toEqual([
+      { status: 'closed', revision: '4', facts_revision: '1' },
+    ])
+    const revisions = await pool.query<{
+      status: string
+      source_facts_revision: string
+      payload_checksum: string
+    }>(
+      `SELECT status, source_facts_revision::text, payload_checksum
+         FROM report_revisions WHERE plan_month_id = $1::uuid`,
+      [fixture.planMonthId],
+    )
+    expect(revisions.rows).toHaveLength(1)
+    expect(revisions.rows[0]).toMatchObject({
+      status: 'original',
+      source_facts_revision: '1',
+    })
+    expect(revisions.rows[0]!.payload_checksum).toMatch(/^[0-9a-f]{64}$/u)
+
+    await expect(
+      pool.query(
+        `INSERT INTO command_receipts
+          (actor_scope, command_type, command_id, fingerprint,
+           result_kind, aggregate_id, aggregate_revision, completed_at)
+         VALUES
+          ('system:planner-worker', 'planning.close-month.v1', $1::uuid,
+           repeat('a', 64), 'planning.report-revision.v1', $2::uuid, 1,
+           '2026-05-04T00:00:00.123Z')`,
+        [randomUUID(), fixture.planMonthId],
+      ),
+    ).rejects.toThrow(/close receipt requires exact/u)
+
+    const closed = await reporting.buildPilotReport.execute({
+      trustedActor: actor(),
+      targetMonth: '2026-04',
+    })
+    expect(closed.status).toBe('closed')
+    expect(closed.source.factsRevision).toBe(1n)
+    expect(closed.sections).toHaveLength(3)
+
+    await expect(
+      tracking.correctRecord.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        expectedRevision: 1n,
+        payload: {
+          factRecordId: recorded.aggregateId,
+          value: { kind: 'quantity', value: '90' },
+          reason: 'Late correction must be rejected',
+        },
+      }),
+    ).rejects.toThrow()
+
+    await worker.tick()
+    await expect(
+      pool.query(
+        `UPDATE report_revisions
+            SET payload_checksum = repeat('0', 64)
+          WHERE plan_month_id = $1::uuid`,
+        [fixture.planMonthId],
+      ),
+    ).rejects.toThrow(/immutable/u)
+    await pool.query(`
+      BEGIN;
+      ALTER TABLE report_revisions DISABLE TRIGGER USER;
+      UPDATE report_revisions
+         SET payload_checksum = repeat('0', 64)
+       WHERE plan_month_id = '${fixture.planMonthId}'::uuid;
+      ALTER TABLE report_revisions ENABLE TRIGGER USER;
+      COMMIT;
+    `)
+    await expect(
+      reporting.buildPilotReport.execute({
+        trustedActor: actor(),
+        targetMonth: '2026-04',
+      }),
+    ).rejects.toBeInstanceOf(PilotReportSourceInvalidError)
+    const repeated = await pool.query<{ readonly count: string }>(
+      `SELECT count(*)::text count
+         FROM report_revisions WHERE plan_month_id = $1::uuid`,
+      [fixture.planMonthId],
+    )
+    expect(repeated.rows).toEqual([{ count: '1' }])
+  })
+
+  it('serializes a correction racing with close at one facts revision', async () => {
+    await resetPair()
+    const fixture = await publishedFixture()
+    const recorded = await record(fixture, 'complete', {
+      kind: 'quantity',
+      value: '100',
+    })
+    const correctionClock = new FakeProductClock(
+      new Date('2026-05-03T18:59:59.999Z'),
+    )
+    const trackingRace = createTrackingApplication({
+      database: provider,
+      transaction,
+      workspaceMembers,
+      clock: correctionClock,
+    })
+    const closeClock = new FakeProductClock(
+      new Date('2026-05-04T00:00:00.123Z'),
+    )
+    const worker = createPlanningLifecycleWorker({
+      database: provider,
+      transaction,
+      lifecycle: new PrismaDueLifecycleRepository(provider),
+      clock: closeClock,
+      closeMonthReport: reporting.buildCloseMonthReport,
+    })
+
+    const [correction, closing] = await Promise.allSettled([
+      trackingRace.correctRecord.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        expectedRevision: 1n,
+        payload: {
+          factRecordId: recorded.aggregateId,
+          value: { kind: 'quantity', value: '90' },
+          reason: 'Concurrent correction race',
+        },
+      }),
+      worker.tick(),
+    ])
+    expect(closing.status).toBe('fulfilled')
+    await worker.tick()
+
+    const lifecycleRow = await pool.query<{
+      readonly status: string
+      readonly facts_revision: string
+    }>(
+      `SELECT status, facts_revision::text
+         FROM plan_months WHERE id = $1::uuid`,
+      [fixture.planMonthId],
+    )
+    expect(lifecycleRow.rows).toEqual([
+      {
+        status: 'closed',
+        facts_revision: correction.status === 'fulfilled' ? '2' : '1',
+      },
+    ])
+
+    const report = await reporting.buildPilotReport.execute({
+      trustedActor: actor(),
+      targetMonth: '2026-04',
+    })
+    expect(report.status).toBe('closed')
+    expect(report.source.factsRevision).toBe(
+      correction.status === 'fulfilled' ? 2n : 1n,
+    )
   })
 })

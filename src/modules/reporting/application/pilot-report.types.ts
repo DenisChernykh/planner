@@ -32,10 +32,17 @@ export type PilotReportMonthSourceInput = {
 }
 
 export type PilotReportMonthSourceV1 = {
-  readonly source: PilotReportSourceV1
-  readonly lifecycleStatus: 'published' | 'grace'
   readonly activeLocalDate: string
-}
+} & (
+  | {
+      readonly source: PilotReportSourceV1
+      readonly lifecycleStatus: 'published' | 'grace'
+    }
+  | {
+      readonly storedReport: PilotReportReadModelV1
+      readonly lifecycleStatus: 'closed'
+    }
+)
 
 export type PilotReportFormulaVersionsV1 = {
   readonly calendar: 'planner.calendar-targets.v1'
@@ -169,7 +176,7 @@ export type PilotReportReadSectionV1 = Omit<PilotReportSectionV1, 'goals'> & {
 
 export type PilotReportReadModelV1 = {
   readonly schemaVersion: typeof PILOT_REPORT_READ_SCHEMA_VERSION
-  readonly status: 'current' | 'preliminary'
+  readonly status: 'current' | 'preliminary' | 'closed'
   readonly source: PilotReportV1['source']
   readonly sections: readonly [
     PilotReportReadSectionV1,

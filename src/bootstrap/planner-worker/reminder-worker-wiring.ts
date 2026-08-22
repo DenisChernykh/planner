@@ -1,4 +1,4 @@
-type PlanningTick = { tick(): Promise<void> }
+type PlanningTick = { tick(signal: AbortSignal): Promise<void> }
 type ReminderTick = { execute(signal: AbortSignal): Promise<unknown> }
 
 export function composePlannerWorkerTick(
@@ -6,7 +6,7 @@ export function composePlannerWorkerTick(
   reminders: ReminderTick,
 ): (signal: AbortSignal) => Promise<void> {
   return async (signal: AbortSignal): Promise<void> => {
-    await planning.tick()
+    await planning.tick(signal)
     await reminders.execute(signal)
   }
 }

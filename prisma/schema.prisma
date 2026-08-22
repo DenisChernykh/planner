@@ -167,6 +167,7 @@ model PlanMonth {
   seedConsumption   PlanningSeedConsumption?
   factRecords       TrackingFactRecord[]
   trackingActions   TrackingActionGroup[]
+  reportRevisions   ReportRevision[]
 
   @@unique([spaceId, monthStart])
   @@unique([spaceId, id])
@@ -572,11 +573,34 @@ model PlanPublication {
   factRecords     TrackingFactRecord[]
   trackingActions TrackingActionGroup[]
   dayClosures     TrackingDayClosure[]
+  reportRevisions ReportRevision[]
 
   @@unique([planMonthId, publicationRevision], map: "plan_publications_month_revision_key")
   @@unique([planMonthId, id], map: "plan_publications_month_id_key")
   @@unique([spaceId, id], map: "plan_publications_space_id_key")
   @@map("plan_publications")
+}
+
+model ReportRevision {
+  id                      String   @id @default(uuid()) @db.Uuid
+  planMonthId             String   @map("plan_month_id") @db.Uuid
+  publicationId          String   @map("publication_id") @db.Uuid
+  revision                BigInt   @db.BigInt
+  publicationSnapshotHash String   @map("publication_snapshot_hash") @db.Char(64)
+  sourceFactsRevision     BigInt   @map("source_facts_revision") @db.BigInt
+  formulaVersion          String   @map("formula_version") @db.VarChar(128)
+  payload                 Json     @db.JsonB
+  payloadChecksum         String   @map("payload_checksum") @db.Char(64)
+  status                  String   @db.VarChar(16)
+  createdAt               DateTime @map("created_at") @db.Timestamptz(3)
+  createdBySystemActorId  String   @map("created_by_system_actor_id") @db.VarChar(32)
+
+  planMonth    PlanMonth       @relation(fields: [planMonthId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  publication  PlanPublication @relation(fields: [publicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([planMonthId, revision], map: "report_revisions_month_revision_key")
+  @@index([planMonthId, status], map: "report_revisions_month_status_idx")
+  @@map("report_revisions")
 }
 
 model PlanGoalSnapshot {

@@ -5,9 +5,11 @@ import type { DatabaseTransactionPort } from '@/shared/application/database-tran
 import type { ProductClock } from '@/shared/application/product-clock'
 
 import { BuildPilotReportQuery } from '../application/build-pilot-report.query'
+import { BuildPilotReportRevision } from '../application/build-pilot-report-revision'
 import { CalculatePilotReportUseCase } from '../application/calculate-pilot-report.use-case'
 import type { ReportingApplication } from '../application/reporting-application'
 import { PrismaPilotReportReadRepository } from '../infrastructure/prisma-pilot-report-read.repository'
+import { PrismaReportRevisionPersistence } from '../infrastructure/prisma-report-revision.persistence'
 
 export function createReportingApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -30,6 +32,10 @@ export function createReportingApplication(dependencies: {
       reports,
       dependencies.transaction,
       dependencies.clock,
+    ),
+    buildCloseMonthReport: new BuildPilotReportRevision(
+      reports,
+      new PrismaReportRevisionPersistence(dependencies.database),
     ),
   })
 }

@@ -541,7 +541,7 @@ function installReportingSchemas(document: OpenAPIObject): void {
         type: 'string',
         enum: ['reporting.pilot-report-read.v1'],
       },
-      status: { type: 'string', enum: ['current', 'preliminary'] },
+      status: { type: 'string', enum: ['current', 'preliminary', 'closed'] },
       source: ref('ReportingPilotSourceV1'),
       sections: {
         type: 'array',
@@ -558,7 +558,7 @@ export const REPORTING_OPENAPI_CONTRIBUTION: OpenApiDocumentContribution = {
   tags: [
     {
       name: 'reporting',
-      description: 'Current and preliminary pilot report read models.',
+      description: 'Current, preliminary and closed pilot report read models.',
     },
   ],
   install: installReportingSchemas,

@@ -1,4 +1,5 @@
 import { createPlanningLifecycleWorker } from '@/modules/planning'
+import { createReportingApplication } from '@/modules/reporting'
 import { createTrackingApplication } from '@/modules/tracking'
 import { createRemindersApplication } from '@/modules/reminders'
 import { createWorkspaceMemberResolver } from '@/modules/workspace'
@@ -12,6 +13,12 @@ import { SystemProductClock } from '@/platform/time/system-product-clock'
 import { composePlannerWorkerTick } from './reminder-worker-wiring'
 
 import type { ObservabilityRuntime } from '@/platform/observability/observability.runtime'
+import type { DatabaseTransactionPort } from '@/shared/application/database-transaction.port'
+import type { ProductClock } from '@/shared/application/product-clock'
+
+type CloseMonthReportParticipant = NonNullable<
+  Parameters<typeof createPlanningLifecycleWorker>[0]['closeMonthReport']
+>
 
 export interface ConfiguredPlannerWorker {
   readonly application: { close(): Promise<void> }
@@ -26,6 +33,25 @@ export class PlannerWorkerStartupCleanupError extends AggregateError {
     )
     this.name = 'PlannerWorkerStartupCleanupError'
   }
+}
+
+export function createPlannerWorkerPlanningDependencies(input: {
+  readonly database: PrismaClientProvider
+  readonly transaction: DatabaseTransactionPort
+  readonly clock: ProductClock
+  readonly closeMonthReport: CloseMonthReportParticipant
+}): {
+  readonly database: PrismaClientProvider
+  readonly transaction: DatabaseTransactionPort
+  readonly clock: ProductClock
+  readonly closeMonthReport: CloseMonthReportParticipant
+} {
+  return Object.freeze({
+    database: input.database,
+    transaction: input.transaction,
+    clock: input.clock,
+    closeMonthReport: input.closeMonthReport,
+  })
 }
 
 function startupAbortError(signal: AbortSignal): Error {
@@ -48,12 +74,21 @@ export async function configurePlannerWorker(
     databaseConfig,
   )
   const clock = new SystemProductClock()
-  const worker = createPlanningLifecycleWorker({
+  const workspaceMembers = createWorkspaceMemberResolver(database)
+  const reporting = createReportingApplication({
     database,
     transaction,
+    workspaceMembers,
     clock,
   })
-  const workspaceMembers = createWorkspaceMemberResolver(database)
+  const worker = createPlanningLifecycleWorker(
+    createPlannerWorkerPlanningDependencies({
+      database,
+      transaction,
+      clock,
+      closeMonthReport: reporting.buildCloseMonthReport,
+    }),
+  )
   const tracking = createTrackingApplication({
     database,
     transaction,

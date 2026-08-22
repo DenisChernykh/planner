@@ -1199,7 +1199,8 @@
           "status": {
             "enum": [
               "current",
-              "preliminary"
+              "preliminary",
+              "closed"
             ],
             "type": "string"
           }
@@ -14255,7 +14256,7 @@
             "sessionCookie": []
           }
         ],
-        "summary": "Read the current pilot report for a month.",
+        "summary": "Read the pilot report for a month.",
         "tags": [
           "reporting"
         ]
@@ -19585,7 +19586,7 @@
       "name": "reminders"
     },
     {
-      "description": "Current and preliminary pilot report read models.",
+      "description": "Current, preliminary and closed pilot report read models.",
       "name": "reporting"
     }
   ]
