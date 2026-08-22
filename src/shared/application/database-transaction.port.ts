@@ -1,6 +1,13 @@
+export type DatabaseTransactionOptions = {
+  readonly mode?: 'default' | 'repeatable_read_only'
+}
+
 /** Runs one application operation inside a module-local database transaction. */
 export interface DatabaseTransactionPort {
-  run<T>(operation: () => Promise<T>): Promise<T>
+  run<T>(
+    operation: () => Promise<T>,
+    options?: DatabaseTransactionOptions,
+  ): Promise<T>
 }
 
 /** Injection token for later product-module transaction participants. */

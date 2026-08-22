@@ -107,6 +107,13 @@ export class TrackingDependencyUnavailableError extends Error {
   }
 }
 
+export class TrackingProgressSourceInvalidError extends Error {
+  public constructor(options?: ErrorOptions) {
+    super('Stored goal progress source is invalid', options)
+    this.name = 'TrackingProgressSourceInvalidError'
+  }
+}
+
 export class CloseDayTargetNotFoundError extends Error {
   public constructor() {
     super('CloseDay target was not found')

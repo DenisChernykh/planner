@@ -1,7 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import type { DatabaseRuntimeConfig } from '@/platform/config/runtime-config.types'
-import type { DatabaseTransactionPort } from '@/shared/application/database-transaction.port'
+import type {
+  DatabaseTransactionOptions,
+  DatabaseTransactionPort,
+} from '@/shared/application/database-transaction.port'
 
 import { DATABASE_RUNTIME_CONFIG } from './database.tokens'
 import { PrismaClientProvider } from './prisma-client.provider'
@@ -18,11 +21,22 @@ export class PrismaTransactionAdapter implements DatabaseTransactionPort {
     private readonly config: { readonly database: DatabaseRuntimeConfig },
   ) {}
 
-  public run<T>(operation: () => Promise<T>): Promise<T> {
+  public run<T>(
+    operation: () => Promise<T>,
+    options?: DatabaseTransactionOptions,
+  ): Promise<T> {
     return this.provider.withClient((client) =>
       this.context.run(client, operation, {
         maxWait: this.config.database.transactionMaxWaitMs,
         timeout: this.config.database.transactionTimeoutMs,
+        beforeOperation:
+          options?.mode === 'repeatable_read_only'
+            ? async (transactionClient) => {
+                await transactionClient.$executeRawUnsafe(
+                  'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+                )
+              }
+            : undefined,
       }),
     )
   }

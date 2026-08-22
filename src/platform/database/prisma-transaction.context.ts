@@ -11,6 +11,13 @@ interface ActiveTransaction {
   rollbackCause?: unknown
 }
 
+export interface PrismaTransactionRunOptions {
+  readonly maxWait: number
+  readonly timeout: number
+  readonly beforeOperation?:
+    ((client: Prisma.TransactionClient) => Promise<void>) | undefined
+}
+
 @Injectable()
 export class PrismaTransactionContext {
   private readonly storage = new AsyncLocalStorage<ActiveTransaction>()
@@ -25,7 +32,7 @@ export class PrismaTransactionContext {
   public run<T>(
     root: PrismaClient | Prisma.TransactionClient,
     operation: () => Promise<T>,
-    options: { readonly maxWait: number; readonly timeout: number },
+    options: PrismaTransactionRunOptions,
   ): Promise<T> {
     const active = this.storage.getStore()
     if (active !== undefined) return this.runNested(active, operation)
@@ -33,8 +40,8 @@ export class PrismaTransactionContext {
       return Promise.reject(new Error('Root Prisma Client is required'))
     }
     return root.$transaction(
-      (client) => this.runOuter(client, operation),
-      options,
+      (client) => this.runOuter(client, operation, options.beforeOperation),
+      { maxWait: options.maxWait, timeout: options.timeout },
     )
   }
 
@@ -54,9 +61,11 @@ export class PrismaTransactionContext {
   private runOuter<T>(
     client: Prisma.TransactionClient,
     operation: () => Promise<T>,
+    beforeOperation?: (client: Prisma.TransactionClient) => Promise<void>,
   ): Promise<T> {
     const active: ActiveTransaction = { client, rollbackOnly: false }
     return this.storage.run(active, async () => {
+      await beforeOperation?.(client)
       const result = await operation()
       if (active.rollbackOnly) {
         throw new DatabaseTransactionRollbackOnlyError(active.rollbackCause)

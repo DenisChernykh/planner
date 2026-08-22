@@ -29,6 +29,7 @@ import {
   FactUndoUnavailableError,
   FactValueInvalidError,
   TrackingAuthorizationDeniedError,
+  TrackingProgressSourceInvalidError,
 } from '../application/tracking-errors'
 import type {
   FactStateV1,
@@ -1610,13 +1611,6 @@ export class PrismaFactPersistence implements FactPersistencePort {
       `
       const header = headers[0]
       if (header === undefined) return null
-      if (
-        header.calendar_formula_version !== 'planner.calendar-targets.v1' ||
-        header.evaluation_formula_version !== 'planner.goal-evaluation.v1'
-      ) {
-        throw new Error('Published formula versions are unsupported')
-      }
-      const projected = projectEvaluationSnapshot(header.config)
       const rows = await client.$queryRaw<ProgressFactRow[]>`
         SELECT record.id::text fact_record_id, record.fact_kind,
                record.local_date::text, record.contribution_id::text,
@@ -1664,141 +1658,152 @@ export class PrismaFactPersistence implements FactPersistencePort {
          ORDER BY record.local_date, expectation.component_kind,
                   expectation.component_id, record.created_at, record.id
       `
-
-      const groups = new Map<string, ProgressFactRow[]>()
-      for (const row of rows) {
-        const key =
-          row.component_kind === 'checklist_item'
-            ? [row.local_date, 'top-level-checklist'].join(':')
-            : [
-                row.local_date,
-                row.fixed_expectation_id ?? '',
-                row.flexible_period_id ?? '',
-                row.component_kind ?? '',
-                row.component_id ?? '',
-              ].join(':')
-        const group = groups.get(key)
-        if (group === undefined) groups.set(key, [row])
-        else group.push(row)
-      }
-
-      const facts: GoalEvaluationFactV1[] = []
-      const checkpointsByDate = new Map<
-        string,
-        { readonly checkpointId: string; readonly value: GoalFactValueV1 }[]
-      >()
-      for (const group of groups.values()) {
-        const first = group[0]!
-        if (first.component_kind === 'checklist_item') {
-          group.sort(
-            (left, right) =>
-              (projected.checklistItemOrder.get(
-                left.checklist_item_id ?? left.component_id ?? '',
-              ) ?? -1) -
-              (projected.checklistItemOrder.get(
-                right.checklist_item_id ?? right.component_id ?? '',
-              ) ?? -1),
-          )
-        } else if (first.fact_kind === 'or_variant') {
-          group.sort(
-            (left, right) =>
-              (projected.variantOrder.get(left.or_variant_id ?? '') ?? -1) -
-              (projected.variantOrder.get(right.or_variant_id ?? '') ?? -1),
-          )
-        }
-        const value = projectFactValue(group)
-        if (first.component_kind === 'checkpoint') {
-          if (first.component_id === null) {
-            throw new Error('Stored checkpoint fact identity is invalid')
-          }
-          const values = checkpointsByDate.get(first.local_date)
-          const checkpoint = { checkpointId: first.component_id, value }
-          if (values === undefined) {
-            checkpointsByDate.set(first.local_date, [checkpoint])
-          } else values.push(checkpoint)
-        } else if (first.fixed_expectation_id !== null) {
-          if (
-            first.component_kind !== 'checklist_item' &&
-            (first.component_kind !== 'goal' || first.component_id !== null)
-          ) {
-            throw new Error('Stored fixed fact identity is invalid')
-          }
-          facts.push({
-            kind: 'fixed',
-            expectationDate: first.local_date,
-            value,
-          })
-        } else if (
-          first.fact_kind === 'weekly_task_result' &&
-          first.flexible_period_id !== null &&
-          first.period_start !== null &&
-          first.period_end !== null &&
-          value.kind === 'boolean'
+      try {
+        if (
+          header.calendar_formula_version !== 'planner.calendar-targets.v1' ||
+          header.evaluation_formula_version !== 'planner.goal-evaluation.v1'
         ) {
-          facts.push({
-            kind: 'weekly_planned_task',
-            periodStart: first.period_start,
-            periodEnd: first.period_end,
-            result: value.result,
-          })
-        } else if (first.flexible_period_id !== null) {
-          facts.push({
-            kind: 'quota_occurrence',
-            localDate: first.local_date,
-            value,
-          })
-        } else {
-          throw new Error('Stored fact calendar identity is invalid')
+          throw new Error('Published formula versions are unsupported')
         }
-      }
-      for (const [expectationDate, checkpoints] of checkpointsByDate) {
-        checkpoints.sort(
-          (left, right) =>
-            (projected.checkpointOrder.get(left.checkpointId) ?? -1) -
-            (projected.checkpointOrder.get(right.checkpointId) ?? -1),
-        )
-        facts.push({
-          kind: 'fixed_checkpoints',
-          expectationDate,
-          checkpoints,
-        })
-      }
-      facts.sort((left, right) => {
-        const leftDate =
-          left.kind === 'fixed' || left.kind === 'fixed_checkpoints'
-            ? left.expectationDate
-            : left.kind === 'quota_occurrence'
-              ? left.localDate
-              : left.periodStart
-        const rightDate =
-          right.kind === 'fixed' || right.kind === 'fixed_checkpoints'
-            ? right.expectationDate
-            : right.kind === 'quota_occurrence'
-              ? right.localDate
-              : right.periodStart
-        return (
-          leftDate.localeCompare(rightDate) ||
-          left.kind.localeCompare(right.kind)
-        )
-      })
+        const projected = projectEvaluationSnapshot(header.config)
+        const groups = new Map<string, ProgressFactRow[]>()
+        for (const row of rows) {
+          const key =
+            row.component_kind === 'checklist_item'
+              ? [row.local_date, 'top-level-checklist'].join(':')
+              : [
+                  row.local_date,
+                  row.fixed_expectation_id ?? '',
+                  row.flexible_period_id ?? '',
+                  row.component_kind ?? '',
+                  row.component_id ?? '',
+                ].join(':')
+          const group = groups.get(key)
+          if (group === undefined) groups.set(key, [row])
+          else group.push(row)
+        }
 
-      return freeze({
-        snapshot: projected.snapshot,
-        calendarInput: {
-          targetMonth: header.target_month,
-          activeLocalDate: header.active_local_date,
-          timeZone: 'Asia/Yekaterinburg',
-          repetition: projected.repetition,
-        },
-        calendar: {
-          formulaVersion: 'planner.calendar-targets.v1',
-          eligible: true,
-          calendar: header.calendar,
-          issues: [],
-        } as SuccessfulEligibleCalendarResult,
-        facts,
-        asOfLocalDate: input.asOfLocalDate,
-      })
+        const facts: GoalEvaluationFactV1[] = []
+        const checkpointsByDate = new Map<
+          string,
+          { readonly checkpointId: string; readonly value: GoalFactValueV1 }[]
+        >()
+        for (const group of groups.values()) {
+          const first = group[0]!
+          if (first.component_kind === 'checklist_item') {
+            group.sort(
+              (left, right) =>
+                (projected.checklistItemOrder.get(
+                  left.checklist_item_id ?? left.component_id ?? '',
+                ) ?? -1) -
+                (projected.checklistItemOrder.get(
+                  right.checklist_item_id ?? right.component_id ?? '',
+                ) ?? -1),
+            )
+          } else if (first.fact_kind === 'or_variant') {
+            group.sort(
+              (left, right) =>
+                (projected.variantOrder.get(left.or_variant_id ?? '') ?? -1) -
+                (projected.variantOrder.get(right.or_variant_id ?? '') ?? -1),
+            )
+          }
+          const value = projectFactValue(group)
+          if (first.component_kind === 'checkpoint') {
+            if (first.component_id === null) {
+              throw new Error('Stored checkpoint fact identity is invalid')
+            }
+            const values = checkpointsByDate.get(first.local_date)
+            const checkpoint = { checkpointId: first.component_id, value }
+            if (values === undefined) {
+              checkpointsByDate.set(first.local_date, [checkpoint])
+            } else values.push(checkpoint)
+          } else if (first.fixed_expectation_id !== null) {
+            if (
+              first.component_kind !== 'checklist_item' &&
+              (first.component_kind !== 'goal' || first.component_id !== null)
+            ) {
+              throw new Error('Stored fixed fact identity is invalid')
+            }
+            facts.push({
+              kind: 'fixed',
+              expectationDate: first.local_date,
+              value,
+            })
+          } else if (
+            first.fact_kind === 'weekly_task_result' &&
+            first.flexible_period_id !== null &&
+            first.period_start !== null &&
+            first.period_end !== null &&
+            value.kind === 'boolean'
+          ) {
+            facts.push({
+              kind: 'weekly_planned_task',
+              periodStart: first.period_start,
+              periodEnd: first.period_end,
+              result: value.result,
+            })
+          } else if (first.flexible_period_id !== null) {
+            facts.push({
+              kind: 'quota_occurrence',
+              localDate: first.local_date,
+              value,
+            })
+          } else {
+            throw new Error('Stored fact calendar identity is invalid')
+          }
+        }
+        for (const [expectationDate, checkpoints] of checkpointsByDate) {
+          checkpoints.sort(
+            (left, right) =>
+              (projected.checkpointOrder.get(left.checkpointId) ?? -1) -
+              (projected.checkpointOrder.get(right.checkpointId) ?? -1),
+          )
+          facts.push({
+            kind: 'fixed_checkpoints',
+            expectationDate,
+            checkpoints,
+          })
+        }
+        facts.sort((left, right) => {
+          const leftDate =
+            left.kind === 'fixed' || left.kind === 'fixed_checkpoints'
+              ? left.expectationDate
+              : left.kind === 'quota_occurrence'
+                ? left.localDate
+                : left.periodStart
+          const rightDate =
+            right.kind === 'fixed' || right.kind === 'fixed_checkpoints'
+              ? right.expectationDate
+              : right.kind === 'quota_occurrence'
+                ? right.localDate
+                : right.periodStart
+          return (
+            leftDate.localeCompare(rightDate) ||
+            left.kind.localeCompare(right.kind)
+          )
+        })
+
+        return freeze({
+          snapshot: projected.snapshot,
+          calendarInput: {
+            targetMonth: header.target_month,
+            activeLocalDate: header.active_local_date,
+            timeZone: 'Asia/Yekaterinburg',
+            repetition: projected.repetition,
+          },
+          calendar: {
+            formulaVersion: 'planner.calendar-targets.v1',
+            eligible: true,
+            calendar: header.calendar,
+            issues: [],
+          } as SuccessfulEligibleCalendarResult,
+          facts,
+          asOfLocalDate: input.asOfLocalDate,
+        })
+      } catch (error: unknown) {
+        if (error instanceof TrackingProgressSourceInvalidError) throw error
+        throw new TrackingProgressSourceInvalidError({ cause: error })
+      }
     })
   }
 
