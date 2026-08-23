@@ -8,7 +8,9 @@ ENV HUSKY=0
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    corepack pnpm@11.15.1 install --frozen-lockfile --store-dir=/pnpm/store
+    corepack enable && \
+    corepack install --global pnpm@11.15.1 && \
+    pnpm install --frozen-lockfile --store-dir=/pnpm/store
 
 FROM dependencies AS source
 COPY --chown=node:node prisma.config.ts nest-cli.json tsconfig.base.json tsconfig.json tsconfig.build.json ./
@@ -25,11 +27,12 @@ EXPOSE 3000
 CMD ["pnpm", "build:compiled"]
 
 FROM source AS build
-RUN corepack pnpm@11.15.1 run build:compiled && \
-    CI=true corepack pnpm@11.15.1 prune --prod
+RUN pnpm run build:compiled && \
+    CI=true pnpm prune --prod
 
 FROM ${NODE_IMAGE} AS runtime
-RUN corepack install --global pnpm@11.15.1 && \
+RUN corepack enable && \
+    corepack install --global pnpm@11.15.1 && \
     rm -rf /usr/local/lib/node_modules/npm && \
     rm -f /usr/local/bin/npm /usr/local/bin/npx
 ENV NODE_ENV=production \

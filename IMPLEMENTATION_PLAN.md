@@ -2346,17 +2346,19 @@ bounded shutdown; data restore выделен в O02.
 
 **Files:**
 
+- Modify: `Dockerfile`
 - Modify: `docker-compose.yml`
+- Create: `.dockerignore`
 - Create: `docs/runbooks/planner-local-operations.md`
 - Create: `scripts/smoke/planner-runtime-smoke.ts`
 - Create: `docs/evidence/local-runtime-smoke.md`
 
-- [ ] Проверить `api + planner-worker + migrator + PostgreSQL + auth Redis`,
+- [x] Проверить `api + planner-worker + migrator + PostgreSQL + auth Redis`,
   readiness, bounded shutdown and restart.
-- [ ] Зафиксировать границу evidence: local smoke не доказывает HTTPS,
+- [x] Зафиксировать границу evidence: local smoke не доказывает HTTPS,
   BotFather settings, hosted OIDC/Telegram or production ingress.
-- [ ] Запустить Docker smoke and `pnpm check`.
-- [ ] Commit: `test: verify local planner runtime composition`.
+- [x] Запустить Docker smoke and `pnpm check`.
+- [x] Commit: `test: verify local planner runtime composition`.
 
 ### O02 — Separate-database restore drill
 

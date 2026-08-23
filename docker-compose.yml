@@ -1,5 +1,5 @@
 x-runtime-image: &runtime-image
-  image: planner:local
+  image: ${PLANNER_RUNTIME_IMAGE:-planner:local}
   build:
     context: .
     target: runtime
@@ -62,6 +62,8 @@ services:
 
   api:
     <<: *runtime-image
+    restart: unless-stopped
+    stop_grace_period: 15s
     environment:
       NODE_ENV: development
       API_HOST: 0.0.0.0
@@ -96,7 +98,8 @@ services:
 
   planner-worker:
     <<: *runtime-image
-    command: ['pnpm', 'start:planner-worker']
+    command: ['node', 'dist/bootstrap/planner-worker/main.js']
+    stop_grace_period: 15s
     environment:
       DATABASE_URL: *database-url
       PLANNER_WORKER_INTERVAL_MS: 30000

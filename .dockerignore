@@ -1,0 +1,15 @@
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!prisma.config.ts
+!nest-cli.json
+!tsconfig.base.json
+!tsconfig.json
+!tsconfig.build.json
+!prisma
+!prisma/**
+!src
+!src/**
