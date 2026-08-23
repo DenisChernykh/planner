@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 
-import type { CloseMonthReport } from '@/modules/planning/application/close-month.command'
+import type {
+  CloseMonthReport,
+  CloseMonthReportPersistenceInput,
+} from '@/modules/planning/application/close-month.command'
 import type { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 import { reportPayloadChecksum } from '@/shared/application/report-payload-integrity'
 
@@ -11,10 +14,7 @@ export class PrismaReportRevisionPersistence implements PilotReportRevisionPersi
 
   public append(input: {
     readonly report: CloseMonthReport
-    readonly input: {
-      readonly publicationSnapshotHash: string
-      readonly occurredAt: Date
-    }
+    readonly input: CloseMonthReportPersistenceInput
   }): Promise<{
     readonly reportRevisionId: string
     readonly revision: bigint
@@ -35,7 +35,7 @@ export class PrismaReportRevisionPersistence implements PilotReportRevisionPersi
           (id, plan_month_id, publication_id, revision,
            publication_snapshot_hash, source_facts_revision, formula_version,
            payload, payload_checksum, status, created_at,
-           created_by_system_actor_id)
+           created_by_system_actor_id, created_by_member_id)
         VALUES
           (${reportRevisionId}::uuid, ${input.report.planMonthId}::uuid,
            ${input.report.publicationId}::uuid, ${revision},
@@ -44,8 +44,18 @@ export class PrismaReportRevisionPersistence implements PilotReportRevisionPersi
            ${JSON.stringify(input.report.payload, (_key, value: unknown) =>
              typeof value === 'bigint' ? value.toString(10) : value,
            )}::jsonb,
-           ${reportPayloadChecksum(input.report.payload)}, 'original',
-           ${input.input.occurredAt}, 'planner-worker')
+           ${reportPayloadChecksum(input.report.payload)},
+           ${input.input.revisionStatus}, ${input.input.occurredAt},
+           ${
+             input.input.createdBy.kind === 'system'
+               ? input.input.createdBy.id
+               : null
+           },
+           ${
+             input.input.createdBy.kind === 'member'
+               ? input.input.createdBy.id
+               : null
+           }::uuid)
       `
       return {
         reportRevisionId,

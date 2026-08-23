@@ -76,7 +76,10 @@ function freeze<T>(value: T): T {
 
 type DatabaseClient = PrismaClient | Prisma.TransactionClient
 
-function restoreStoredReport(value: unknown): PilotReportReadModelV1 {
+function restoreStoredReport(
+  value: unknown,
+  expectedStatus: 'original' | 'revised',
+): PilotReportReadModelV1 {
   if (value === null || typeof value !== 'object') {
     throw new PilotReportSourceInvalidError()
   }
@@ -85,7 +88,7 @@ function restoreStoredReport(value: unknown): PilotReportReadModelV1 {
   if (
     sourceValue === null ||
     typeof sourceValue !== 'object' ||
-    payload.status !== 'closed'
+    payload.status !== (expectedStatus === 'original' ? 'closed' : 'revised')
   ) {
     throw new PilotReportSourceInvalidError()
   }
@@ -99,7 +102,7 @@ function restoreStoredReport(value: unknown): PilotReportReadModelV1 {
   try {
     return freeze({
       ...payload,
-      status: 'closed' as const,
+      status: expectedStatus === 'original' ? 'closed' : 'revised',
       source: {
         ...source,
         publicationRevision: BigInt(source.publicationRevision),
@@ -138,6 +141,7 @@ export class PrismaPilotReportReadRepository
           readonly lifecycle_status: 'published' | 'grace' | 'closed'
           readonly active_local_date: string
           readonly report_payload: Prisma.JsonValue
+          readonly report_status: 'original' | 'revised' | null
           readonly report_publication_snapshot_hash: string | null
           readonly report_payload_checksum: string | null
         }[]
@@ -147,14 +151,22 @@ export class PrismaPilotReportReadRepository
                month.status lifecycle_status,
                publication.active_local_date::text active_local_date,
                revision.payload report_payload,
+               revision.status report_status,
                revision.publication_snapshot_hash report_publication_snapshot_hash,
                revision.payload_checksum report_payload_checksum
           FROM plan_months month
           JOIN plan_publications publication
             ON publication.id = month.active_publication_id
-          LEFT JOIN report_revisions revision
-            ON revision.plan_month_id = month.id
-           AND revision.status = 'original'
+          LEFT JOIN LATERAL (
+            SELECT candidate.payload,
+                   candidate.status,
+                   candidate.publication_snapshot_hash,
+                   candidate.payload_checksum
+              FROM report_revisions candidate
+             WHERE candidate.plan_month_id = month.id
+             ORDER BY candidate.revision DESC
+             LIMIT 1
+          ) revision ON TRUE
          WHERE month.space_id = ${input.spaceId}::uuid
            AND month.month_start = ${`${input.targetMonth}-01`}::date
            AND month.status IN ('published', 'grace', 'closed')
@@ -165,6 +177,7 @@ export class PrismaPilotReportReadRepository
       if (row.lifecycle_status === 'closed') {
         if (
           row.report_payload === null ||
+          row.report_status === null ||
           row.report_publication_snapshot_hash !==
             row.publication_snapshot_hash ||
           row.report_payload_checksum === null ||
@@ -175,7 +188,10 @@ export class PrismaPilotReportReadRepository
           throw new PilotReportSourceInvalidError()
         }
         return freeze({
-          storedReport: restoreStoredReport(row.report_payload),
+          storedReport: restoreStoredReport(
+            row.report_payload,
+            row.report_status,
+          ),
           lifecycleStatus: 'closed' as const,
           activeLocalDate: row.active_local_date,
         })

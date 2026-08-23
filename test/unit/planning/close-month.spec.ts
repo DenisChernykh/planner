@@ -84,6 +84,8 @@ describe('L01 CloseMonth application contract', () => {
         ...command().payload,
         commandId,
         occurredAt: new Date('2026-04-04T00:00:00.000Z'),
+        revisionStatus: 'original',
+        createdBy: { kind: 'system', id: 'planner-worker' },
       },
     ])
   })

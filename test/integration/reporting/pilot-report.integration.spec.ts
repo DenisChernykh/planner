@@ -24,6 +24,10 @@ import {
 } from '@/modules/tracking'
 import { PrismaWorkspaceMemberResolver } from '@/modules/workspace/infrastructure/prisma-workspace-member.resolver'
 import { PrismaDueLifecycleRepository } from '@/modules/planning/infrastructure/due-lifecycle.repository'
+import {
+  PlanMonthRecloseConflictError,
+  PlanMonthRevisionConflictError,
+} from '@/modules/planning/application/planning-errors'
 import { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 import { PrismaTransactionAdapter } from '@/platform/database/prisma-transaction.adapter'
 import { PrismaTransactionContext } from '@/platform/database/prisma-transaction.context'
@@ -115,12 +119,6 @@ describe('R01 pilot report on PostgreSQL', () => {
     transaction = new PrismaTransactionAdapter(provider, context, config)
     workspaceMembers = new PrismaWorkspaceMemberResolver(provider)
     clock = new FakeProductClock(new Date('2026-03-30T18:00:00.123Z'))
-    planning = createPlanningApplication({
-      database: provider,
-      transaction,
-      workspaceMembers,
-      clock,
-    })
     tracking = createTrackingApplication({
       database: provider,
       transaction,
@@ -132,6 +130,13 @@ describe('R01 pilot report on PostgreSQL', () => {
       transaction,
       workspaceMembers,
       clock,
+    })
+    planning = createPlanningApplication({
+      database: provider,
+      transaction,
+      workspaceMembers,
+      clock,
+      closeMonthReport: reporting.buildCloseMonthReport,
     })
   })
 
@@ -675,6 +680,430 @@ describe('R01 pilot report on PostgreSQL', () => {
     expect(report.status).toBe('closed')
     expect(report.source.factsRevision).toBe(
       correction.status === 'fulfilled' ? 2n : 1n,
+    )
+  })
+
+  it('recloses a reopened month with an immutable member-authored revision', async () => {
+    await resetPair()
+    const fixture = await publishedFixture()
+    const recorded = await record(fixture, 'complete', {
+      kind: 'quantity',
+      value: '100',
+    })
+    clock.set(new Date('2026-05-04T00:00:00.123Z'))
+    const worker = createPlanningLifecycleWorker({
+      database: provider,
+      transaction,
+      lifecycle: new PrismaDueLifecycleRepository(provider),
+      clock,
+      closeMonthReport: reporting.buildCloseMonthReport,
+    })
+    await worker.tick()
+
+    const reopened = await planning.reopenMonth.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: 4n,
+      payload: {
+        planMonthId: fixture.planMonthId,
+        reason: 'Сверили фактическое значение.',
+      },
+    })
+    expect(reopened.aggregateRevision).toBe(5n)
+    await tracking.correctRecord.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: 1n,
+      payload: {
+        factRecordId: recorded.aggregateId,
+        value: { kind: 'quantity', value: '90' },
+        reason: 'Исправление после сверки.',
+      },
+    })
+
+    const commandId = randomUUID()
+    const input = {
+      commandId,
+      trustedActor: actor(),
+      expectedRevision: 5n,
+      payload: { planMonthId: fixture.planMonthId },
+    }
+    const result = await planning.recloseMonth.execute(input)
+    expect(result).toMatchObject({
+      kind: 'planning.report-revision.v1',
+      aggregateRevision: 2n,
+    })
+    await expect(planning.recloseMonth.execute(input)).resolves.toEqual(result)
+
+    const month = await pool.query(
+      `SELECT status, lifecycle_mode, revision::text, facts_revision::text
+         FROM plan_months WHERE id = $1::uuid`,
+      [fixture.planMonthId],
+    )
+    expect(month.rows).toEqual([
+      {
+        status: 'closed',
+        lifecycle_mode: 'reopened',
+        revision: '6',
+        facts_revision: '2',
+      },
+    ])
+    const revisions = await pool.query<{
+      readonly revision: string
+      readonly status: string
+      readonly source_facts_revision: string
+      readonly payload_checksum: string
+      readonly created_by_system_actor_id: string | null
+      readonly created_by_member_id: string | null
+    }>(
+      `SELECT revision::text, status, source_facts_revision::text,
+              payload_checksum, created_by_system_actor_id,
+              created_by_member_id::text
+         FROM report_revisions
+        WHERE plan_month_id = $1::uuid
+        ORDER BY revision`,
+      [fixture.planMonthId],
+    )
+    expect(revisions.rows).toHaveLength(2)
+    expect(revisions.rows[0]).toMatchObject({
+      revision: '1',
+      status: 'original',
+      source_facts_revision: '1',
+      created_by_system_actor_id: 'planner-worker',
+      created_by_member_id: null,
+    })
+    expect(revisions.rows[1]).toMatchObject({
+      revision: '2',
+      status: 'revised',
+      source_facts_revision: '2',
+      created_by_system_actor_id: null,
+      created_by_member_id: firstMemberId,
+    })
+    expect(revisions.rows[1]?.payload_checksum).not.toBe(
+      revisions.rows[0]?.payload_checksum,
+    )
+
+    const report = await reporting.buildPilotReport.execute({
+      trustedActor: actor(),
+      targetMonth: '2026-04',
+    })
+    expect(report.status).toBe('revised')
+    expect(report.source.factsRevision).toBe(2n)
+
+    await worker.tick()
+    await expect(
+      pool.query(
+        `SELECT count(*)::text count FROM report_revisions
+          WHERE plan_month_id = $1::uuid`,
+        [fixture.planMonthId],
+      ),
+    ).resolves.toMatchObject({ rows: [{ count: '2' }] })
+
+    await expect(
+      planning.recloseMonth.execute({
+        ...input,
+        commandId: randomUUID(),
+        expectedRevision: 5n,
+      }),
+    ).rejects.toBeInstanceOf(PlanMonthRevisionConflictError)
+    await expect(
+      planning.recloseMonth.execute({
+        ...input,
+        commandId: randomUUID(),
+        expectedRevision: 6n,
+      }),
+    ).rejects.toBeInstanceOf(PlanMonthRecloseConflictError)
+
+    const reopenedAgain = await planning.reopenMonth.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: 6n,
+      payload: {
+        planMonthId: fixture.planMonthId,
+        reason: 'Повторная сверка после revised отчёта.',
+      },
+    })
+    expect(reopenedAgain.aggregateRevision).toBe(7n)
+    const reclosedAgain = await planning.recloseMonth.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: 7n,
+      payload: { planMonthId: fixture.planMonthId },
+    })
+    expect(reclosedAgain.aggregateRevision).toBe(3n)
+    await expect(
+      pool.query(
+        `SELECT revision::text, status
+           FROM report_revisions
+          WHERE plan_month_id = $1::uuid
+          ORDER BY revision`,
+        [fixture.planMonthId],
+      ),
+    ).resolves.toMatchObject({
+      rows: [
+        { revision: '1', status: 'original' },
+        { revision: '2', status: 'revised' },
+        { revision: '3', status: 'revised' },
+      ],
+    })
+
+    await expect(
+      pool.query(
+        `INSERT INTO report_revisions
+          (id, plan_month_id, publication_id, revision,
+           publication_snapshot_hash, source_facts_revision, formula_version,
+           payload, payload_checksum, status, created_at,
+           created_by_system_actor_id, created_by_member_id)
+         SELECT $1::uuid, plan_month_id, publication_id, 4,
+                publication_snapshot_hash, source_facts_revision,
+                formula_version, payload, payload_checksum, 'revised',
+                created_at + INTERVAL '1 second', NULL,
+                created_by_member_id
+           FROM report_revisions
+          WHERE id = $2::uuid`,
+        [randomUUID(), reclosedAgain.aggregateId],
+      ),
+    ).rejects.toThrow(/revised report revision requires exact/u)
+
+    await expect(
+      pool.query(
+        `INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+         VALUES
+          ($1::uuid, 'month_reclosed', 'member', $2, $3::uuid, NULL,
+           $4::uuid, NULL, 'planning.reclose-month.v1', $5::uuid, 8, 9,
+           now())`,
+        [
+          randomUUID(),
+          `member:${firstMemberId}`,
+          firstMemberId,
+          fixture.planMonthId,
+          randomUUID(),
+        ],
+      ),
+    ).rejects.toThrow(/requires exact|receipt_fkey/u)
+
+    const phantomReportId = randomUUID()
+    const phantomCommandId = randomUUID()
+    const phantom = await pool.connect()
+    try {
+      await phantom.query('BEGIN')
+      await phantom.query(
+        `INSERT INTO report_revisions
+          (id, plan_month_id, publication_id, revision,
+           publication_snapshot_hash, source_facts_revision, formula_version,
+           payload, payload_checksum, status, created_at,
+           created_by_system_actor_id, created_by_member_id)
+         SELECT $1::uuid, plan_month_id, publication_id, 4,
+                publication_snapshot_hash, source_facts_revision,
+                formula_version, payload, payload_checksum, 'revised',
+                created_at, NULL, $2::uuid
+           FROM report_revisions
+          WHERE id = $3::uuid`,
+        [phantomReportId, secondMemberId, reclosedAgain.aggregateId],
+      )
+      await expect(
+        phantom.query(
+          `INSERT INTO planning_action_groups
+            (id, action_kind, actor_kind, actor_scope, member_id,
+             system_actor_id, plan_month_id, goal_definition_id,
+             command_type, command_id, before_revision, after_revision,
+             occurred_at)
+           SELECT $1::uuid, 'month_reclosed', 'member', $2, $3::uuid, NULL,
+                  month.id, NULL, 'planning.reclose-month.v1', $4::uuid,
+                  month.revision - 1, month.revision, month.updated_at
+             FROM plan_months month
+            WHERE month.id = $5::uuid`,
+          [
+            randomUUID(),
+            `member:${secondMemberId}`,
+            secondMemberId,
+            phantomCommandId,
+            fixture.planMonthId,
+          ],
+        ),
+      ).rejects.toThrow(/planning_action_groups_reclose_revision_key/u)
+    } finally {
+      await phantom.query('ROLLBACK')
+      phantom.release()
+    }
+
+    await expect(
+      pool.query(
+        `INSERT INTO report_revisions
+          (id, plan_month_id, publication_id, revision,
+           publication_snapshot_hash, source_facts_revision, formula_version,
+           payload, payload_checksum, status, created_at,
+           created_by_system_actor_id, created_by_member_id)
+         SELECT $1::uuid, plan_month_id, publication_id, 5,
+                publication_snapshot_hash, source_facts_revision,
+                formula_version, payload, payload_checksum, 'revised',
+                created_at + INTERVAL '2 seconds', NULL,
+                created_by_member_id
+           FROM report_revisions
+          WHERE id = $2::uuid`,
+        [randomUUID(), reclosedAgain.aggregateId],
+      ),
+    ).rejects.toThrow(/dense sequence/u)
+
+    const reopenedForHashCheck = await planning.reopenMonth.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: 8n,
+      payload: {
+        planMonthId: fixture.planMonthId,
+        reason: 'Проверка snapshot hash guard.',
+      },
+    })
+    expect(reopenedForHashCheck.aggregateRevision).toBe(9n)
+    const badHashReportId = randomUUID()
+    const badHashCommandId = randomUUID()
+    const badHashAt = new Date('2026-05-04T00:00:00.124Z')
+    const badHash = await pool.connect()
+    try {
+      await badHash.query('BEGIN')
+      await badHash.query(
+        `INSERT INTO report_revisions
+          (id, plan_month_id, publication_id, revision,
+           publication_snapshot_hash, source_facts_revision, formula_version,
+           payload, payload_checksum, status, created_at,
+           created_by_system_actor_id, created_by_member_id)
+         SELECT $1::uuid, plan_month_id, publication_id, 4,
+                repeat('b', 64), source_facts_revision, formula_version,
+                payload, payload_checksum, 'revised', $2, NULL, $3::uuid
+           FROM report_revisions
+          WHERE id = $4::uuid`,
+        [badHashReportId, badHashAt, firstMemberId, reclosedAgain.aggregateId],
+      )
+      await badHash.query(
+        `INSERT INTO planning_action_groups
+          (id, action_kind, actor_kind, actor_scope, member_id,
+           system_actor_id, plan_month_id, goal_definition_id,
+           command_type, command_id, before_revision, after_revision,
+           occurred_at)
+         VALUES
+          ($1::uuid, 'month_reclosed', 'member', $2, $3::uuid, NULL,
+           $4::uuid, NULL, 'planning.reclose-month.v1', $5::uuid, 9, 10, $6)`,
+        [
+          randomUUID(),
+          `member:${firstMemberId}`,
+          firstMemberId,
+          fixture.planMonthId,
+          badHashCommandId,
+          badHashAt,
+        ],
+      )
+      await badHash.query(
+        `UPDATE plan_months
+            SET status = 'closed', lifecycle_mode = 'reopened', revision = 10,
+                updated_at = $2
+          WHERE id = $1::uuid`,
+        [fixture.planMonthId, badHashAt],
+      )
+      await badHash.query(
+        `INSERT INTO command_receipts
+          (actor_scope, command_type, command_id, fingerprint,
+           result_kind, aggregate_id, aggregate_revision, completed_at)
+         VALUES
+          ($1, 'planning.reclose-month.v1', $2::uuid, repeat('e', 64),
+           'planning.report-revision.v1', $3::uuid, 4, $4)`,
+        [
+          `member:${firstMemberId}`,
+          badHashCommandId,
+          badHashReportId,
+          badHashAt,
+        ],
+      )
+      await expect(badHash.query('COMMIT')).rejects.toThrow(/requires exact/u)
+    } finally {
+      await badHash.query('ROLLBACK').catch(() => undefined)
+      badHash.release()
+    }
+    await expect(
+      pool.query(
+        `SELECT status, lifecycle_mode, revision::text
+           FROM plan_months WHERE id = $1::uuid`,
+        [fixture.planMonthId],
+      ),
+    ).resolves.toMatchObject({
+      rows: [{ status: 'grace', lifecycle_mode: 'reopened', revision: '9' }],
+    })
+
+    await expect(
+      pool.query(
+        `INSERT INTO command_receipts
+          (actor_scope, command_type, command_id, fingerprint,
+           result_kind, aggregate_id, aggregate_revision, completed_at)
+         VALUES
+          ('system:planner-worker', 'planning.reclose-month.v1', $1::uuid,
+           repeat('f', 64), 'planning.report-revision.v1', $2::uuid, 2,
+           '2026-05-04T00:00:00.123Z')`,
+        [randomUUID(), result.aggregateId],
+      ),
+    ).rejects.toThrow(/reclose receipt requires exact/u)
+  })
+
+  it('serializes a correction racing with explicit reclose', async () => {
+    await resetPair()
+    const fixture = await publishedFixture()
+    const recorded = await record(fixture, 'complete', {
+      kind: 'quantity',
+      value: '100',
+    })
+    clock.set(new Date('2026-05-04T00:00:00.123Z'))
+    const worker = createPlanningLifecycleWorker({
+      database: provider,
+      transaction,
+      lifecycle: new PrismaDueLifecycleRepository(provider),
+      clock,
+      closeMonthReport: reporting.buildCloseMonthReport,
+    })
+    await worker.tick()
+    await planning.reopenMonth.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: 4n,
+      payload: { planMonthId: fixture.planMonthId, reason: 'Race fixture.' },
+    })
+
+    const outcomes = await Promise.allSettled([
+      tracking.correctRecord.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        expectedRevision: 1n,
+        payload: {
+          factRecordId: recorded.aggregateId,
+          value: { kind: 'quantity', value: '80' },
+          reason: 'Concurrent correction.',
+        },
+      }),
+      planning.recloseMonth.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        expectedRevision: 5n,
+        payload: { planMonthId: fixture.planMonthId },
+      }),
+    ])
+    expect(outcomes[1]?.status).toBe('fulfilled')
+
+    const source = await pool.query<{
+      readonly facts_revision: string
+      readonly source_facts_revision: string
+    }>(
+      `SELECT month.facts_revision::text,
+              report.source_facts_revision::text
+         FROM plan_months month
+         JOIN report_revisions report ON report.plan_month_id = month.id
+          AND report.status = 'revised'
+        WHERE month.id = $1::uuid`,
+      [fixture.planMonthId],
+    )
+    expect(source.rows).toHaveLength(1)
+    expect(source.rows[0]?.source_facts_revision).toBe(
+      source.rows[0]?.facts_revision,
     )
   })
 })

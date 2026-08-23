@@ -4,6 +4,7 @@ import type { PrismaClientProvider } from '@/platform/database/prisma-client.pro
 import type { DatabaseTransactionPort } from '@/shared/application/database-transaction.port'
 import { DurableCommandExecutor } from '@/shared/application/durable-command.executor'
 import type { ProductClock } from '@/shared/application/product-clock'
+import type { CloseMonthReportPort } from '../application/close-month.command'
 
 import { CreateEmptyDraftCommand } from '../application/create-empty-draft.command'
 import { CreateDraftFromPublicationCommand } from '../application/create-draft-from-publication.command'
@@ -36,18 +37,21 @@ import { GetActiveMonthQuery } from '../application/get-active-month.query'
 import { CancelPublicationCommand } from '../application/cancel-publication.command'
 import { RepublishMonthCommand } from '../application/republish-month.command'
 import { ReopenMonthCommand } from '../application/reopen-month.command'
+import { RecloseMonthCommand } from '../application/reclose-month.command'
 import { PrismaPlanDraftPersistence } from '../infrastructure/prisma-plan-draft.persistence'
 import { PrismaDraftGoalPersistence } from '../infrastructure/prisma-draft-goal.persistence'
 import { PrismaGoalCatalogPersistence } from '../infrastructure/prisma-goal-catalog.persistence'
 import { PrismaPublicationPersistence } from '../infrastructure/prisma-publication.persistence'
 import { PrismaSeedOwnerBinding } from '../infrastructure/prisma-seed-owner-binding'
 import { PrismaReopenMonthPersistence } from '../infrastructure/prisma-reopen-month.persistence'
+import { PrismaRecloseMonthPersistence } from '../infrastructure/prisma-reclose-month.persistence'
 
 export function createPlanningApplication(dependencies: {
   readonly database: PrismaClientProvider
   readonly transaction: DatabaseTransactionPort
   readonly workspaceMembers: WorkspaceMemberResolver
   readonly clock: ProductClock
+  readonly closeMonthReport?: CloseMonthReportPort
 }): PlanningApplication {
   const drafts = new PrismaPlanDraftPersistence(dependencies.database)
   const draftGoals = new PrismaDraftGoalPersistence(dependencies.database)
@@ -55,6 +59,16 @@ export function createPlanningApplication(dependencies: {
   const publications = new PrismaPublicationPersistence(dependencies.database)
   const seedOwnerBindings = new PrismaSeedOwnerBinding(dependencies.database)
   const reopenedMonths = new PrismaReopenMonthPersistence(dependencies.database)
+  const reclosedMonths = new PrismaRecloseMonthPersistence(
+    dependencies.database,
+  )
+  const closeMonthReport: CloseMonthReportPort =
+    dependencies.closeMonthReport ?? {
+      build: () =>
+        Promise.reject(new Error('RecloseMonth report participant is missing')),
+      persist: () =>
+        Promise.reject(new Error('RecloseMonth report participant is missing')),
+    }
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -111,6 +125,12 @@ export function createPlanningApplication(dependencies: {
       executor,
       dependencies.workspaceMembers,
       reopenedMonths,
+    ),
+    recloseMonth: new RecloseMonthCommand(
+      executor,
+      dependencies.workspaceMembers,
+      reclosedMonths,
+      closeMonthReport,
     ),
     getPublishedSnapshot: new GetPublishedSnapshotQuery(
       dependencies.workspaceMembers,

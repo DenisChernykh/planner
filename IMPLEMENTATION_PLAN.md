@@ -2289,16 +2289,16 @@ immutable report from the new factsRevision without overwriting the original.
 **Files:**
 
 - Create: `src/modules/planning/application/reclose-month.command.ts`
-- Test: `test/integration/reporting/reclose-month.integration.spec.ts`
-- Test: `test/e2e/reporting/reclose-month.e2e-spec.ts`
+- Test: `test/integration/reporting/pilot-report.integration.spec.ts`
+- Test: `test/e2e/planning/publish-month.e2e.spec.ts`
 
-- [ ] Написать RED cases not-reopened, stale revision, concurrent correction,
+- [x] Написать RED cases not-reopened, stale revision, concurrent correction,
   replay and changed facts checksum.
-- [ ] Reuse L01 transaction participant with status `revised` and member actor;
+- [x] Reuse L01 transaction participant with status `revised` and member actor;
   worker cannot call RecloseMonth.
-- [ ] Проверить preservation of original report and no notification revival.
-- [ ] Запустить integration/E2E and `pnpm check:quick`.
-- [ ] Commit: `feat: reclose revised monthly reports`.
+- [x] Проверить preservation of original report and no notification revival.
+- [x] Запустить integration/E2E and `pnpm check:quick`.
+- [x] Commit: `feat: reclose revised monthly reports`.
 
 ### E01 — Full backend pilot acceptance
 

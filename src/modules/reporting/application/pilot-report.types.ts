@@ -176,7 +176,7 @@ export type PilotReportReadSectionV1 = Omit<PilotReportSectionV1, 'goals'> & {
 
 export type PilotReportReadModelV1 = {
   readonly schemaVersion: typeof PILOT_REPORT_READ_SCHEMA_VERSION
-  readonly status: 'current' | 'preliminary' | 'closed'
+  readonly status: 'current' | 'preliminary' | 'closed' | 'revised'
   readonly source: PilotReportV1['source']
   readonly sections: readonly [
     PilotReportReadSectionV1,

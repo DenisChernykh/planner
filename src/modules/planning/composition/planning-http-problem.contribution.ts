@@ -25,6 +25,7 @@ import {
   PlanMonthNotFoundError,
   PlanMonthRevisionConflictError,
   PlanMonthReopenConflictError,
+  PlanMonthRecloseConflictError,
 } from '../application/planning-errors'
 import {
   DRAFT_GOAL_NOT_FOUND_PROBLEM,
@@ -46,6 +47,7 @@ import {
   PLAN_MONTH_NOT_FOUND_PROBLEM,
   PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
   PLAN_MONTH_REOPEN_CONFLICT_PROBLEM,
+  PLAN_MONTH_RECLOSE_CONFLICT_PROBLEM,
 } from '../presentation/planning-problem.definitions'
 
 const bodyIssue = Object.freeze({
@@ -76,6 +78,7 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       PLAN_MONTH_NOT_FOUND_PROBLEM,
       PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
       PLAN_MONTH_REOPEN_CONFLICT_PROBLEM,
+      PLAN_MONTH_RECLOSE_CONFLICT_PROBLEM,
     ]),
     mappedCodes: Object.freeze([
       'PLANNING_AUTHORIZATION_DENIED',
@@ -97,6 +100,7 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       'PLAN_MONTH_NOT_FOUND',
       'PLAN_MONTH_REVISION_CONFLICT',
       'PLAN_MONTH_REOPEN_CONFLICT',
+      'PLAN_MONTH_RECLOSE_CONFLICT',
       'VALIDATION_FAILED',
       'DEPENDENCY_UNAVAILABLE',
     ]),
@@ -208,6 +212,17 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
             reason: error.reason,
             currentRevision: error.currentRevision.toString(10),
             currentStatus: error.currentStatus,
+            nextAction: 'reload-month',
+          },
+        }
+      }
+      if (error instanceof PlanMonthRecloseConflictError) {
+        return {
+          code: 'PLAN_MONTH_RECLOSE_CONFLICT',
+          conflict: {
+            currentRevision: error.currentRevision.toString(10),
+            currentStatus: error.currentStatus,
+            currentLifecycleMode: error.currentLifecycleMode,
             nextAction: 'reload-month',
           },
         }

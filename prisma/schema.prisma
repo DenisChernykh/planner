@@ -56,6 +56,7 @@ model Membership {
   reminderSchedule        ReminderSchedule?
   reminderOccurrences     ReminderOccurrence[]
   notificationAttempts    NotificationAttempt[]
+  createdReportRevisions  ReportRevision[]
 
   @@unique([spaceId, slot])
   @@unique([spaceId, id])
@@ -604,10 +605,12 @@ model ReportRevision {
   payloadChecksum         String   @map("payload_checksum") @db.Char(64)
   status                  String   @db.VarChar(16)
   createdAt               DateTime @map("created_at") @db.Timestamptz(3)
-  createdBySystemActorId  String   @map("created_by_system_actor_id") @db.VarChar(32)
+  createdBySystemActorId  String?  @map("created_by_system_actor_id") @db.VarChar(32)
+  createdByMemberId       String?  @map("created_by_member_id") @db.Uuid
 
   planMonth    PlanMonth       @relation(fields: [planMonthId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   publication  PlanPublication @relation(fields: [publicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdByMember Membership?   @relation(fields: [createdByMemberId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@unique([planMonthId, revision], map: "report_revisions_month_revision_key")
   @@index([planMonthId, status], map: "report_revisions_month_status_idx")

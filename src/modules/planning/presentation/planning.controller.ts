@@ -68,6 +68,7 @@ import {
   PLAN_MONTH_NOT_FOUND_PROBLEM,
   PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
   PLAN_MONTH_REOPEN_CONFLICT_PROBLEM,
+  PLAN_MONTH_RECLOSE_CONFLICT_PROBLEM,
 } from './planning-problem.definitions'
 import {
   CopyGoalDefinitionRequestDto,
@@ -116,9 +117,14 @@ import {
   type PlanPublicationResultResponse,
   type PublishedSnapshotResponse,
 } from './publication.response'
-import { ReopenMonthRequestDto } from './month-lifecycle.dto'
 import {
+  RecloseMonthRequestDto,
+  ReopenMonthRequestDto,
+} from './month-lifecycle.dto'
+import {
+  toReportRevisionMutationResponse,
   toPlanMonthMutationResponse,
+  type ReportRevisionMutationResponse,
   type PlanMonthMutationResponse,
 } from './month-lifecycle.response'
 
@@ -916,6 +922,43 @@ export class PlanningMonthController {
         trustedActor: await this.actor(principal),
         expectedRevision: BigInt(body.expectedRevision),
         payload: { planMonthId: path.planMonthId, reason: body.reason },
+      }),
+    )
+  }
+
+  @Post(':planMonthId/reclose')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Explicitly reclose a reopened month with a revised report.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiBody({
+    required: true,
+    schema: { $ref: '#/components/schemas/RecloseMonthRequestV1' },
+  })
+  @ApiOkResponse({
+    schema: {
+      $ref: '#/components/schemas/ReportRevisionMutationResponseV1',
+    },
+  })
+  @ApiProblemResponses(
+    ...mutationProblems,
+    PLAN_MONTH_NOT_FOUND_PROBLEM,
+    PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
+    PLAN_MONTH_RECLOSE_CONFLICT_PROBLEM,
+  )
+  public async reclose(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PlanMonthPathDto,
+    @Body() body: RecloseMonthRequestDto,
+  ): Promise<ReportRevisionMutationResponse> {
+    return toReportRevisionMutationResponse(
+      await this.planning.recloseMonth.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: { planMonthId: path.planMonthId },
       }),
     )
   }

@@ -331,6 +331,31 @@ describe('P07 authenticated atomic publication HTTP', () => {
     )
   }
 
+  async function reclose(
+    body: Record<string, unknown> | string,
+    options: {
+      readonly selectedCookie?: string
+      readonly selectedOrigin?: string
+      readonly selectedCsrf?: string
+      readonly contentType?: string
+      readonly selectedPlanMonthId?: string
+    } = {},
+  ): Promise<Response> {
+    return fetch(
+      `${baseUrl}/planning/months/${options.selectedPlanMonthId ?? planMonthId}/reclose`,
+      {
+        method: 'POST',
+        headers: {
+          cookie: options.selectedCookie ?? cookie,
+          origin: options.selectedOrigin ?? origin,
+          'x-csrf-token': options.selectedCsrf ?? csrfToken,
+          'content-type': options.contentType ?? 'application/json',
+        },
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+      },
+    )
+  }
+
   async function state(
     selectedPlanMonthIds: string | readonly string[],
   ): Promise<readonly Record<string, unknown>[]> {
@@ -622,7 +647,7 @@ describe('P07 authenticated atomic publication HTTP', () => {
     }
 
     await admin.query(
-      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l03_lifecycle_update',
     )
     await admin.query(
       'ALTER TABLE plan_months DISABLE TRIGGER plan_months_lifecycle_effect_consistent',
@@ -679,7 +704,7 @@ describe('P07 authenticated atomic publication HTTP', () => {
         'ALTER TABLE plan_months ENABLE TRIGGER plan_months_lifecycle_effect_consistent',
       )
       await admin.query(
-        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l03_lifecycle_update',
       )
     }
 
@@ -699,7 +724,7 @@ describe('P07 authenticated atomic publication HTTP', () => {
       [scheduledPublicationId],
     )
     await admin.query(
-      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l03_lifecycle_update',
     )
     await admin.query(
       'ALTER TABLE plan_months DISABLE TRIGGER plan_months_lifecycle_effect_consistent',
@@ -759,12 +784,12 @@ describe('P07 authenticated atomic publication HTTP', () => {
         'ALTER TABLE plan_months ENABLE TRIGGER plan_months_lifecycle_effect_consistent',
       )
       await admin.query(
-        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l03_lifecycle_update',
       )
     }
 
     await admin.query(
-      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+      'ALTER TABLE plan_months DISABLE TRIGGER plan_months_guard_l03_lifecycle_update',
     )
     await admin.query(
       'ALTER TABLE plan_months DISABLE TRIGGER plan_months_lifecycle_effect_consistent',
@@ -794,7 +819,7 @@ describe('P07 authenticated atomic publication HTTP', () => {
         'ALTER TABLE plan_months ENABLE TRIGGER plan_months_lifecycle_effect_consistent',
       )
       await admin.query(
-        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l02_lifecycle_update',
+        'ALTER TABLE plan_months ENABLE TRIGGER plan_months_guard_l03_lifecycle_update',
       )
     }
 
@@ -1158,6 +1183,27 @@ describe('P07 authenticated atomic publication HTTP', () => {
       '422',
       '503',
     ])
+    expect(
+      document.paths['/planning/months/{planMonthId}/reclose']?.['post']
+        ?.security,
+    ).toEqual([{ sessionCookie: [], csrfToken: [] }])
+    expect(
+      Object.keys(
+        document.paths['/planning/months/{planMonthId}/reclose']?.['post']
+          ?.responses ?? {},
+      ).sort(),
+    ).toEqual([
+      '200',
+      '400',
+      '401',
+      '403',
+      '404',
+      '409',
+      '413',
+      '415',
+      '422',
+      '503',
+    ])
     for (const name of [
       'PublishMonthRequestV1',
       'PlanPublicationResultResponseV1',
@@ -1169,6 +1215,9 @@ describe('P07 authenticated atomic publication HTTP', () => {
       'PlanMonthMutationResponseV1',
       'PlanMonthRevisionConflictProblemResponseDto',
       'PlanMonthReopenConflictProblemResponseDto',
+      'RecloseMonthRequestV1',
+      'ReportRevisionMutationResponseV1',
+      'PlanMonthRecloseConflictProblemResponseDto',
     ])
       expect(document.components.schemas[name]).toBeDefined()
   })
@@ -1208,6 +1257,30 @@ describe('P07 authenticated atomic publication HTTP', () => {
       conflict: {
         reason: 'not_closed',
         currentStatus: 'published',
+      },
+    })
+
+    const recloseBody = {
+      commandId: randomUUID(),
+      expectedRevision: month?.['month_revision'],
+    }
+    const noRecloseCsrf = await reclose(recloseBody, { selectedCsrf: '' })
+    expect(noRecloseCsrf.status).toBe(403)
+    const outsiderReclose = await reclose(recloseBody, {
+      selectedCookie: outsiderCookie,
+      selectedCsrf: outsiderCsrfToken,
+    })
+    expect(outsiderReclose.status).toBe(403)
+    expect(await json(outsiderReclose)).toMatchObject({
+      code: 'PLANNING_AUTHORIZATION_DENIED',
+    })
+    const recloseConflict = await reclose(recloseBody)
+    expect(recloseConflict.status).toBe(409)
+    expect(await json(recloseConflict)).toMatchObject({
+      code: 'PLAN_MONTH_RECLOSE_CONFLICT',
+      conflict: {
+        currentStatus: 'published',
+        currentLifecycleMode: 'ordinary',
       },
     })
   })
@@ -1448,6 +1521,92 @@ describe('P07 authenticated atomic publication HTTP', () => {
         )
       ).rows,
     ).toEqual([{ status: 'grace', lifecycle_mode: 'reopened', revision: '5' }])
+    expect(
+      (
+        await admin.query(
+          'SELECT * FROM report_revisions WHERE id = $1::uuid',
+          [reportId],
+        )
+      ).rows,
+    ).toEqual(reportBefore.rows)
+
+    const recloseCommandId = randomUUID()
+    const recloseBody = {
+      commandId: recloseCommandId,
+      expectedRevision: '5',
+    }
+    const reclosed = await reclose(recloseBody, {
+      selectedPlanMonthId: reopenPlanMonthId,
+    })
+    expect(reclosed.status).toBe(200)
+    const revisedRef = await json(reclosed)
+    expect(revisedRef).toMatchObject({
+      kind: 'planning.report-revision.v1',
+      aggregateRevision: '2',
+    })
+    const recloseReplay = await reclose(recloseBody, {
+      selectedPlanMonthId: reopenPlanMonthId,
+    })
+    expect(recloseReplay.status).toBe(200)
+    expect(await json(recloseReplay)).toEqual(revisedRef)
+    const recloseFingerprint = await reclose(
+      { ...recloseBody, expectedRevision: '6' },
+      { selectedPlanMonthId: reopenPlanMonthId },
+    )
+    expect(recloseFingerprint.status).toBe(409)
+    expect(await json(recloseFingerprint)).toMatchObject({
+      code: 'COMMAND_FINGERPRINT_CONFLICT',
+    })
+    const staleReclose = await reclose(
+      { commandId: randomUUID(), expectedRevision: '5' },
+      { selectedPlanMonthId: reopenPlanMonthId },
+    )
+    expect(staleReclose.status).toBe(409)
+    expect(await json(staleReclose)).toMatchObject({
+      code: 'PLAN_MONTH_REVISION_CONFLICT',
+      conflict: { expectedRevision: '5', currentRevision: '6' },
+    })
+    expect(
+      (
+        await admin.query(
+          `SELECT status, lifecycle_mode, revision::text
+             FROM plan_months WHERE id = $1::uuid`,
+          [reopenPlanMonthId],
+        )
+      ).rows,
+    ).toEqual([{ status: 'closed', lifecycle_mode: 'reopened', revision: '6' }])
+    expect(
+      (
+        await admin.query(
+          `SELECT status, revision::text, created_by_system_actor_id,
+                  created_by_member_id::text
+             FROM report_revisions
+            WHERE plan_month_id = $1::uuid
+            ORDER BY revision`,
+          [reopenPlanMonthId],
+        )
+      ).rows,
+    ).toEqual([
+      {
+        status: 'original',
+        revision: '1',
+        created_by_system_actor_id: 'planner-worker',
+        created_by_member_id: null,
+      },
+      {
+        status: 'revised',
+        revision: '2',
+        created_by_system_actor_id: null,
+        created_by_member_id: memberId,
+      },
+    ])
+    expect(
+      (
+        await fetch(`${baseUrl}/reporting/months/${monthAtOffset(-1)}`, {
+          headers: { cookie },
+        }).then(json)
+      )['status'],
+    ).toBe('revised')
     expect(
       (
         await admin.query(

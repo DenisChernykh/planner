@@ -33,6 +33,7 @@ export type ProblemConflict =
   | ReminderScheduleRevisionProblemConflict
   | PlanMonthRevisionProblemConflict
   | PlanMonthReopenProblemConflict
+  | PlanMonthRecloseProblemConflict
 
 export interface TrackingFactTargetUnavailableProblemConflict {
   readonly reason:
@@ -98,6 +99,13 @@ export interface PlanMonthReopenProblemConflict {
   readonly reason: 'not_closed' | 'already_reopened'
   readonly currentRevision: string
   readonly currentStatus: 'draft' | 'published' | 'grace' | 'closed'
+  readonly nextAction: 'reload-month'
+}
+
+export interface PlanMonthRecloseProblemConflict {
+  readonly currentRevision: string
+  readonly currentStatus: 'draft' | 'published' | 'grace' | 'closed'
+  readonly currentLifecycleMode: 'ordinary' | 'reopened'
   readonly nextAction: 'reload-month'
 }
 

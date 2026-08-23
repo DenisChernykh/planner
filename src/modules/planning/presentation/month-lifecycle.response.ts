@@ -18,3 +18,22 @@ export function toPlanMonthMutationResponse(
     aggregateRevision: value.aggregateRevision.toString(10),
   })
 }
+
+export type ReportRevisionMutationResponse = {
+  readonly kind: 'planning.report-revision.v1'
+  readonly aggregateId: string
+  readonly aggregateRevision: string
+}
+
+export function toReportRevisionMutationResponse(
+  value: DurableCommandResultRef<'planning.report-revision.v1'>,
+): ReportRevisionMutationResponse {
+  if (value.aggregateRevision <= 0n) {
+    throw new TypeError('Expected positive report revision')
+  }
+  return Object.freeze({
+    kind: value.kind,
+    aggregateId: value.aggregateId,
+    aggregateRevision: value.aggregateRevision.toString(10),
+  })
+}

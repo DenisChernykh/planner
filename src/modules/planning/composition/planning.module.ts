@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Module, type DynamicModule } from '@nestjs/common'
 
 import {
   WorkspaceModule,
@@ -8,6 +8,12 @@ import {
 import { DatabaseModule } from '@/platform/database/database.module'
 import { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 import { SystemProductClock } from '@/platform/time/system-product-clock'
+import type { ProductClock } from '@/shared/application/product-clock'
+import {
+  REPORTING_APPLICATION,
+  ReportingModule,
+  type ReportingApplication,
+} from '@/modules/reporting'
 import {
   DATABASE_TRANSACTION_PORT,
   type DatabaseTransactionPort,
@@ -22,34 +28,46 @@ import {
 } from '../presentation/planning.controller'
 import { createPlanningApplication } from './create-planning-application'
 
-@Module({
-  imports: [DatabaseModule, WorkspaceModule],
-  controllers: [
-    PlanningController,
-    PlanningDraftController,
-    PlanningPublicationController,
-    PlanningMonthController,
-  ],
-  providers: [
-    {
-      provide: PLANNING_APPLICATION,
-      inject: [
-        PrismaClientProvider,
-        DATABASE_TRANSACTION_PORT,
-        WORKSPACE_MEMBER_RESOLVER,
+@Module({})
+export class PlanningModule {
+  public static forRoot(reportingClock?: ProductClock): DynamicModule {
+    return {
+      module: PlanningModule,
+      imports: [
+        DatabaseModule,
+        WorkspaceModule,
+        ReportingModule.forRoot(reportingClock),
       ],
-      useFactory: (
-        database: PrismaClientProvider,
-        transaction: DatabaseTransactionPort,
-        workspaceMembers: WorkspaceMemberResolver,
-      ) =>
-        createPlanningApplication({
-          database,
-          transaction,
-          workspaceMembers,
-          clock: new SystemProductClock(),
-        }),
-    },
-  ],
-})
-export class PlanningModule {}
+      controllers: [
+        PlanningController,
+        PlanningDraftController,
+        PlanningPublicationController,
+        PlanningMonthController,
+      ],
+      providers: [
+        {
+          provide: PLANNING_APPLICATION,
+          inject: [
+            PrismaClientProvider,
+            DATABASE_TRANSACTION_PORT,
+            WORKSPACE_MEMBER_RESOLVER,
+            REPORTING_APPLICATION,
+          ],
+          useFactory: (
+            database: PrismaClientProvider,
+            transaction: DatabaseTransactionPort,
+            workspaceMembers: WorkspaceMemberResolver,
+            reporting: ReportingApplication,
+          ) =>
+            createPlanningApplication({
+              database,
+              transaction,
+              workspaceMembers,
+              clock: new SystemProductClock(),
+              closeMonthReport: reporting.buildCloseMonthReport,
+            }),
+        },
+      ],
+    }
+  }
+}

@@ -22,6 +22,8 @@ export type CloseMonthApplicationCommand = ApplicationCommand<CloseMonthPayload>
 export type CloseMonthPersistenceInput = CloseMonthPayload & {
   readonly commandId: string
   readonly occurredAt: Date
+  readonly revisionStatus: 'original'
+  readonly createdBy: { readonly kind: 'system'; readonly id: 'planner-worker' }
 }
 
 export type CloseMonthReportInput = {
@@ -29,6 +31,10 @@ export type CloseMonthReportInput = {
   readonly planMonthId: string
   readonly publicationId: string
   readonly asOfLocalDate: string
+  readonly revisionStatus: 'original' | 'revised'
+  readonly createdBy:
+    | { readonly kind: 'system'; readonly id: 'planner-worker' }
+    | { readonly kind: 'member'; readonly id: string }
 }
 
 export type CloseMonthReportPersistenceInput = CloseMonthReportInput & {
@@ -215,6 +221,8 @@ export class CloseMonthCommand {
               ...command.payload,
               commandId: command.commandId,
               occurredAt: context.occurredAt,
+              revisionStatus: 'original',
+              createdBy: { kind: 'system', id: 'planner-worker' },
             },
             this.report,
           )

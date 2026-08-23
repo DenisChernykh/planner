@@ -13,6 +13,8 @@ import {
   DraftProblemConflictResponseDto,
   PlanMonthRevisionConflictProblemResponseDto,
   PlanMonthReopenConflictProblemResponseDto,
+  PlanMonthRecloseConflictProblemResponseDto,
+  PlanMonthRecloseConflictResponseDto,
   ReminderScheduleRevisionConflictProblemResponseDto,
   ReminderScheduleRevisionConflictResponseDto,
   ProblemFieldErrorResponseDto,
@@ -75,6 +77,9 @@ export function ApiProblemResponses(
           }
           if (code === 'PLAN_MONTH_REOPEN_CONFLICT') {
             return PlanMonthReopenConflictProblemResponseDto
+          }
+          if (code === 'PLAN_MONTH_RECLOSE_CONFLICT') {
+            return PlanMonthRecloseConflictProblemResponseDto
           }
           if (code === 'REMINDER_SCHEDULE_REVISION_CONFLICT') {
             return ReminderScheduleRevisionConflictProblemResponseDto
@@ -155,6 +160,8 @@ export function ApiProblemResponses(
       DraftConflictProblemResponseDto,
       PlanMonthRevisionConflictProblemResponseDto,
       PlanMonthReopenConflictProblemResponseDto,
+      PlanMonthRecloseConflictResponseDto,
+      PlanMonthRecloseConflictProblemResponseDto,
       ReminderScheduleRevisionConflictProblemResponseDto,
       ReminderScheduleRevisionConflictResponseDto,
       ValidationProblemResponseDto,
@@ -235,6 +242,16 @@ function problemExample(definition: RegisteredProblemDefinition): object {
             reason: 'not_closed',
             currentRevision: '3',
             currentStatus: 'grace',
+            nextAction: 'reload-month',
+          },
+        }
+      : {}),
+    ...(definition.code === 'PLAN_MONTH_RECLOSE_CONFLICT'
+      ? {
+          conflict: {
+            currentRevision: '4',
+            currentStatus: 'closed',
+            currentLifecycleMode: 'ordinary',
             nextAction: 'reload-month',
           },
         }

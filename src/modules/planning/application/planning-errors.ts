@@ -171,6 +171,17 @@ export class PlanMonthReopenConflictError extends Error {
   }
 }
 
+export class PlanMonthRecloseConflictError extends Error {
+  public constructor(
+    public readonly currentRevision: bigint,
+    public readonly currentStatus: 'draft' | 'published' | 'grace' | 'closed',
+    public readonly currentLifecycleMode: 'ordinary' | 'reopened',
+  ) {
+    super('Plan month is not currently eligible for explicit reclose')
+    this.name = 'PlanMonthRecloseConflictError'
+  }
+}
+
 export type PlanPublicationCancellationConflictReason =
   'not_active' | 'month_started' | 'facts_exist'
 

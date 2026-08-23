@@ -153,3 +153,11 @@ export const PLAN_MONTH_REOPEN_CONFLICT_PROBLEM = defineProblemDefinition({
   title: 'Plan month cannot be reopened',
   detail: 'The plan month is not currently eligible for reopening.',
 })
+
+export const PLAN_MONTH_RECLOSE_CONFLICT_PROBLEM = defineProblemDefinition({
+  slug: 'plan-month-reclose-conflict',
+  code: 'PLAN_MONTH_RECLOSE_CONFLICT',
+  status: 409,
+  title: 'Plan month cannot be reclosed',
+  detail: 'The plan month is not currently eligible for explicit reclose.',
+})

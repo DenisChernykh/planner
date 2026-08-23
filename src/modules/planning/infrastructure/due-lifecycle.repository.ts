@@ -153,7 +153,7 @@ export class PrismaDueLifecycleRepository
            AND snapshot.config #>> '{measurement,kind}' = 'boolean'
            AND month.active_publication_id = publication.id
            AND month.status IN ('published', 'grace')
-           AND COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') = 'ordinary'
+           AND month.lifecycle_mode = 'ordinary'
            AND period.period_end < ${input.currentLocalDate}::date
            AND (record.id IS NULL OR revision.revision_kind = 'tombstoned')
          GROUP BY period.publication_id, period.period_start, period.period_end
@@ -544,6 +544,8 @@ export class PrismaDueLifecycleRepository
         asOfLocalDate: asOfLocalDate[0]!.month_end,
         publicationSnapshotHash: month.publication_snapshot_hash,
         occurredAt: input.occurredAt,
+        revisionStatus: input.revisionStatus,
+        createdBy: input.createdBy,
       })
       if (reportSnapshot.factsRevision !== month.facts_revision) {
         throw new Error('CloseMonth report snapshot is stale')
@@ -557,7 +559,7 @@ export class PrismaDueLifecycleRepository
          WHERE id = ${month.plan_month_id}::uuid
            AND revision = ${month.month_revision}
            AND status = 'grace'
-           AND COALESCE(to_jsonb(month)->>'lifecycle_mode', 'ordinary') = 'ordinary'
+           AND lifecycle_mode = 'ordinary'
       `
       if (updated !== 1) throw new Error('CloseMonth lifecycle CAS failed')
       const actionId = randomUUID()

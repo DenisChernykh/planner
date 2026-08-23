@@ -23,9 +23,32 @@ export class ReopenMonthRequestDto {
   public readonly reason!: string
 }
 
+export class RecloseMonthRequestDto {
+  @ApiProperty({ type: String, pattern: UUID.source })
+  @IsString()
+  @Matches(UUID)
+  public readonly commandId!: string
+
+  @IsString()
+  @Matches(POSITIVE)
+  @ApiProperty({ type: String, pattern: POSITIVE.source })
+  public readonly expectedRevision!: string
+}
+
 export class PlanMonthMutationResponseDto {
   @ApiProperty({ enum: ['planning.plan-month.v1'] })
   public readonly kind!: 'planning.plan-month.v1'
+
+  @ApiProperty({ type: String, pattern: UUID.source })
+  public readonly aggregateId!: string
+
+  @ApiProperty({ type: String, pattern: POSITIVE.source })
+  public readonly aggregateRevision!: string
+}
+
+export class ReportRevisionMutationResponseDto {
+  @ApiProperty({ enum: ['planning.report-revision.v1'] })
+  public readonly kind!: 'planning.report-revision.v1'
 
   @ApiProperty({ type: String, pattern: UUID.source })
   public readonly aggregateId!: string

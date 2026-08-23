@@ -51,7 +51,7 @@ export class BuildPilotReportRevision implements CloseMonthReportPort {
     )
     const payload: PilotReportReadModelV1 = freeze({
       schemaVersion: PILOT_REPORT_READ_SCHEMA_VERSION,
-      status: 'closed',
+      status: input.revisionStatus === 'original' ? 'closed' : 'revised',
       source: report.source,
       sections: buildPilotReportSeries(source, report, input.asOfLocalDate),
     })

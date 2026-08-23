@@ -150,6 +150,28 @@ export class PlanMonthReopenConflictProblemResponseDto extends ProblemResponseDt
   public readonly conflict!: PlanMonthReopenConflictResponseDto
 }
 
+export class PlanMonthRecloseConflictResponseDto {
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$', example: '4' })
+  public readonly currentRevision!: string
+
+  @ApiProperty({ enum: ['draft', 'published', 'grace', 'closed'] })
+  public readonly currentStatus!: 'draft' | 'published' | 'grace' | 'closed'
+
+  @ApiProperty({ enum: ['ordinary', 'reopened'] })
+  public readonly currentLifecycleMode!: 'ordinary' | 'reopened'
+
+  @ApiProperty({ enum: ['reload-month'] })
+  public readonly nextAction!: 'reload-month'
+}
+
+export class PlanMonthRecloseConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({ enum: ['PLAN_MONTH_RECLOSE_CONFLICT'] })
+  declare public readonly code: 'PLAN_MONTH_RECLOSE_CONFLICT'
+
+  @ApiProperty({ type: () => PlanMonthRecloseConflictResponseDto })
+  public readonly conflict!: PlanMonthRecloseConflictResponseDto
+}
+
 export class ReminderScheduleRevisionConflictResponseDto {
   @ApiProperty({
     type: String,
