@@ -145,12 +145,10 @@ describe('T01 real application composition records seed facts', () => {
     const record = async (
       snapshotId: string,
       value: string,
-      expectedRevision?: bigint,
     ): Promise<DurableCommandResultRef<'tracking.fact-record.v1'>> =>
       tracking.recordFact.execute({
         commandId: randomUUID(),
         trustedActor: actor,
-        ...(expectedRevision === undefined ? {} : { expectedRevision }),
         payload: {
           publicationId: publication.aggregateId,
           planGoalSnapshotId: snapshotId,
@@ -161,7 +159,16 @@ describe('T01 real application composition records seed facts', () => {
     await record(waterId, '400')
     await record(waterId, '800')
     const firstSteps = await record(stepsId, '2000')
-    await record(stepsId, '7000', firstSteps.aggregateRevision)
+    await tracking.correctRecord.execute({
+      commandId: randomUUID(),
+      trustedActor: actor,
+      expectedRevision: firstSteps.aggregateRevision,
+      payload: {
+        factRecordId: firstSteps.aggregateId,
+        value: { kind: 'quantity', value: '7000' },
+        reason: 'Уточнено итоговое значение шагов.',
+      },
+    })
 
     const [water, steps] = await Promise.all([
       tracking.getFactState.execute({

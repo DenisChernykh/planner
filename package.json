@@ -14,6 +14,7 @@
     "build": "pnpm run build:compiled",
     "build:clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build:compiled": "pnpm run prisma:generate && pnpm run build:clean && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "check": "pnpm run check:quick && pnpm run test:integration:run && pnpm run test:e2e:run",
     "check:quick": "pnpm run format:check && pnpm run openapi:drift && pnpm run openapi:lint && pnpm run lint && pnpm run typecheck && pnpm run test:run && pnpm run architecture:check && pnpm run build:compiled",
     "format": "prettier . --write",
     "format:check": "prettier . --check",

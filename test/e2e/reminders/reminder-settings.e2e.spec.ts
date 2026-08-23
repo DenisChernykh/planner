@@ -96,6 +96,7 @@ async function insertTerminalAttempt(input: {
   const expiresAt = new Date(completedAt.getTime() + 60 * 60 * 1_000)
   const attemptId = randomUUID()
   const contentHash = randomUUID().replaceAll('-', '').padEnd(64, 'a')
+  const providerRetryAfterSec = input.outcome === 'retryable' ? 1 : null
   const client = await input.pool.connect()
   try {
     await client.query('BEGIN')
@@ -104,8 +105,9 @@ async function insertTerminalAttempt(input: {
          (id, space_id, recipient_member_id, schedule_id, local_date, slot_kind,
           schedule_revision, due_at, expires_at, state, fencing_token,
           created_at, updated_at)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::date, $6,
-               1, $7, $8, 'expired', 0, $9, $9)`,
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::date,
+               $6::varchar(16), 1, $7::timestamptz, $8::timestamptz,
+               'expired', 0, $9::timestamptz, $9::timestamptz)`,
       [
         occurrenceId,
         spaceId,
@@ -124,8 +126,9 @@ async function insertTerminalAttempt(input: {
           local_date, slot_kind, source_facts_revision, intent_revision,
           content_schema_version, content, content_hash, expires_at, created_at)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6::date,
-               $7, 0, 1, 'reminders.rendered-content.v1', '{}'::jsonb,
-               $8, $9, $10)`,
+               $7::varchar(16), 0, 1, 'reminders.rendered-content.v1',
+               '{}'::jsonb, $8::char(64), $9::timestamptz,
+               $10::timestamptz)`,
       [
         intentId,
         occurrenceId,
@@ -145,9 +148,9 @@ async function insertTerminalAttempt(input: {
           attempt_number, state, fencing_token, outcome, outcome_reason,
           provider_retry_after_sec, started_at, completed_at, created_at, updated_at)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
-               1, 'terminal', 0, $6, $7,
-               CASE WHEN $6 = 'retryable' THEN 1 ELSE NULL END,
-               $8, $9, $8, $9)`,
+               1, 'terminal', 0, $6::varchar(16), $7::varchar(32),
+               $8::integer, $9::timestamptz, $10::timestamptz,
+               $9::timestamptz, $10::timestamptz)`,
       [
         attemptId,
         intentId,
@@ -156,6 +159,7 @@ async function insertTerminalAttempt(input: {
         input.memberId,
         input.outcome,
         input.outcomeReason,
+        providerRetryAfterSec,
         startedAt,
         completedAt,
       ],
@@ -187,6 +191,13 @@ describe('N04 reminder settings and delivery status HTTP adapter', () => {
   let outsiderCookie: string
   let publicationId: string
   let postgresUnavailable = false
+  let testPoolTerminationExpected = false
+  const unexpectedTestPoolErrors: Error[] = []
+  const testPoolErrorHandler = (error: Error): void => {
+    const code = (error as Error & { readonly code?: string }).code
+    if (testPoolTerminationExpected && code === '57P01') return
+    unexpectedTestPoolErrors.push(error)
+  }
 
   beforeAll(async () => {
     ;[postgres, redis] = await Promise.all([
@@ -199,6 +210,7 @@ describe('N04 reminder settings and delivery status HTTP adapter', () => {
     ])
     deployMigrations(postgres.getConnectionUri())
     pool = new Pool({ connectionString: postgres.getConnectionUri() })
+    pool.on('error', testPoolErrorHandler)
     const controlUrl = new URL(postgres.getConnectionUri())
     controlUrl.pathname = '/postgres'
     postgresControl = new Pool({ connectionString: controlUrl.toString() })
@@ -329,7 +341,12 @@ describe('N04 reminder settings and delivery status HTTP adapter', () => {
     await runtime?.stop()
     await issuerRedis?.close(AbortSignal.timeout(1_000)).catch(() => undefined)
     await provider?.close(AbortSignal.timeout(2_000)).catch(() => undefined)
-    await pool?.end()
+    try {
+      await pool?.end()
+    } finally {
+      pool?.off('error', testPoolErrorHandler)
+      testPoolTerminationExpected = false
+    }
     await postgresControl?.end()
     await Promise.all([postgres?.stop(), redis?.stop()])
     for (const key of [
@@ -348,6 +365,12 @@ describe('N04 reminder settings and delivery status HTTP adapter', () => {
       'TELEGRAM_OIDC_CALLBACK_URL',
     ])
       delete process.env[key]
+    if (unexpectedTestPoolErrors.length > 0) {
+      throw new AggregateError(
+        unexpectedTestPoolErrors,
+        'Unexpected test-owned PostgreSQL pool errors',
+      )
+    }
   })
 
   it('returns isolated defaults and an available status for both members', async () => {
@@ -842,6 +865,7 @@ describe('N04 reminder settings and delivery status HTTP adapter', () => {
       'ALTER DATABASE planner_n04_e2e WITH ALLOW_CONNECTIONS false',
     )
     postgresUnavailable = true
+    testPoolTerminationExpected = true
     await postgresControl.query(
       `SELECT pg_terminate_backend(pid)
          FROM pg_stat_activity
@@ -859,5 +883,12 @@ describe('N04 reminder settings and delivery status HTTP adapter', () => {
       'ALTER DATABASE planner_n04_e2e WITH ALLOW_CONNECTIONS true',
     )
     postgresUnavailable = false
+    const recovered = await fetch(`${baseUrl}/reminders/settings`, {
+      headers: { cookie: firstCookie },
+    })
+    expect(recovered.status).toBe(200)
+    await expect(json(recovered)).resolves.toMatchObject({
+      schemaVersion: 'reminders.settings.v1',
+    })
   })
 })

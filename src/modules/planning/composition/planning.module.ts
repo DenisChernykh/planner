@@ -30,13 +30,15 @@ import { createPlanningApplication } from './create-planning-application'
 
 @Module({})
 export class PlanningModule {
-  public static forRoot(reportingClock?: ProductClock): DynamicModule {
+  public static forRoot(
+    clock: ProductClock = new SystemProductClock(),
+  ): DynamicModule {
     return {
       module: PlanningModule,
       imports: [
         DatabaseModule,
         WorkspaceModule,
-        ReportingModule.forRoot(reportingClock),
+        ReportingModule.forRoot(clock),
       ],
       controllers: [
         PlanningController,
@@ -63,7 +65,7 @@ export class PlanningModule {
               database,
               transaction,
               workspaceMembers,
-              clock: new SystemProductClock(),
+              clock,
               closeMonthReport: reporting.buildCloseMonthReport,
             }),
         },

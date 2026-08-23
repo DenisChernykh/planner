@@ -12,6 +12,7 @@ import {
   createPlanningApplication,
   type PlanningApplication,
 } from '@/modules/planning'
+import { createRemindersApplication } from '@/modules/reminders'
 import { PrismaWorkspaceMemberResolver } from '@/modules/workspace/infrastructure/prisma-workspace-member.resolver'
 import { PrismaClientProvider } from '@/platform/database/prisma-client.provider'
 import { PrismaCommandReceiptAdapter } from '@/platform/database/prisma-command-receipt.adapter'
@@ -1266,7 +1267,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
     await expectUnpublished(fixture.planMonthId)
   }
 
-  it('retains the exact P07 five-table inventory after the T06 extension', async () => {
+  it('retains the exact P07 five-table inventory through the accepted backend head', async () => {
     const migrations = await pool.query<{ migration_name: string }>(
       `SELECT migration_name FROM _prisma_migrations ORDER BY migration_name`,
     )
@@ -1274,7 +1275,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       migration_name: '20260811151000_plan_publication',
     })
     expect(migrations.rows.at(-1)).toEqual({
-      migration_name: '20260811165000_fact_undo',
+      migration_name: '20260812020000_reclose_month',
     })
     const tables = await pool.query<{ table_name: string }>(`
       SELECT table_name FROM information_schema.tables
@@ -1649,7 +1650,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
            )
            OR trigger_name LIKE '%p07%'
            OR trigger_name LIKE '%publication%'
-           OR trigger_name LIKE '%p08%'
+           OR trigger_name = 'plan_months_guard_l03_lifecycle_update'
            OR trigger_name = 'plan_months_lifecycle_effect_consistent'
          )
        ORDER BY trigger_name
@@ -1662,7 +1663,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       'flexible_periods_validate',
       'plan_goal_snapshots_reject_update_delete',
       'plan_goal_snapshots_validate',
-      'plan_months_guard_p08_lifecycle_update',
+      'plan_months_guard_l03_lifecycle_update',
       'plan_months_lifecycle_effect_consistent',
       'plan_months_require_publication_pointer',
       'plan_publications_guard_revision',
@@ -2183,6 +2184,277 @@ describe('P07 atomic publication in real PostgreSQL', () => {
     ).toEqual(published)
   })
 
+  it('materializes an April 15 late activation without preactivation fixed rows or reminder backfill and prorates quota targets', async () => {
+    clock.set(new Date('2026-04-14T19:00:00.000Z'))
+    const reminders = createRemindersApplication({
+      database: provider,
+      transaction,
+      workspaceMembers: members,
+      clock,
+    })
+    await reminders.saveReminderSchedule.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      payload: {
+        timeZone: 'Asia/Yekaterinburg',
+        morning: '08:00',
+        day: null,
+        evening: null,
+      },
+    })
+
+    const draft = await application.createEmptyDraft.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      payload: {
+        targetMonth: '2026-04',
+        focus: 'AC-05 late activation',
+      },
+    })
+    const goals = [
+      {
+        title: 'Daily fixed proof',
+        repetition: { kind: 'daily' as const },
+      },
+      {
+        title: 'Weekly preactivation proof',
+        repetition: { kind: 'weekly' as const, n: '3' },
+      },
+      {
+        title: 'Monthly proration proof',
+        repetition: { kind: 'monthly' as const, n: '10' },
+      },
+    ]
+    for (const [index, goal] of goals.entries()) {
+      const definition = await application.createGoalDefinition.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        payload: {
+          title: goal.title,
+          why: 'AC-05 real PostgreSQL evidence',
+          category: 'Test',
+        },
+      })
+      await application.addDraftGoal.execute({
+        commandId: randomUUID(),
+        trustedActor: actor(),
+        expectedRevision: BigInt(index + 1),
+        payload: {
+          planMonthId: draft.aggregateId,
+          goalDefinitionId: definition.aggregateId,
+          config: {
+            schemaVersion: 1,
+            scope: { kind: 'shared' },
+            repetition: goal.repetition,
+            measurement: { kind: 'boolean' },
+            checkpoints: null,
+          },
+          sourceProvenance: null,
+        },
+      })
+    }
+
+    const preview = await application.buildPublicationPreview.execute({
+      trustedUserId: firstUserId,
+      targetMonth: '2026-04',
+    })
+    if (preview === null) throw new Error('AC-05 preview missing')
+    expect(preview).toMatchObject({
+      activation: {
+        mode: 'immediate',
+        activeLocalDate: '2026-04-15',
+        latePublication: true,
+      },
+      blockers: [],
+    })
+    const published = await application.publishMonth.execute({
+      commandId: randomUUID(),
+      trustedActor: actor(),
+      expectedRevision: BigInt(preview.draftRevision),
+      payload: {
+        planMonthId: draft.aggregateId,
+        previewSchemaVersion: preview.schemaVersion,
+        previewHashVersion: preview.previewHashVersion,
+        previewHash: preview.previewHash,
+      },
+    })
+
+    const publication = await pool.query<{
+      active_local_date: string
+      late_publication: boolean
+    }>(
+      `SELECT active_local_date::text active_local_date, late_publication
+         FROM plan_publications
+        WHERE id = $1::uuid`,
+      [published.aggregateId],
+    )
+    expect(publication.rows).toEqual([
+      { active_local_date: '2026-04-15', late_publication: true },
+    ])
+
+    const fixed = await pool.query<{
+      expectation_date: string
+    }>(
+      `SELECT expectation.expectation_date::text expectation_date
+         FROM fixed_expectations expectation
+         JOIN plan_goal_snapshots snapshot
+           ON snapshot.id = expectation.plan_goal_snapshot_id
+        WHERE expectation.publication_id = $1::uuid
+          AND snapshot.title = 'Daily fixed proof'
+        ORDER BY expectation.expectation_date`,
+      [published.aggregateId],
+    )
+    const activeAprilDates = Array.from(
+      { length: 16 },
+      (_, index) => `2026-04-${String(index + 15).padStart(2, '0')}`,
+    )
+    const preactivationAprilDates = Array.from(
+      { length: 14 },
+      (_, index) => `2026-04-${String(index + 1).padStart(2, '0')}`,
+    )
+    const physicalFixedDates = fixed.rows.map(
+      ({ expectation_date }) => expectation_date,
+    )
+    expect(physicalFixedDates).toEqual(activeAprilDates)
+    expect(
+      preactivationAprilDates.filter((date) =>
+        physicalFixedDates.includes(date),
+      ),
+    ).toEqual([])
+
+    const periods = await pool.query<{
+      title: string
+      period_kind: string
+      ordinal: number
+      period_start: string
+      period_end: string
+      active_days: number
+      period_target: number
+    }>(
+      `SELECT snapshot.title, period.period_kind, period.ordinal,
+              period.period_start::text period_start,
+              period.period_end::text period_end,
+              cardinality(period.active_dates)::integer active_days,
+              period.period_target
+         FROM flexible_periods period
+         JOIN plan_goal_snapshots snapshot
+           ON snapshot.id = period.plan_goal_snapshot_id
+        WHERE period.publication_id = $1::uuid
+        ORDER BY snapshot.title, period.ordinal`,
+      [published.aggregateId],
+    )
+    expect(
+      periods.rows.filter(
+        ({ title }) => title === 'Weekly preactivation proof',
+      ),
+    ).toEqual([
+      {
+        title: 'Weekly preactivation proof',
+        period_kind: 'weekly',
+        ordinal: 1,
+        period_start: '2026-04-01',
+        period_end: '2026-04-05',
+        active_days: 0,
+        period_target: 0,
+      },
+      {
+        title: 'Weekly preactivation proof',
+        period_kind: 'weekly',
+        ordinal: 2,
+        period_start: '2026-04-06',
+        period_end: '2026-04-12',
+        active_days: 0,
+        period_target: 0,
+      },
+      {
+        title: 'Weekly preactivation proof',
+        period_kind: 'weekly',
+        ordinal: 3,
+        period_start: '2026-04-13',
+        period_end: '2026-04-19',
+        active_days: 5,
+        period_target: 2,
+      },
+      {
+        title: 'Weekly preactivation proof',
+        period_kind: 'weekly',
+        ordinal: 4,
+        period_start: '2026-04-20',
+        period_end: '2026-04-26',
+        active_days: 7,
+        period_target: 3,
+      },
+      {
+        title: 'Weekly preactivation proof',
+        period_kind: 'weekly',
+        ordinal: 5,
+        period_start: '2026-04-27',
+        period_end: '2026-04-30',
+        active_days: 4,
+        period_target: 2,
+      },
+    ])
+    expect(
+      periods.rows.filter(({ title }) => title === 'Monthly proration proof'),
+    ).toEqual([
+      {
+        title: 'Monthly proration proof',
+        period_kind: 'monthly',
+        ordinal: 1,
+        period_start: '2026-04-01',
+        period_end: '2026-04-30',
+        active_days: 16,
+        period_target: 5,
+      },
+    ])
+
+    const notificationBackfill = await pool.query<{
+      occurrence_dates: string[]
+      past_occurrences: number
+      past_intents: number
+      past_attempts: number
+    }>(
+      `SELECT
+         ARRAY(
+           SELECT occurrence.local_date::text
+             FROM reminder_occurrences occurrence
+            WHERE occurrence.recipient_member_id = $1::uuid
+            ORDER BY occurrence.local_date
+         ) occurrence_dates,
+         (
+           SELECT count(*)::integer
+             FROM reminder_occurrences occurrence
+            WHERE occurrence.recipient_member_id = $1::uuid
+              AND occurrence.local_date < $2::date
+         ) past_occurrences,
+         (
+           SELECT count(*)::integer
+             FROM notification_intents intent
+             JOIN reminder_occurrences occurrence
+               ON occurrence.id = intent.occurrence_id
+            WHERE occurrence.recipient_member_id = $1::uuid
+              AND occurrence.local_date < $2::date
+         ) past_intents,
+         (
+           SELECT count(*)::integer
+             FROM notification_attempts attempt
+             JOIN reminder_occurrences occurrence
+               ON occurrence.id = attempt.occurrence_id
+            WHERE occurrence.recipient_member_id = $1::uuid
+              AND occurrence.local_date < $2::date
+         ) past_attempts`,
+      [firstMemberId, '2026-04-15'],
+    )
+    expect(notificationBackfill.rows).toEqual([
+      {
+        occurrence_dates: ['2026-04-15', '2026-04-16'],
+        past_occurrences: 0,
+        past_intents: 0,
+        past_attempts: 0,
+      },
+    ])
+  })
+
   it('stores the exact scalar, any-of parent, checklist and checkpoint component matrix without a fake preactivation weekly-task period', async () => {
     clock.set(new Date('2028-03-14T19:00:00.000Z'))
     const draft = await application.createEmptyDraft.execute({
@@ -2700,7 +2972,7 @@ describe('P07 atomic publication in real PostgreSQL', () => {
       [`created_at = created_at + INTERVAL '1 second'`, '55000'],
       [
         `revision = revision + 7, updated_at = updated_at + INTERVAL '1 second'`,
-        '23514',
+        '55000',
       ],
     ] as const) {
       await pool.query('BEGIN')

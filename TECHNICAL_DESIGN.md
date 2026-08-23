@@ -2715,11 +2715,14 @@ Recovery различает crash window:
   provider outcome и только до `expiresAt`;
 - fencing не позволяет старому worker записать outcome после reclaim.
 
-Завершённая personal/shared норма подавляется. Shared completion подавляет её у
-обоих участников. После последнего reread остаётся неизбежное окно до внешнего
-side effect; система не обещает current-at-receipt или exactly-once. Crash
-между `dispatching` и фактической передачей запроса может дать безопасный
-пропуск, выбранный вместо риска дубля.
+Flexible personal/shared цель попадает в слот только при
+`actualProgress < expectedProgress`. Shared progress один для пространства и
+проецируется одинаково обоим участникам: одна частичная отметка не может скрыть
+цель только у её автора. Завершённая personal/shared норма подавляется, а shared
+completion подавляет её у обоих участников. После последнего reread остаётся
+неизбежное окно до внешнего side effect; система не обещает current-at-receipt
+или exactly-once. Crash между `dispatching` и фактической передачей запроса
+может дать безопасный пропуск, выбранный вместо риска дубля.
 
 Worker N05 фиксирует bounded retry policy: на один occurrence допускаются не
 более трёх provider attempts. Для явного retryable `429` используется

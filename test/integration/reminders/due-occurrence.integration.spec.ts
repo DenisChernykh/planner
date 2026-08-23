@@ -27,7 +27,7 @@ const spaceId = '33333333-3333-4333-8333-333333333333'
 const memberId = '44444444-4444-4444-8444-444444444444'
 const partnerMemberId = '55555555-5555-4555-8555-555555555555'
 
-const migrations = [
+const migrationsThroughN01 = [
   '20260811090000_planner_foundation',
   '20260811100000_local_user_session',
   '20260811110000_pair_workspace',
@@ -56,6 +56,15 @@ const migrations = [
   '20260811210000_reminder_schedule_occurrence',
 ] as const
 
+const rawTailMigrationsAfterN01 = [
+  '20260811220000_notification_intents',
+  '20260811230000_notification_attempts',
+  '20260811240000_reminder_worker_retry',
+  '20260812000000_report_revisions',
+  '20260812010000_reopen_month',
+  '20260812020000_reclose_month',
+] as const
+
 describe('N01 reminder schedules and due occurrences on PostgreSQL', () => {
   let postgres: StartedPostgreSqlContainer
   let pool: Pool
@@ -72,7 +81,12 @@ describe('N01 reminder schedules and due occurrences on PostgreSQL', () => {
       .withPassword('planner-test-only')
       .start()
     pool = new Pool({ connectionString: postgres.getConnectionUri() })
-    for (const migration of migrations) {
+    for (const migration of migrationsThroughN01) {
+      await pool.query(
+        readFileSync(`prisma/migrations/${migration}/migration.sql`, 'utf8'),
+      )
+    }
+    for (const migration of rawTailMigrationsAfterN01) {
       await pool.query(
         readFileSync(`prisma/migrations/${migration}/migration.sql`, 'utf8'),
       )

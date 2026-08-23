@@ -56,6 +56,20 @@ const migrationsThroughT09 = [
   '20260811167000_weekly_task_result',
 ] as const
 const T10_MIGRATION = '20260811168000_close_week'
+const rawTailMigrationsAfterT10 = [
+  '20260811170000_telegram_ingress_state',
+  '20260811200000_telegram_action_intents',
+  '20260811201000_telegram_scalar_action_intents',
+  '20260811202000_telegram_composite_action_intents',
+  '20260811203000_telegram_tracking_action_intents',
+  '20260811210000_reminder_schedule_occurrence',
+  '20260811220000_notification_intents',
+  '20260811230000_notification_attempts',
+  '20260811240000_reminder_worker_retry',
+  '20260812000000_report_revisions',
+  '20260812010000_reopen_month',
+  '20260812020000_reclose_month',
+] as const
 
 type Fixture = {
   readonly planMonthId: string
@@ -145,6 +159,11 @@ describe('T10 CloseWeek worker on PostgreSQL', () => {
       readFileSync(`prisma/migrations/${T10_MIGRATION}/migration.sql`, 'utf8'),
     )
     expect(await legacyTrackingDigest()).toBe(beforeUpgrade)
+    for (const migration of rawTailMigrationsAfterT10) {
+      await pool.query(
+        readFileSync(`prisma/migrations/${migration}/migration.sql`, 'utf8'),
+      )
+    }
     await pool.query('TRUNCATE spaces, users, command_receipts CASCADE')
     clock.set(new Date('2026-03-30T07:00:00.000Z'))
   }, 120_000)

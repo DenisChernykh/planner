@@ -222,6 +222,55 @@ describe('reminder relevance policy', () => {
     expect(content('evening', value)).toBeNull()
   })
 
+  it('applies the same pace relevance to personal and shared flexible norms', () => {
+    const baseline = read()
+    const flexiblePeriod = {
+      flexiblePeriodId: fixedId,
+      periodKind: 'weekly' as const,
+      ordinal: 1,
+      periodStart: '2026-03-30',
+      periodEnd: '2026-04-05',
+      periodTarget: 2,
+      eligibleOnDate: true,
+      expectedProgress: 1,
+      actualProgress: { numerator: '1', denominator: '1' },
+      state: 'partial' as const,
+      facts: [],
+    }
+    const forAccess = (
+      viewerAccess: 'personal_owner' | 'shared',
+      expectedProgress: number,
+    ): PublishedToday =>
+      read({
+        goals: [{ ...baseline.goals[0]!, viewerAccess }],
+        day: {
+          ...baseline.day,
+          goals: [
+            {
+              ...baseline.day.goals[0]!,
+              fixedExpectations: [],
+              flexiblePeriods: [{ ...flexiblePeriod, expectedProgress }],
+            },
+          ],
+        },
+      })
+
+    for (const viewerAccess of ['personal_owner', 'shared'] as const) {
+      expect(content('morning', forAccess(viewerAccess, 1))).toBeNull()
+      expect(content('morning', forAccess(viewerAccess, 2))).toMatchObject({
+        items: [
+          expect.objectContaining({
+            kind: 'flexible',
+            goalId,
+            state: 'partial',
+            expectedProgress: 2,
+            actualProgress: { numerator: '1', denominator: '1' },
+          }),
+        ],
+      })
+    }
+  })
+
   it('uses a checkpoint satisfaction target for an exact partial remainder', () => {
     const baseline = read()
     const value = read({

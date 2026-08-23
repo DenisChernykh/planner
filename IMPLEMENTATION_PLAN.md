@@ -2309,19 +2309,33 @@ traceability каждого pilot AC без live-provider claims.
 
 **Files:**
 
-- Create: `test/e2e/pilot/full-month-pilot.e2e-spec.ts`
+- Create: `test/e2e/pilot/full-month-pilot.e2e.spec.ts`
 - Create: `docs/evidence/backend-pilot-acceptance.md`
-- Modify: `TECHNICAL_DESIGN.md` acceptance matrix only if verified test mapping
-  differs from the approved mapping.
-
-- [ ] Написать one fake-clock journey OIDC → April draft/publish → web and
+- Modify: `TECHNICAL_DESIGN.md`
+- Modify: `PRD.md`
+- Modify: `USER_FLOWS.md`
+- Modify: `SCREEN_MAP.md`
+- Modify: `src/modules/planning/composition/planning.module.ts`
+- Modify: `src/modules/reminders/domain/reminder-relevance.ts`
+- Modify: `package.json`
+- Modify: `test/unit/reminders/relevance.spec.ts`
+- Modify: `test/integration/platform/foundation-runtime.integration.spec.ts`
+- Modify: `test/integration/planning/publish-month.integration.spec.ts`
+- Modify: `test/integration/planning/close-week-worker.integration.spec.ts`
+- Modify: `test/integration/reminders/due-occurrence.integration.spec.ts`
+- Modify: `test/integration/reminders/reminder-intent.integration.spec.ts`
+- Modify: `test/e2e/reminders/reminder-settings.e2e.spec.ts`
+- Modify: `test/e2e/platform/http-contracts.e2e.spec.ts`
+- Modify: `test/e2e/planning/draft-goal.e2e.spec.ts`
+- Modify: `test/e2e/tracking/record-command.e2e.spec.ts`
+- [x] Написать one fake-clock journey OIDC → April draft/publish → web and
   Telegram facts → reminders → CloseDay/CloseWeek → grace/close/reopen/report →
   next-month copy.
-- [ ] Привязать AC-01/01b, AC-02…AC-11, AC-13/14, AC-16…AC-24 и AC-SM-01 к
+- [x] Привязать AC-01/01b, AC-02…AC-11, AC-13/14, AC-16…AC-24 и AC-SM-01 к
   exact automated/manual evidence. AC-12/15 остаются completed-v1.
-- [ ] Запустить fresh DB E2E, `pnpm check` and OpenAPI drift.
-- [ ] Провести independent whole-feature review and one consolidated fix wave.
-- [ ] Commit: `test: verify backend pilot acceptance journey`.
+- [x] Запустить fresh DB E2E, `pnpm check` and OpenAPI drift.
+- [x] Провести independent whole-feature review and one consolidated fix wave.
+- [x] Commit: `test: verify backend pilot acceptance journey`.
 
 ### O01 — Local runtime composition smoke
 

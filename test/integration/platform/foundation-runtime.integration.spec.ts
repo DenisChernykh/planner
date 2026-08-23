@@ -66,7 +66,7 @@ describe('Planner foundation database runtime', () => {
     await container?.stop()
   })
 
-  it('deploys the exact accepted migration and production-table inventory through T03', async () => {
+  it('deploys the exact accepted migration and production-table inventory through L03', async () => {
     const migration = deployMigrations(container.getConnectionUri())
 
     expect(migration).toMatchObject({ exitCode: 0 })
@@ -91,6 +91,21 @@ describe('Planner foundation database runtime', () => {
       { migration_name: '20260811163000_or_composite_facts' },
       { migration_name: '20260811164000_fact_corrections_tombstones' },
       { migration_name: '20260811165000_fact_undo' },
+      { migration_name: '20260811166000_close_day' },
+      { migration_name: '20260811167000_weekly_task_result' },
+      { migration_name: '20260811168000_close_week' },
+      { migration_name: '20260811170000_telegram_ingress_state' },
+      { migration_name: '20260811200000_telegram_action_intents' },
+      { migration_name: '20260811201000_telegram_scalar_action_intents' },
+      { migration_name: '20260811202000_telegram_composite_action_intents' },
+      { migration_name: '20260811203000_telegram_tracking_action_intents' },
+      { migration_name: '20260811210000_reminder_schedule_occurrence' },
+      { migration_name: '20260811220000_notification_intents' },
+      { migration_name: '20260811230000_notification_attempts' },
+      { migration_name: '20260811240000_reminder_worker_retry' },
+      { migration_name: '20260812000000_report_revisions' },
+      { migration_name: '20260812010000_reopen_month' },
+      { migration_name: '20260812020000_reclose_month' },
     ])
     const productionTables = await migratorPool.query<{ table_name: string }>(
       `SELECT table_name
@@ -107,6 +122,8 @@ describe('Planner foundation database runtime', () => {
       { table_name: 'goal_definitions' },
       { table_name: 'goal_series' },
       { table_name: 'memberships' },
+      { table_name: 'notification_attempts' },
+      { table_name: 'notification_intents' },
       { table_name: 'plan_draft_goal_revisions' },
       { table_name: 'plan_draft_goals' },
       { table_name: 'plan_drafts' },
@@ -118,12 +135,21 @@ describe('Planner foundation database runtime', () => {
       { table_name: 'planning_goal_catalog_changes' },
       { table_name: 'planning_month_copy_changes' },
       { table_name: 'planning_month_focus_changes' },
+      { table_name: 'planning_month_reopen_changes' },
       { table_name: 'planning_publication_changes' },
       { table_name: 'planning_seed_consumptions' },
+      { table_name: 'reminder_occurrences' },
+      { table_name: 'reminder_schedule_changes' },
+      { table_name: 'reminder_schedule_slots' },
+      { table_name: 'reminder_schedules' },
+      { table_name: 'report_revisions' },
       { table_name: 'spaces' },
       { table_name: 'telegram_access_allowlist' },
+      { table_name: 'telegram_action_intents' },
       { table_name: 'telegram_external_identities' },
+      { table_name: 'telegram_ingress_state' },
       { table_name: 'tracking_action_groups' },
+      { table_name: 'tracking_day_closures' },
       { table_name: 'tracking_fact_changes' },
       { table_name: 'tracking_fact_records' },
       { table_name: 'tracking_fact_revisions' },
