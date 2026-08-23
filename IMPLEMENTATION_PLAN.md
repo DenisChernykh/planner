@@ -2373,14 +2373,14 @@ and proves product/report recovery content; auth Redis may start empty.
 - Create: `scripts/smoke/planner-restore-smoke.ts`
 - Create: `docs/evidence/local-restore-drill.md`
 
-- [ ] Создать backup populated E01 database without copying auth Redis.
-- [ ] Восстановить в отдельную instance, применить required migrations and
+- [x] Создать backup populated E01 database without copying auth Redis.
+- [x] Восстановить в отдельную instance, применить required migrations and
   verify identities, active publication, facts revisions, pending reminders
   and sample report checksum.
-- [ ] Зафиксировать measured local elapsed time separately from production RPO
+- [x] Зафиксировать measured local elapsed time separately from production RPO
   ≤ 1 hour and RTO ≤ 4 hours objectives.
-- [ ] Запустить restore smoke and final `pnpm check`.
-- [ ] Commit: `docs: verify planner database restore`.
+- [x] Запустить restore smoke and final `pnpm check`.
+- [x] Commit: `docs: verify planner database restore`.
 
 ---
 

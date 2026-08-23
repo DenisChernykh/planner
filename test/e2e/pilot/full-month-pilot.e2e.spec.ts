@@ -9,6 +9,7 @@ import {
 } from '@testcontainers/postgresql'
 import type { StartedRedisContainer } from '@testcontainers/redis'
 import { Pool } from 'pg'
+import { createClient } from 'redis'
 import request from 'supertest'
 
 import { ApiModule } from '@/bootstrap/api/api.module'
@@ -69,6 +70,11 @@ import {
   type DatabaseTransactionPort,
 } from '@/shared/application/database-transaction.port'
 import { startRedisContainer } from '@test/integration/support/redis-container'
+import {
+  assertExternalDatabaseEmpty,
+  validatePostgresEndpoint,
+  validateRedisEndpoint,
+} from '@scripts/smoke/planner-restore-guards'
 
 const POSTGRES_IMAGE =
   'postgres:18.4-trixie@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a'
@@ -105,7 +111,60 @@ function deployMigrations(databaseUrl: string): void {
       env: { ...process.env, DATABASE_URL: databaseUrl },
     },
   )
-  if (result.status !== 0) throw new Error(`${result.stdout}${result.stderr}`)
+  if (result.status !== 0) throw new Error('E01 migrations failed')
+}
+
+type ExternalE01Fixture = {
+  readonly databaseUrl: string
+  readonly redisUrl: string
+}
+
+async function externalE01Fixture(): Promise<ExternalE01Fixture | null> {
+  const databaseUrl = process.env.PLANNER_E01_EXTERNAL_DATABASE_URL
+  const redisUrl = process.env.PLANNER_E01_EXTERNAL_REDIS_URL
+  const restoreFixture = process.env.PLANNER_E01_RESTORE_FIXTURE
+  const present = [databaseUrl, redisUrl, restoreFixture].filter(
+    (value) => value !== undefined,
+  ).length
+  if (present === 0) return null
+  if (
+    present !== 3 ||
+    databaseUrl === undefined ||
+    redisUrl === undefined ||
+    restoreFixture !== '1'
+  ) {
+    throw new Error(
+      'PLANNER_E01_EXTERNAL_DATABASE_URL, PLANNER_E01_EXTERNAL_REDIS_URL and PLANNER_E01_RESTORE_FIXTURE=1 are required together',
+    )
+  }
+  const { databaseName } = validatePostgresEndpoint(
+    databaseUrl,
+    'PLANNER_E01_EXTERNAL_DATABASE_URL',
+    'planner_o02_source_',
+  )
+  validateRedisEndpoint(redisUrl, 'PLANNER_E01_EXTERNAL_REDIS_URL')
+
+  const validationPool = new Pool({ connectionString: databaseUrl })
+  try {
+    await assertExternalDatabaseEmpty(validationPool, databaseName)
+  } finally {
+    await validationPool.end()
+  }
+
+  const redis = createClient({
+    url: redisUrl,
+    disableOfflineQueue: true,
+    socket: { connectTimeout: 5_000, reconnectStrategy: false },
+  })
+  redis.on('error', () => undefined)
+  try {
+    await redis.connect()
+    if ((await redis.ping()) !== 'PONG')
+      throw new Error('External E01 Redis startup failed')
+  } finally {
+    redis.destroy()
+  }
+  return { databaseUrl, redisUrl }
 }
 
 function base64UrlJson(value: unknown): string {
@@ -210,6 +269,7 @@ describe('E01 full backend pilot acceptance', () => {
   let activeNonce = ''
   let activeProviderUserId = firstTelegramId
   let updateId = 1_000
+  let externalFixture: ExternalE01Fixture | null = null
 
   const telegramBatches: unknown[][] = []
   const telegramMessages: TelegramSendMessage[] = []
@@ -219,16 +279,26 @@ describe('E01 full backend pilot acceptance', () => {
   }[] = []
 
   beforeAll(async () => {
-    ;[postgres, redis] = await Promise.all([
-      new PostgreSqlContainer(POSTGRES_IMAGE)
-        .withDatabase('planner_e01_acceptance')
-        .withUsername('planner')
-        .withPassword('planner-test-only')
-        .start(),
-      startRedisContainer(),
-    ])
-    deployMigrations(postgres.getConnectionUri())
-    pool = new Pool({ connectionString: postgres.getConnectionUri() })
+    externalFixture = await externalE01Fixture()
+    let databaseUrl: string
+    let redisUrl: string
+    if (externalFixture !== null) {
+      databaseUrl = externalFixture.databaseUrl
+      redisUrl = externalFixture.redisUrl
+    } else {
+      ;[postgres, redis] = await Promise.all([
+        new PostgreSqlContainer(POSTGRES_IMAGE)
+          .withDatabase('planner_e01_acceptance')
+          .withUsername('planner')
+          .withPassword('planner-test-only')
+          .start(),
+        startRedisContainer(),
+      ])
+      databaseUrl = postgres.getConnectionUri()
+      redisUrl = redis.getConnectionUrl()
+    }
+    deployMigrations(databaseUrl)
+    pool = new Pool({ connectionString: databaseUrl })
 
     realFetch = globalThis.fetch
     globalThis.fetch = (input, init) => {
@@ -284,10 +354,10 @@ describe('E01 full backend pilot acceptance', () => {
       NODE_ENV: 'test',
       API_HOST: '127.0.0.1',
       API_PORT: 3000,
-      DATABASE_URL: postgres.getConnectionUri(),
+      DATABASE_URL: databaseUrl,
       DATABASE_POOL_MAX: 16,
       DATABASE_TRANSACTION_TIMEOUT_MS: 60_000,
-      REDIS_AUTH_URL: redis.getConnectionUrl(),
+      REDIS_AUTH_URL: redisUrl,
       REDIS_KEY_PREFIX: 'planner',
       AUTH_SESSION_KEY_SECRET: Buffer.alloc(32, 101).toString('base64url'),
       AUTH_CSRF_SECRET: Buffer.alloc(32, 102).toString('base64url'),
@@ -368,7 +438,9 @@ describe('E01 full backend pilot acceptance', () => {
     await app?.close().catch(() => undefined)
     await pool?.end().catch(() => undefined)
     globalThis.fetch = realFetch
-    await Promise.allSettled([postgres?.stop(), redis?.stop()])
+    if (externalFixture === null) {
+      await Promise.allSettled([postgres?.stop(), redis?.stop()])
+    }
   })
 
   async function login(input: {
@@ -625,7 +697,15 @@ describe('E01 full backend pilot acceptance', () => {
     const deliveryTransport: ReminderDeliveryTransportPort = {
       send: (input) => {
         reminderDeliveries.push({ chatId: input.chatId, text: input.text })
-        return Promise.resolve({ kind: 'accepted' })
+        return Promise.resolve(
+          externalFixture === null
+            ? { kind: 'accepted' as const }
+            : {
+                kind: 'retryable' as const,
+                reason: 'provider_error' as const,
+                retryAfterSeconds: 60,
+              },
+        )
       },
     }
     const reminderWorker = createRemindersApplication({
@@ -658,6 +738,29 @@ describe('E01 full backend pilot acceptance', () => {
     expect(reminderDeliveries[0]!.text).not.toContain(
       'Показатель 054',
     )
+    if (externalFixture !== null) {
+      await expect(
+        pool.query(
+          `SELECT occurrence.state, attempt.state AS attempt_state,
+                  attempt.outcome, attempt.next_attempt_at
+             FROM reminder_occurrences occurrence
+             JOIN notification_attempts attempt
+               ON attempt.occurrence_id = occurrence.id
+            WHERE occurrence.local_date = DATE '2026-04-10'
+              AND occurrence.slot_kind = 'morning'
+            ORDER BY attempt.created_at DESC
+            LIMIT 1`,
+        ),
+      ).resolves.toMatchObject({
+        rows: [
+          {
+            state: 'pending',
+            attempt_state: 'terminal',
+            outcome: 'retryable',
+          },
+        ],
+      })
+    }
 
     clock.set(new Date('2026-04-10T18:50:00.123Z'))
     const closePath = `/tracking/publications/${publicationId}/days/2026-04-10`
