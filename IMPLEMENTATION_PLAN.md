@@ -72,6 +72,7 @@ M0 Foundation
   → M3 Tracking/worker
   → M4 Telegram/reminders/reporting
   → pilot acceptance
+  → frontend API readiness
   → deployment gate
 ```
 
@@ -2382,6 +2383,223 @@ and proves product/report recovery content; auth Redis may start empty.
 - [x] Запустить restore smoke and final `pnpm check`.
 - [x] Commit: `docs: verify planner database restore`.
 
+### Frontend API readiness (`F01…F10`)
+
+`F` означает backend contract для отдельного frontend consumer. Все cards ниже
+pending и исполняются по одной. Источник требований —
+`FRONTEND_API_ADDENDUM.md`; наличие application command без HTTP/OpenAPI не
+считается завершённой task.
+
+### F01 — Workspace/member presentation context
+
+**Depends on:** A01, A03, P11.
+
+**Outcome:** authenticated browser получает current pair/member, safe display
+labels, timezone и backend-owned persona mapping без UUID/slot inference.
+
+**Files:**
+
+- Create: `src/modules/workspace/application/get-current-workspace.query.ts`
+- Create: `src/modules/workspace/presentation/workspace.controller.ts`
+- Modify: `src/modules/workspace/composition/workspace.module.ts`
+- Modify: `src/bootstrap/contracts/generate-openapi.ts`
+- Test: `test/e2e/workspace/current-workspace.e2e.spec.ts`
+
+- [ ] Зафиксировать profile/persona persistence and pre-binding null semantics.
+- [ ] Реализовать bounded same-space query и `GET /workspace/current`.
+- [ ] Доказать no hardcoded UUID/slot, foreign/inconsistent state и PII-negative
+  serialization.
+- [ ] Regenerate OpenAPI, запустить focused tests и `pnpm check:quick`.
+- [ ] Commit: `feat: expose current planner workspace context`.
+
+### F02 — Plan/month discovery read model
+
+**Depends on:** P08, P09, T07, R02, L03.
+
+**Outcome:** browser получает deterministic bounded index current/future/history
+months с lifecycle references и server-owned allowed actions.
+
+**Files:**
+
+- Create: `src/modules/planning/application/list-plan-months.query.ts`
+- Modify: `src/modules/planning/presentation/planning.controller.ts`
+- Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
+- Test: `test/integration/planning/list-plan-months.integration.spec.ts`
+- Test: `test/e2e/planning/list-plan-months.e2e.spec.ts`
+
+- [ ] Написать no-plan, draft, future/active, grace, reopened, closed/revised,
+  copy-source and pagination cases in one consistent snapshot.
+- [ ] Реализовать `GET /planning/months` без browser date probing.
+- [ ] Проверить concealed foreign state, stable order и string revisions.
+- [ ] Regenerate OpenAPI, запустить focused tests и `pnpm check:quick`.
+- [ ] Commit: `feat: expose planner month discovery`.
+
+### F03 — Create empty draft HTTP adapter
+
+**Depends on:** P01, S04.
+
+**Outcome:** existing `CreateEmptyDraft` доступен browser через authenticated,
+CSRF-protected и idempotent HTTP command.
+
+**Files:**
+
+- Modify: `src/modules/planning/presentation/planning.controller.ts`
+- Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
+- Test: `test/e2e/planning/create-empty-draft.e2e.spec.ts`
+
+- [ ] Зафиксировать exact DTO `{ commandId, targetMonth, focus }` и finite
+  Problem/recovery mapping.
+- [ ] Реализовать `POST /planning/drafts/empty` только как adapter существующей
+  application command.
+- [ ] Доказать replay/fingerprint/competing month, CSRF и actor-from-session.
+- [ ] Regenerate OpenAPI and run focused contract/E2E.
+- [ ] Commit: `feat: expose empty planner drafts`.
+
+### F04 — Copy publication to draft HTTP adapter
+
+**Depends on:** P09, F02, S04.
+
+**Outcome:** exact immutable publication можно выбрать из discovery и атомарно
+скопировать в новый draft без facts/results/report/reminder state.
+
+**Files:**
+
+- Modify: `src/modules/planning/presentation/planning.controller.ts`
+- Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
+- Test: `test/e2e/planning/copy-publication-to-draft.e2e.spec.ts`
+
+- [ ] Зафиксировать exact DTO `{ commandId, sourcePublicationId, targetMonth }`.
+- [ ] Реализовать `POST /planning/drafts/from-publication` поверх P09.
+- [ ] Доказать concealed source, source immutability, no-facts copy and replay.
+- [ ] Regenerate OpenAPI and run focused contract/E2E.
+- [ ] Commit: `feat: expose publication draft copy`.
+
+### F05 — Update month focus HTTP adapter
+
+**Depends on:** P01, F03, S04.
+
+**Outcome:** draft focus меняется через revision-guarded browser command и
+попадает в следующий preview/snapshot.
+
+**Files:**
+
+- Modify: `src/modules/planning/presentation/planning.controller.ts`
+- Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
+- Test: `test/e2e/planning/update-month-focus.e2e.spec.ts`
+
+- [ ] Зафиксировать exact DTO `{ commandId, expectedRevision, focus }`.
+- [ ] Реализовать `POST /planning/drafts/{planMonthId}/focus` поверх P01.
+- [ ] Доказать stale recovery, replay и immutable published state.
+- [ ] Regenerate OpenAPI and run focused contract/E2E.
+- [ ] Commit: `feat: expose planner month focus updates`.
+
+### F06 — Cancel and republish HTTP adapters
+
+**Depends on:** P08, P07, S04.
+
+**Outcome:** future publication без facts возвращается в draft и публикуется
+новой append-only revision через существующие P08 commands.
+
+**Files:**
+
+- Modify: `src/modules/planning/presentation/planning.controller.ts`
+- Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
+- Test: `test/e2e/planning/cancel-republish.e2e.spec.ts`
+
+- [ ] Зафиксировать cancel lifecycle revision и exact republish P07 confirmation
+  DTOs.
+- [ ] Реализовать cancel/republish routes без controller-owned policy.
+- [ ] Доказать started/facts/stale/replay, immutable old snapshots and next
+  publication revision.
+- [ ] Regenerate OpenAPI and run focused integration/E2E.
+- [ ] Commit: `feat: expose publication cancel and republish`.
+
+### F07 — Fact and lifecycle audit read models
+
+**Depends on:** T05, T06, P08, L03.
+
+**Outcome:** members читают bounded module-owned fact revision chain и month
+lifecycle timeline без global audit store.
+
+**Files:**
+
+- Create: `src/modules/tracking/application/get-fact-history.query.ts`
+- Create: `src/modules/planning/application/get-month-history.query.ts`
+- Modify: `src/modules/tracking/presentation/fact-maintenance.controller.ts`
+- Modify: `src/modules/planning/presentation/planning.controller.ts`
+- Test: `test/integration/tracking/fact-history.integration.spec.ts`
+- Test: `test/integration/planning/month-history.integration.spec.ts`
+
+- [ ] Зафиксировать bounded pagination/order и exact typed history variants.
+- [ ] Реализовать separate tracking/planning queries в consistent snapshots.
+- [ ] Доказать authors/reasons/revisions/tombstones, concealed foreign state и
+  no reason text in logs/telemetry.
+- [ ] Regenerate OpenAPI, run focused tests and `pnpm check:quick`.
+- [ ] Commit: `feat: expose planner audit histories`.
+
+### F08 — Frontend-safe OIDC result redirect
+
+**Depends on:** A03.
+
+**Outcome:** terminal Telegram OIDC outcomes возвращают browser на fixed safe
+frontend result route, не ослабляя ceremony consume/cookie/identity policy.
+
+**Files:**
+
+- Modify: `src/modules/auth/presentation/telegram-oidc.controller.ts`
+- Test: `test/contract/auth/telegram-oidc-callback.contract.spec.ts`
+- Test: `test/e2e/auth/telegram-oidc-callback.e2e.spec.ts`
+
+- [ ] Зафиксировать finite frontend result-code allowlist и exact redirect
+  boundary для malformed/mismatch outcomes.
+- [ ] Реализовать only relative `/auth/telegram/result`; запретить returnTo/open
+  redirect и provider data in URL.
+- [ ] Доказать cancel/rejected/denied/dependency/invalid, replay and PII-negative
+  headers/logs.
+- [ ] Regenerate OpenAPI and run focused auth E2E.
+- [ ] Commit: `feat: redirect telegram oidc results safely`.
+
+### F09 — Bot navigation metadata
+
+**Depends on:** A03, G01, N04.
+
+**Outcome:** authenticated browser получает configured safe bot navigation
+capability отдельно от reminder delivery status.
+
+**Files:**
+
+- Create: `src/modules/telegram-bot/application/get-bot-navigation.query.ts`
+- Create: `src/modules/telegram-bot/presentation/telegram-navigation.controller.ts`
+- Modify: `src/modules/telegram-bot/composition/telegram-bot.module.ts`
+- Test: `test/e2e/telegram-bot/navigation.e2e.spec.ts`
+
+- [ ] Зафиксировать safe HTTPS URL/capability response и disabled/misconfigured
+  behavior.
+- [ ] Реализовать `GET /telegram/navigation` без raw Telegram/chat/member IDs.
+- [ ] Доказать no hardcoded consumer URL, no bot token/start payload leakage and
+  no coupling to delivery health.
+- [ ] Regenerate OpenAPI and run focused contract/E2E.
+- [ ] Commit: `feat: expose planner bot navigation`.
+
+### F10 — Published OpenAPI consumer handoff
+
+**Depends on:** F01–F09.
+
+**Outcome:** backend Git SHA и committed OpenAPI bytes воспроизводимо закреплены
+отдельным frontend consumer; drift между local и CI невозможен молча.
+
+**Files:**
+
+- Modify: `FRONTEND_API_ADDENDUM.md`
+- Create: `docs/evidence/frontend-api-handoff.md`
+- Modify: `package.json`
+
+- [ ] Выбрать один pinned-SHA/checksum handoff для local и CI без copy-paste.
+- [ ] Доказать all 9 capabilities в canonical OpenAPI и consumer regeneration.
+- [ ] Запустить full `pnpm check`; отделить backend/consumer/hosted evidence.
+- [ ] Провести independent cross-repository contract review.
+- [ ] Commit: `docs: verify planner frontend api handoff`.
+
 ---
 
 ## 4. Dependency spine
@@ -2399,6 +2617,10 @@ N01 + N03 → N04; N01 + N02 + N03 + T10 → N05
 P05 + T07 → R01 → R02 → L01 → L02 → L03
 P08 + P09 + P11 + H01/H02/H03 + G05 + N04/N05 + L03 → E01
 E01 → O01 → O02
+P11 + A03 → F01; P08 + P09 + T07 + R02 + L03 → F02
+P01 → F03 → F05; P09 + F02 → F04; P08 + P07 → F06
+T05 + T06 + P08 + L03 → F07; A03 → F08; A03 + G01 + N04 → F09
+F01 + F02 + F03 + F04 + F05 + F06 + F07 + F08 + F09 → F10
 ```
 
 Parallel execution допустим только для branches без общей schema/contract
@@ -2416,6 +2638,7 @@ Parallel execution допустим только для branches без обще
 | M4 | G01–G05, N01–N05, R01–R02, L01–L03 | Telegram/reminder/report E2E + quick gate | весь pilot behavior работает локально |
 | Acceptance | E01 | `pnpm check` | все pilot AC трассированы |
 | Local ops | O01–O02 | Docker + restore smoke | local runtime/recovery evidence |
+| Frontend API | F01–F10 | OpenAPI contracts + `pnpm check` + pinned consumer handoff | `GAP-01…GAP-09` доступны отдельному web consumer |
 
 ### 5.1. Acceptance owner map
 
@@ -2452,6 +2675,8 @@ Parallel execution допустим только для branches без обще
 - AI/free-text parser, public signup, multi-space, native apps, wearables and
   medical recommendations.
 - Frontend technical design and frontend implementation.
+- До `F10`: утверждение, что backend HTTP/OpenAPI полностью готов для отдельного
+  frontend consumer.
 - Production hosting/provider, reverse proxy, DNS/TLS, production Telegram
   ingress and hosted smoke. They are launch-blocking deployment work, not local
   backend tasks.
@@ -2479,8 +2704,8 @@ review/commit/PR. Код Planner не ждёт extraction обратно в Star
 
 ## 8. Pre-pilot deployment gate
 
-После O02, но до месяца без бумаги, отдельный deployment plan обязан выбрать и
-доказать:
+После O02 и F10, но до месяца без бумаги, отдельный deployment plan обязан
+выбрать и доказать:
 
 - provider/VPS, reverse proxy and release mechanism;
 - production Compose/service definitions for `api`, `planner-worker`,
@@ -2511,3 +2736,5 @@ local `pnpm check` и Docker smoke зелёные.
 - Evidence boundary: local, CI, Docker, hosted and restore claims разделены.
 - Placeholder scan: plan содержит явные решения и blockers; неопределённых
   implementation placeholders нет.
+- Frontend readiness: каждый `GAP-01…GAP-09` имеет отдельную owning task, а
+  application-only command не назван доступным browser до OpenAPI merge.

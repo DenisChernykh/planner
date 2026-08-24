@@ -3051,6 +3051,33 @@ Fingerprint conflict не раскрывает prior fingerprint/payload. Valida
 возвращает value-free `/body` или precise field pointer; unknown error остаётся
 constant `INTERNAL_ERROR`.
 
+### 15.3. Frontend API readiness boundary
+
+Отдельный browser consumer закреплён в
+[Frontend API Addendum](./FRONTEND_API_ADDENDUM.md). `GAP-01…GAP-09` являются
+backend-owned requirements, но не считаются доступными до реализации
+`F01…F09` и появления operations в committed OpenAPI.
+
+Новые browser contracts обязаны сохранять существующие boundaries:
+
+- actor выводится из session, а personal `ownerMemberId` выбирается только из
+  server-provided workspace context;
+- mutations переиспользуют существующие application commands, durable receipts,
+  CAS и module-owned history вместо controller-side workflow;
+- reads bounded, member-authorized и consistent-snapshot; global audit store и
+  cross-module table reads из presentation adapters запрещены;
+- UUID/bigint/revisions/decimal values сериализуются losslessly, а exact replay
+  выполняется до clock, membership и aggregate reads;
+- RFC 9457, concealed resources, Origin/CSRF и PII-safe logging не ослабляются;
+- OIDC result UX не вводит caller-controlled redirect и не помещает provider
+  payload, `state`, code, token, claim или Telegram ID в URL;
+- bot navigation metadata не является identity/delivery-health contract;
+- realtime и offline command queue не обещаются.
+
+Точный target HTTP surface, acceptance и межрепозиторный OpenAPI handoff
+определены addendum. Любое изменение этих требований синхронно обновляет
+addendum, OpenAPI/contract tests и consumer matrix до реализации.
+
 ## 16. Failure model
 
 | Failure | Обязательное поведение |

@@ -10,6 +10,7 @@
 - [User Flows](./USER_FLOWS.md)
 - [Screen Map](./SCREEN_MAP.md)
 - [Backend Technical Design](./TECHNICAL_DESIGN.md)
+- [Frontend API Addendum](./FRONTEND_API_ADDENDUM.md)
 - [Implementation Plan](./IMPLEMENTATION_PLAN.md)
 - [Инструкции для ИИ-агента](./AGENTS.md)
 
