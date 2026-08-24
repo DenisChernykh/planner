@@ -106,6 +106,11 @@ describe('F01 current workspace presentation context', () => {
        VALUES ($1, $2, $3, 1)`,
       [firstMemberId, spaceId, firstUserId],
     )
+    await admin.query(
+      `INSERT INTO telegram_access_allowlist (space_id, user_id, telegram_id)
+       VALUES ($1, $2, $3)`,
+      [spaceId, firstUserId, firstTelegramId],
+    )
 
     provider = new PrismaClientProvider(
       {
@@ -214,6 +219,11 @@ describe('F01 current workspace presentation context', () => {
        VALUES ($1, $2, $3, 2)`,
       [secondMemberId, spaceId, secondUserId],
     )
+    await admin.query(
+      `INSERT INTO telegram_access_allowlist (space_id, user_id, telegram_id)
+       VALUES ($1, $2, $3)`,
+      [spaceId, secondUserId, secondTelegramId],
+    )
   }
 
   it('publishes the exact protected OpenAPI operation', async () => {
@@ -231,13 +241,15 @@ describe('F01 current workspace presentation context', () => {
     for (const status of ['200', '401', '403', '409', '503']) {
       expect(operation.responses).toHaveProperty(status)
     }
-    expect(
-      document.components.schemas.WorkspaceCurrentResponseV1,
-    ).toMatchObject({
+    const responseSchema =
+      document.components.schemas.WorkspaceCurrentResponseV1
+    if (responseSchema === undefined) {
+      throw new Error('WorkspaceCurrentResponseV1 schema is missing')
+    }
+    expect(responseSchema).toMatchObject({
       type: 'object',
       additionalProperties: false,
       required: [
-        'schemaVersion',
         'spaceId',
         'timeZone',
         'currentMemberId',
@@ -245,6 +257,17 @@ describe('F01 current workspace presentation context', () => {
         'members',
       ],
     })
+    expect(
+      Object.keys(
+        (responseSchema.properties ?? {}) as Record<string, unknown>,
+      ).sort(),
+    ).toEqual([
+      'currentMemberId',
+      'members',
+      'personaMappingState',
+      'spaceId',
+      'timeZone',
+    ])
   })
 
   it('returns authentication, membership and inconsistent-pair boundaries', async () => {
@@ -275,7 +298,6 @@ describe('F01 current workspace presentation context', () => {
     const firstBody = await json(beforeFirst)
     const secondBody = await json(beforeSecond)
     expect(firstBody).toMatchObject({
-      schemaVersion: 'workspace.current.v1',
       spaceId,
       timeZone: 'Asia/Yekaterinburg',
       currentMemberId: firstMemberId,
@@ -295,6 +317,15 @@ describe('F01 current workspace presentation context', () => {
         },
       ],
     })
+    for (const body of [firstBody, secondBody]) {
+      expect(Object.keys(body).sort()).toEqual([
+        'currentMemberId',
+        'members',
+        'personaMappingState',
+        'spaceId',
+        'timeZone',
+      ])
+    }
     expect(secondBody).toMatchObject({
       currentMemberId: secondMemberId,
       personaMappingState: 'unbound',
@@ -342,7 +373,18 @@ describe('F01 current workspace presentation context', () => {
     const afterSecond = await current(secondCookie)
     expect(afterFirst.status).toBe(200)
     expect(afterSecond.status).toBe(200)
-    expect(await json(afterFirst)).toMatchObject({
+    const afterFirstBody = await json(afterFirst)
+    const afterSecondBody = await json(afterSecond)
+    for (const body of [afterFirstBody, afterSecondBody]) {
+      expect(Object.keys(body).sort()).toEqual([
+        'currentMemberId',
+        'members',
+        'personaMappingState',
+        'spaceId',
+        'timeZone',
+      ])
+    }
+    expect(afterFirstBody).toMatchObject({
       personaMappingState: 'bound',
       members: [
         {
@@ -359,7 +401,7 @@ describe('F01 current workspace presentation context', () => {
         },
       ],
     })
-    expect(await json(afterSecond)).toMatchObject({
+    expect(afterSecondBody).toMatchObject({
       personaMappingState: 'bound',
       members: [
         {

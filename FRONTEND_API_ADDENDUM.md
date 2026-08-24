@@ -2,7 +2,8 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; реализация `F01…F10` не начата
+**Статус:** обязательные backend-требования; `F01` реализована в committed
+backend contract, `F02…F10` не начаты
 **Backend contract baseline:** `44f00d00715d6a485ad5aff3f36680a414af96ae`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
@@ -79,10 +80,10 @@ security/recovery semantics и acceptance gate. Бизнес-правила по
 
 ### GAP-01 — Workspace/member presentation context
 
-**Current state:** `GET /auth/me` возвращает только `userId` и `sessionId`;
-workspace resolver не является browser read model.
+**Implemented state (F01):** `GET /auth/me` по-прежнему возвращает только
+`userId` и `sessionId`; browser read model — `GET /workspace/current`.
 
-**Required surface:** authenticated `GET /workspace/current`.
+**Committed surface:** authenticated `GET /workspace/current`.
 
 The committed response schema is `workspace.current.v1` and contains exactly
 `spaceId`, `timeZone = "Asia/Yekaterinburg"`, `currentMemberId`,

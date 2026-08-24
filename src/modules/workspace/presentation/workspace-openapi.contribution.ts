@@ -40,10 +40,6 @@ function installWorkspaceSchemas(document: OpenAPIObject): void {
   )
   schemas['WorkspaceCurrentResponseV1'] = object(
     {
-      schemaVersion: {
-        type: 'string',
-        enum: ['workspace.current.v1'],
-      },
       spaceId: uuid,
       timeZone: { type: 'string', enum: ['Asia/Yekaterinburg'] },
       currentMemberId: uuid,
@@ -59,7 +55,6 @@ function installWorkspaceSchemas(document: OpenAPIObject): void {
       },
     },
     [
-      'schemaVersion',
       'spaceId',
       'timeZone',
       'currentMemberId',

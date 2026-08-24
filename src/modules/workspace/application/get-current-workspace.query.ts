@@ -19,7 +19,6 @@ export interface CurrentWorkspaceMemberView {
 }
 
 export interface CurrentWorkspaceView {
-  readonly schemaVersion: 'workspace.current.v1'
   readonly spaceId: string
   readonly timeZone: 'Asia/Yekaterinburg'
   readonly currentMemberId: string
@@ -108,7 +107,6 @@ export class GetCurrentWorkspaceQuery {
       }
 
       return freeze({
-        schemaVersion: 'workspace.current.v1' as const,
         spaceId: snapshot.spaceId,
         timeZone: 'Asia/Yekaterinburg' as const,
         currentMemberId: snapshot.currentMemberId,

@@ -45,7 +45,6 @@ describe('GetCurrentWorkspaceQuery', () => {
     }).execute({ trustedUserId: '11111111-1111-4111-8111-111111111111' })
 
     expect(result).toEqual({
-      schemaVersion: 'workspace.current.v1',
       spaceId,
       timeZone: 'Asia/Yekaterinburg',
       currentMemberId,
