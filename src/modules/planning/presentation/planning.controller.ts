@@ -96,6 +96,7 @@ import {
 import {
   AddDraftGoalRequestDto,
   CreateEmptyDraftRequestDto,
+  CreateDraftFromPublicationRequestDto,
   CreateDraftFromSeedRequestDto,
   DraftGoalPathDto,
   DraftMonthQueryDto,
@@ -247,6 +248,19 @@ const createEmptyDraftBodySchema = {
   },
   required: ['commandId', 'targetMonth', 'focus'],
 }
+const createFromPublicationBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    sourcePublicationId: uuidSchema,
+    targetMonth: {
+      type: 'string' as const,
+      pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
+    },
+  },
+  required: ['commandId', 'sourcePublicationId', 'targetMonth'],
+}
 const draftEditorResponseSchema = {
   $ref: '#/components/schemas/DraftEditorResponseV1',
 }
@@ -357,6 +371,11 @@ const seedDraftProblems = [
 ]
 const emptyDraftProblems = [
   ...mutationProblems,
+  PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
+]
+const copyDraftProblems = [
+  ...mutationProblems,
+  PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
   PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
 ]
 const draftMutationBaseProblems = [
@@ -708,6 +727,33 @@ export class PlanningDraftController {
         commandId: body.commandId,
         trustedActor: await this.actor(principal),
         payload: { targetMonth: body.targetMonth, focus: body.focus },
+      }),
+    )
+  }
+
+  @Post('from-publication')
+  @ApiOperation({
+    summary: 'Create an editable draft from an immutable publication.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiCreatedResponse({
+    description: 'Draft aggregate reference at revision one.',
+    schema: draftMutationResponseSchema,
+  })
+  @ApiBody({ required: true, schema: createFromPublicationBodySchema })
+  @ApiProblemResponses(...copyDraftProblems)
+  public async createFromPublication(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Body() body: CreateDraftFromPublicationRequestDto,
+  ): Promise<DraftMutationResponse> {
+    return toDraftMutationResponse(
+      await this.planning.createDraftFromPublication.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        payload: {
+          sourcePublicationId: body.sourcePublicationId,
+          targetMonth: body.targetMonth,
+        },
       }),
     )
   }

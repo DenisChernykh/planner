@@ -53,6 +53,20 @@ export class CreateEmptyDraftRequestDto {
   public readonly focus!: string
 }
 
+export class CreateDraftFromPublicationRequestDto {
+  @IsString()
+  @Matches(UUID)
+  public readonly commandId!: string
+
+  @IsString()
+  @Matches(UUID)
+  public readonly sourcePublicationId!: string
+
+  @IsString()
+  @Matches(MONTH)
+  public readonly targetMonth!: string
+}
+
 export class PlanMonthPathDto {
   @IsString()
   @Matches(UUID)

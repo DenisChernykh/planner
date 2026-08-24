@@ -2468,11 +2468,11 @@ CSRF-protected и idempotent HTTP command.
 - Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
 - Test: `test/e2e/planning/copy-publication-to-draft.e2e.spec.ts`
 
-- [ ] Зафиксировать exact DTO `{ commandId, sourcePublicationId, targetMonth }`.
-- [ ] Реализовать `POST /planning/drafts/from-publication` поверх P09.
-- [ ] Доказать concealed source, source immutability, no-facts copy and replay.
-- [ ] Regenerate OpenAPI and run focused contract/E2E.
-- [ ] Commit: `feat: expose publication draft copy`.
+- [x] Зафиксировать exact DTO `{ commandId, sourcePublicationId, targetMonth }`.
+- [x] Реализовать `POST /planning/drafts/from-publication` поверх P09.
+- [x] Доказать concealed source, source immutability, no-facts copy and replay.
+- [x] Regenerate OpenAPI and run focused contract/E2E.
+- [x] Commit: `feat: expose publication draft copy`.
 
 ### F05 — Update month focus HTTP adapter
 

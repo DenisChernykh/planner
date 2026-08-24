@@ -458,6 +458,7 @@ describe('S03 HTTP contracts', () => {
       '/planning/catalog/goal-definitions/{goalDefinitionId}/versions',
       '/planning/drafts',
       '/planning/drafts/empty',
+      '/planning/drafts/from-publication',
       '/planning/drafts/from-seed',
       '/planning/drafts/publication-preview',
       '/planning/drafts/{planMonthId}/goals',
@@ -1036,6 +1037,7 @@ describe('S03 HTTP contracts', () => {
 
     const drafts = document.paths['/planning/drafts']
     const emptyDraft = document.paths['/planning/drafts/empty']
+    const copyDraft = document.paths['/planning/drafts/from-publication']
     const publicationPreview =
       document.paths['/planning/drafts/publication-preview']
     const draftAdd = document.paths['/planning/drafts/{planMonthId}/goals']
@@ -1047,6 +1049,7 @@ describe('S03 HTTP contracts', () => {
       document.paths['/planning/drafts/{planMonthId}/goals/reorder']
     expect(Object.keys(drafts ?? {})).toEqual(['get'])
     expect(Object.keys(emptyDraft ?? {})).toEqual(['post'])
+    expect(Object.keys(copyDraft ?? {})).toEqual(['post'])
     expect(Object.keys(publicationPreview ?? {})).toEqual(['get'])
     for (const operation of [
       draftAdd,
@@ -1058,6 +1061,9 @@ describe('S03 HTTP contracts', () => {
     }
     expect(drafts?.get?.security).toEqual([{ sessionCookie: [] }])
     expect(emptyDraft?.post?.security).toEqual([
+      { sessionCookie: [], csrfToken: [] },
+    ])
+    expect(copyDraft?.post?.security).toEqual([
       { sessionCookie: [], csrfToken: [] },
     ])
     expect(publicationPreview?.get?.security).toEqual([{ sessionCookie: [] }])
@@ -1131,6 +1137,7 @@ describe('S03 HTTP contracts', () => {
       Object.keys(publicationPreview?.get?.responses ?? {}).sort(),
     ).toEqual(['200', '401', '403', '404', '409', '422', '503'])
     for (const [operation, success] of [
+      [copyDraft?.post, '201'],
       [draftAdd?.post, '201'],
       [draftUpdate?.post, '200'],
       [draftRemove?.post, '200'],
@@ -1219,6 +1226,47 @@ describe('S03 HTTP contracts', () => {
     const exactRequestBody = (schema: OpenApiSchema): object => ({
       content: { 'application/json': { schema } },
       required: true,
+    })
+    expect(copyDraft?.post?.requestBody).toEqual(
+      exactRequestBody({
+        additionalProperties: false,
+        properties: {
+          commandId: uuidSchema,
+          sourcePublicationId: uuidSchema,
+          targetMonth: {
+            pattern:
+              '^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$',
+            type: 'string',
+          },
+        },
+        required: ['commandId', 'sourcePublicationId', 'targetMonth'],
+        type: 'object',
+      }),
+    )
+    expect(copyDraft?.post?.responses?.['201']).toMatchObject({
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/DraftMutationResponseV1' },
+        },
+      },
+    })
+    expect(
+      copyDraft?.post?.responses?.['404']?.content?.['application/problem+json']
+        ?.examples,
+    ).toHaveProperty('PLAN_PUBLICATION_NOT_FOUND')
+    expect(copyDraft?.post?.responses?.['409']).toMatchObject({
+      content: {
+        'application/problem+json': {
+          schema: {
+            oneOf: [
+              baseProblemRef,
+              {
+                $ref: '#/components/schemas/PlanMonthAlreadyExistsProblemResponseDto',
+              },
+            ],
+          },
+        },
+      },
     })
     expect(draftAdd?.post?.requestBody).toEqual(
       exactRequestBody({

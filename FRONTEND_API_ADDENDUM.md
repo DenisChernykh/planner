@@ -2,9 +2,9 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01`, `F02` и `F03` реализованы
-в backend contract, `F04…F10` не начаты
-**Backend contract baseline:** `44f00d00715d6a485ad5aff3f36680a414af96ae`
+**Статус:** обязательные backend-требования; `F01`, `F02`, `F03` и `F04`
+реализованы в backend contract, `F05…F10` не начаты
+**Backend contract baseline:** `99f42d09bbb79de8e4c0f12ac099e1d96921c7f3`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
 ## 1. Назначение и граница
@@ -201,8 +201,8 @@ guessing or retrying a second create.
 
 ### GAP-04 — Create draft from publication HTTP command
 
-**Current state:** `CreateDraftFromPublication` реализован в P09 только как
-application command.
+**Implemented state (F04):** `CreateDraftFromPublication` из P09 опубликован
+через strict authenticated + CSRF HTTP adapter.
 
 **Required surface:** authenticated + CSRF
 `POST /planning/drafts/from-publication`.
@@ -214,6 +214,18 @@ statuses, notes/results, reports, reminders, progress и publication metadata н
 
 **Acceptance:** source остаётся byte-stable; destination создаётся один раз и
 открывается по возвращённой draft reference; no-facts copy доказан E2E.
+
+**F04 implementation contract:** `POST /planning/drafts/from-publication`
+requires the session cookie, allowed browser origin and session-bound CSRF
+header. The JSON body has `additionalProperties: false` and exactly
+`commandId` (UUID), `sourcePublicationId` (UUID) and canonical `targetMonth`
+(`YYYY-MM`). Actor and space fields are rejected and never read; the actor is
+derived from the authenticated principal and workspace member resolver. Create
+and exact replay return `201` with `DraftMutationResponseV1` and decimal-string
+revisions. Missing and foreign publication IDs both return the concealed
+`PLAN_PUBLICATION_NOT_FOUND` Problem. Existing destination months return the
+safe `PLAN_MONTH_ALREADY_EXISTS` shape with `open-existing-month`; no user,
+space or source metadata is returned.
 
 ### GAP-05 — Update month focus HTTP command
 

@@ -1779,6 +1779,25 @@ identifier is returned. Exact replay remains safe after an ambiguous network
 result, and competing month creation leaves one draft, one receipt, and one
 history action.
 
+F04 exposes the existing P09 command through authenticated + CSRF-protected
+`POST /planning/drafts/from-publication`. Its strict request body is exactly
+`{ commandId, sourcePublicationId, targetMonth }`; actor and space are derived
+from the checked session principal and workspace resolver, while all source
+lookup, copy ordering, provenance and transaction policy remain in
+`CreateDraftFromPublication`. Successful create and exact replay return `201`
+with `planning.plan-draft.v1` and decimal-string `aggregateRevision`.
+
+The F04 adapter documents only finite mutation Problems: authentication/CSRF,
+planning authorization, malformed/unsupported/oversized body, validation,
+fingerprint conflict, concealed `PLAN_PUBLICATION_NOT_FOUND`, safe
+`PLAN_MONTH_ALREADY_EXISTS`, and dependency unavailability. Missing and
+foreign publications have the same concealed response. A destination conflict
+returns only `{ existingRef, nextAction: "open-existing-month" }`, with no
+space, user or source publication details. The copied draft contains only
+source focus/configuration/order/provenance and new draft identities; source
+publication/month rows stay immutable and destination has no facts, results,
+reports, reminders, progress, publication metadata, expectations or periods.
+
 P02 commands имеют exact contracts:
 
 ```text
