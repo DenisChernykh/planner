@@ -34,6 +34,7 @@ import { UpdateMonthFocusCommand } from '../application/update-month-focus.comma
 import { PublishMonthCommand } from '../application/publish-month.command'
 import { GetPublishedSnapshotQuery } from '../application/get-published-snapshot.query'
 import { GetActiveMonthQuery } from '../application/get-active-month.query'
+import { ListPlanMonthsQuery } from '../application/list-plan-months.query'
 import { CancelPublicationCommand } from '../application/cancel-publication.command'
 import { RepublishMonthCommand } from '../application/republish-month.command'
 import { ReopenMonthCommand } from '../application/reopen-month.command'
@@ -45,6 +46,7 @@ import { PrismaPublicationPersistence } from '../infrastructure/prisma-publicati
 import { PrismaSeedOwnerBinding } from '../infrastructure/prisma-seed-owner-binding'
 import { PrismaReopenMonthPersistence } from '../infrastructure/prisma-reopen-month.persistence'
 import { PrismaRecloseMonthPersistence } from '../infrastructure/prisma-reclose-month.persistence'
+import { PrismaListPlanMonthsRead } from '../infrastructure/prisma-list-plan-months.read'
 
 export function createPlanningApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -62,6 +64,7 @@ export function createPlanningApplication(dependencies: {
   const reclosedMonths = new PrismaRecloseMonthPersistence(
     dependencies.database,
   )
+  const listPlanMonthsRead = new PrismaListPlanMonthsRead(dependencies.database)
   const closeMonthReport: CloseMonthReportPort =
     dependencies.closeMonthReport ?? {
       build: () =>
@@ -139,6 +142,12 @@ export function createPlanningApplication(dependencies: {
     getActiveMonth: new GetActiveMonthQuery(
       dependencies.workspaceMembers,
       publications,
+      dependencies.clock,
+    ),
+    listPlanMonths: new ListPlanMonthsQuery(
+      dependencies.workspaceMembers,
+      listPlanMonthsRead,
+      dependencies.transaction,
       dependencies.clock,
     ),
     addDraftGoal: new AddDraftGoalCommand(

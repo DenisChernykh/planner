@@ -2385,8 +2385,8 @@ and proves product/report recovery content; auth Redis may start empty.
 
 ### Frontend API readiness (`F01…F10`)
 
-`F` означает backend contract для отдельного frontend consumer. Все cards ниже
-pending и исполняются по одной. Источник требований —
+`F` означает backend contract для отдельного frontend consumer. Cards ниже
+исполняются по одной. Источник требований —
 `FRONTEND_API_ADDENDUM.md`; наличие application command без HTTP/OpenAPI не
 считается завершённой task.
 
@@ -2427,12 +2427,12 @@ months с lifecycle references и server-owned allowed actions.
 - Test: `test/integration/planning/list-plan-months.integration.spec.ts`
 - Test: `test/e2e/planning/list-plan-months.e2e.spec.ts`
 
-- [ ] Написать no-plan, draft, future/active, grace, reopened, closed/revised,
+- [x] Написать no-plan, draft, future/active, grace, reopened, closed/revised,
   copy-source and pagination cases in one consistent snapshot.
-- [ ] Реализовать `GET /planning/months` без browser date probing.
-- [ ] Проверить concealed foreign state, stable order и string revisions.
-- [ ] Regenerate OpenAPI, запустить focused tests и `pnpm check:quick`.
-- [ ] Commit: `feat: expose planner month discovery`.
+- [x] Реализовать `GET /planning/months` без browser date probing.
+- [x] Проверить concealed foreign state, stable order и string revisions.
+- [x] Regenerate OpenAPI, запустить focused tests и `pnpm check:quick`.
+- [x] Commit: `feat: expose planner month discovery`.
 
 ### F03 — Create empty draft HTTP adapter
 

@@ -2,8 +2,8 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01` реализована в committed
-backend contract, `F02…F10` не начаты
+**Статус:** обязательные backend-требования; `F01` и `F02` реализованы в
+backend contract, `F03…F10` не начаты
 **Backend contract baseline:** `44f00d00715d6a485ad5aff3f36680a414af96ae`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
@@ -120,10 +120,35 @@ selection и report labels без hardcoded UUID/persona.
 
 ### GAP-02 — Plan/month discovery
 
-**Current state:** известный `targetMonth` читается через tracking query, а
-active publication — отдельным query; перечисления history/future months нет.
+**Implemented state (F02):** authenticated `GET /planning/months` возвращает
+один consistent `planning.month-index.v1` snapshot с bounded newest-first
+keyset pagination.
 
-**Required surface:** authenticated `GET /planning/months` с bounded pagination.
+**Committed surface:** authenticated `GET /planning/months?limit=20&cursor=...`.
+
+`limit` — integer `1..50`, default `20`; cursor — opaque versioned keyset
+token `v1.<base64url>`, internally bound to the last `{targetMonth,
+planMonthId}` and never interpreted by the browser. The server reads `limit+1`
+rows ordered by `month_start DESC, plan_month_id DESC` and returns `nextCursor`
+only when another row exists. Invalid limit/cursor returns the existing `422`
+Problem Details contract.
+
+Response schema is exact `planning.month-index.v1`: `queryLocalDate` is the
+single server-derived `Asia/Yekaterinburg` local date; each item has
+`targetMonth`, server-derived `phase` (`draft|future|active|grace|closed`),
+`lifecycle` (`planMonthId`, `status`, `mode`, string `revision`), mandatory
+`draft.revision` string, nullable latest exact `publication` (`publicationId`,
+string `revision`, `activeLocalDate`, `isActive`), nullable latest `report`
+(`reportRevisionId`, string `revision`, `status: original|revised`) and exact
+boolean `allowedActions` (`openDraft`, `openPublication`, `copySource`,
+`cancel`, `reopen`, `reclose`). `items` is bounded and `nextCursor` is
+nullable.
+
+The latest immutable publication is selected by publication revision rather
+than the active pointer, so a historical or cancelled publication remains an
+exact `copySource`. `isActive` is derived from the same-space active pointer.
+No UUID, revision, date, bigint, or lifecycle policy is inferred by the
+browser.
 
 Каждая запись обязана содержать canonical month, lifecycle status/mode,
 plan-month/draft/publication/report references и их string revisions, а также

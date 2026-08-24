@@ -39,6 +39,7 @@ import {
   PLANNING_APPLICATION,
   type PlanningApplication,
 } from '../application/planning-application'
+import type { PlanMonthIndex } from '../application/list-plan-months.query'
 import { CANONICAL_CALENDAR_MONTH_PATTERN } from '../domain/planning-values'
 import {
   GoalDefinitionNotFoundError,
@@ -121,6 +122,7 @@ import {
   RecloseMonthRequestDto,
   ReopenMonthRequestDto,
 } from './month-lifecycle.dto'
+import { ListPlanMonthsQueryDto } from './month-index.dto'
 import {
   toReportRevisionMutationResponse,
   toPlanMonthMutationResponse,
@@ -874,6 +876,37 @@ export class PlanningMonthController {
     @Inject(WORKSPACE_MEMBER_RESOLVER)
     private readonly workspaceMembers: WorkspaceMemberResolver,
   ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List monthly planning states for the workspace.' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    schema: {
+      type: 'string',
+      pattern: '^v1\\.[A-Za-z0-9_-]+$',
+      maxLength: 300,
+    },
+  })
+  @ApiOkResponse({
+    schema: { $ref: '#/components/schemas/PlanningMonthIndexResponseV1' },
+  })
+  @ApiProblemResponses(...readProblems)
+  public list(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Query() query: ListPlanMonthsQueryDto,
+  ): Promise<PlanMonthIndex> {
+    return this.planning.listPlanMonths.execute({
+      trustedUserId: principal.userId,
+      ...(query.limit === undefined ? {} : { limit: query.limit }),
+      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+    })
+  }
 
   @Get('active')
   @ApiOperation({ summary: 'Read the active published plan for today.' })

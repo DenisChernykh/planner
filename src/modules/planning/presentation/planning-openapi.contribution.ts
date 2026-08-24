@@ -1485,6 +1485,120 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
     },
     ['kind', 'aggregateId', 'aggregateRevision'],
   )
+  schemas['PlanningMonthIndexDraftV1'] = object(
+    { revision: { type: 'string', pattern: '^[1-9][0-9]*$' } },
+    ['revision'],
+  )
+  schemas['PlanningMonthIndexPublicationV1'] = object(
+    {
+      publicationId: uuid,
+      revision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+      activeLocalDate: {
+        type: 'string',
+        format: 'date',
+        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$',
+      },
+      isActive: { type: 'boolean' },
+    },
+    ['publicationId', 'revision', 'activeLocalDate', 'isActive'],
+  )
+  schemas['PlanningMonthIndexReportV1'] = object(
+    {
+      reportRevisionId: uuid,
+      revision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+      status: { type: 'string', enum: ['original', 'revised'] },
+    },
+    ['reportRevisionId', 'revision', 'status'],
+  )
+  schemas['PlanningMonthIndexLifecycleV1'] = object(
+    {
+      planMonthId: uuid,
+      status: {
+        type: 'string',
+        enum: ['draft', 'published', 'grace', 'closed'],
+      },
+      mode: { type: 'string', enum: ['ordinary', 'reopened'] },
+      revision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+    },
+    ['planMonthId', 'status', 'mode', 'revision'],
+  )
+  schemas['PlanningMonthIndexActionsV1'] = object(
+    {
+      openDraft: { type: 'boolean' },
+      openPublication: { type: 'boolean' },
+      copySource: { type: 'boolean' },
+      cancel: { type: 'boolean' },
+      reopen: { type: 'boolean' },
+      reclose: { type: 'boolean' },
+    },
+    [
+      'openDraft',
+      'openPublication',
+      'copySource',
+      'cancel',
+      'reopen',
+      'reclose',
+    ],
+  )
+  schemas['PlanningMonthIndexItemV1'] = object(
+    {
+      targetMonth: {
+        type: 'string',
+        pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
+      },
+      phase: {
+        type: 'string',
+        enum: ['draft', 'future', 'active', 'grace', 'closed'],
+      },
+      lifecycle: { $ref: '#/components/schemas/PlanningMonthIndexLifecycleV1' },
+      draft: { $ref: '#/components/schemas/PlanningMonthIndexDraftV1' },
+      publication: {
+        type: 'object',
+        allOf: [
+          { $ref: '#/components/schemas/PlanningMonthIndexPublicationV1' },
+        ],
+        nullable: true,
+      },
+      report: {
+        type: 'object',
+        allOf: [{ $ref: '#/components/schemas/PlanningMonthIndexReportV1' }],
+        nullable: true,
+      },
+      allowedActions: {
+        $ref: '#/components/schemas/PlanningMonthIndexActionsV1',
+      },
+    },
+    [
+      'targetMonth',
+      'phase',
+      'lifecycle',
+      'draft',
+      'publication',
+      'report',
+      'allowedActions',
+    ],
+  )
+  schemas['PlanningMonthIndexResponseV1'] = object(
+    {
+      schemaVersion: { type: 'string', enum: ['planning.month-index.v1'] },
+      queryLocalDate: {
+        type: 'string',
+        format: 'date',
+        pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$',
+      },
+      items: {
+        type: 'array',
+        maxItems: 50,
+        items: { $ref: '#/components/schemas/PlanningMonthIndexItemV1' },
+      },
+      nextCursor: {
+        type: 'string',
+        pattern: '^v1\\.[A-Za-z0-9_-]+$',
+        nullable: true,
+      },
+    },
+    ['schemaVersion', 'queryLocalDate', 'items', 'nextCursor'],
+  )
 }
 
 export const PLANNING_OPENAPI_CONTRIBUTION: OpenApiDocumentContribution = {

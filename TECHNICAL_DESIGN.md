@@ -2603,6 +2603,46 @@ history и deferred linkage month effect -> action -> change -> receipt. Ста�
 publication/snapshot/calendar rows остаются immutable и доступны по exact ID;
 active query определяется только текущим month pointer.
 
+### 11.6. F02 plan/month discovery read model
+
+Authenticated `GET /planning/months?limit=20&cursor=...` возвращает один
+consistent `planning.month-index.v1` snapshot. `limit` принимает целое `1..50`,
+по умолчанию `20`; cursor — opaque versioned keyset token `v1.<base64url>` с
+внутренним `{ v: 1, targetMonth, planMonthId }`. Cursor не является offset и
+не содержит display policy. Запрос читает `limit + 1` строк и сортирует
+`month_start DESC, plan_month_id DESC`, поэтому `nextCursor` стабилен при
+переходе между страницами; malformed/unknown cursor и invalid limit дают
+существующий `422 VALIDATION_FAILED`.
+
+Response имеет exact shape с `schemaVersion: planning.month-index.v1`,
+`queryLocalDate`, bounded `items` и nullable `nextCursor`. Каждая item содержит
+`targetMonth`, server-derived `phase` (`draft|future|active|grace|closed`),
+`lifecycle` (`planMonthId`, `status`, `mode`, string `revision`), mandatory
+`draft.revision` string, nullable latest exact `publication`
+(`publicationId`, string `revision`, `activeLocalDate`, `isActive`), nullable
+latest `report` (`reportRevisionId`, string `revision`, `status:
+original|revised`) и exact boolean `allowedActions` (`openDraft`,
+`openPublication`, `copySource`, `cancel`, `reopen`, `reclose`).
+
+Latest publication выбирается по максимальной immutable publication revision,
+а не по active pointer, поэтому historical/cancelled publication остаётся
+точным `copySource`; `isActive` вычисляется только из same-month
+`active_publication_id`. `phase` вычисляется backend из одного чтения часов:
+draft → `draft`, published → `future|active` по `month_start > queryLocalDate`,
+а `grace`/`closed` сохраняют свои statuses. `openDraft` разрешён для draft;
+любая publication даёт `openPublication` и `copySource`; `cancel` — только
+future published с active publication и `factsRevision = 0`; `reopen` — только
+closed с active publication; `reclose` — только grace+reopened с active
+publication. Эти boolean не принимаются от browser.
+
+Module-local `ListPlanMonthsReadPort` и Prisma adapter выполняют membership
+resolution и `limit+1` read внутри `repeatable_read_only` transaction. Product
+clock вызывается ровно один раз с `Asia/Yekaterinburg`. Prisma rows, `bigint`,
+`Date` и raw SQL records не пересекают application/presentation boundary;
+нарушение invariant или dependency failure fail-closed как `503`. Missing
+membership и foreign space остаются concealed `403`; no-plan — `200` с
+`items: []` и `nextCursor: null`.
+
 ## 12. Reporting
 
 ### 12.1. Active и grace

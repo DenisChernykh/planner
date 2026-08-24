@@ -464,6 +464,7 @@ describe('S03 HTTP contracts', () => {
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/remove',
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/update',
       '/planning/drafts/{planMonthId}/publish',
+      '/planning/months',
       '/planning/months/active',
       '/planning/months/{planMonthId}/reclose',
       '/planning/months/{planMonthId}/reopen',
@@ -487,6 +488,7 @@ describe('S03 HTTP contracts', () => {
       '/tracking/publications/{publicationId}/days/{localDate}/close-preview',
       '/tracking/publications/{publicationId}/weekly-tasks/{flexiblePeriodId}/result',
       '/tracking/today',
+      '/workspace/current',
     ])
     expect(document.paths['/auth/issue']).toBeUndefined()
     expect(Object.keys(document.paths['/auth/me'] ?? {})).toEqual(['get'])
@@ -674,6 +676,8 @@ describe('S03 HTTP contracts', () => {
       'TRACKING_QUERY_INVALID',
       'TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND',
       'UNSUPPORTED_MEDIA_TYPE',
+      'WORKSPACE_AUTHORIZATION_DENIED',
+      'WORKSPACE_STATE_CONFLICT',
     ]
     expect(
       document.components?.schemas?.['ProblemResponseDto']?.properties?.['code']
@@ -1994,7 +1998,13 @@ describe('S03 HTTP contracts', () => {
       document.paths['/planning/drafts/{planMonthId}/publish']?.post
     const published =
       document.paths['/planning/publications/{publicationId}']?.get
+    const monthIndex = document.paths['/planning/months']?.get
     const active = document.paths['/planning/months/active']?.get
+    expect(
+      (monthIndex as (OpenApiOperation & { operationId?: string }) | undefined)
+        ?.operationId,
+    ).toBe('PlanningMonthController_list')
+    expect(monthIndex?.security).toEqual([{ sessionCookie: [] }])
     expect(publish?.security).toEqual([{ sessionCookie: [], csrfToken: [] }])
     expect(published?.security).toEqual([{ sessionCookie: [] }])
     expect(active?.security).toEqual([{ sessionCookie: [] }])
@@ -2010,16 +2020,39 @@ describe('S03 HTTP contracts', () => {
       '422',
       '503',
     ])
-    for (const operation of [published, active]) {
+    for (const operation of [monthIndex, published, active]) {
       expect(Object.keys(operation?.responses ?? {}).sort()).toEqual([
         '200',
         '401',
         '403',
-        '404',
+        ...(operation === monthIndex ? [] : ['404']),
         '422',
         '503',
       ])
     }
+    expect(parameter(monthIndex, 'limit')).toEqual({
+      in: 'query',
+      name: 'limit',
+      required: false,
+      schema: { default: 20, maximum: 50, minimum: 1, type: 'integer' },
+    })
+    expect(parameter(monthIndex, 'cursor')).toEqual({
+      in: 'query',
+      name: 'cursor',
+      required: false,
+      schema: {
+        maxLength: 300,
+        pattern: '^v1\\.[A-Za-z0-9_-]+$',
+        type: 'string',
+      },
+    })
+    expect(
+      monthIndex?.responses?.['200']?.content?.['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/PlanningMonthIndexResponseV1' })
+    expect(schemas['PlanningMonthIndexResponseV1']).toMatchObject({
+      additionalProperties: false,
+      required: ['schemaVersion', 'queryLocalDate', 'items', 'nextCursor'],
+    })
     expect(parameter(publish, 'planMonthId')).toEqual({
       in: 'path',
       name: 'planMonthId',

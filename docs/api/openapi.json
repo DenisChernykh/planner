@@ -1751,6 +1751,232 @@
         ],
         "type": "object"
       },
+      "PlanningMonthIndexActionsV1": {
+        "additionalProperties": false,
+        "properties": {
+          "cancel": {
+            "type": "boolean"
+          },
+          "copySource": {
+            "type": "boolean"
+          },
+          "openDraft": {
+            "type": "boolean"
+          },
+          "openPublication": {
+            "type": "boolean"
+          },
+          "reclose": {
+            "type": "boolean"
+          },
+          "reopen": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "openDraft",
+          "openPublication",
+          "copySource",
+          "cancel",
+          "reopen",
+          "reclose"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthIndexDraftV1": {
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthIndexItemV1": {
+        "additionalProperties": false,
+        "properties": {
+          "allowedActions": {
+            "$ref": "#/components/schemas/PlanningMonthIndexActionsV1"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/PlanningMonthIndexDraftV1"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/PlanningMonthIndexLifecycleV1"
+          },
+          "phase": {
+            "enum": [
+              "draft",
+              "future",
+              "active",
+              "grace",
+              "closed"
+            ],
+            "type": "string"
+          },
+          "publication": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlanningMonthIndexPublicationV1"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "report": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlanningMonthIndexReportV1"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "targetMonth": {
+            "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetMonth",
+          "phase",
+          "lifecycle",
+          "draft",
+          "publication",
+          "report",
+          "allowedActions"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthIndexLifecycleV1": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "ordinary",
+              "reopened"
+            ],
+            "type": "string"
+          },
+          "planMonthId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "grace",
+              "closed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "planMonthId",
+          "status",
+          "mode",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthIndexPublicationV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "publicationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "publicationId",
+          "revision",
+          "activeLocalDate",
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthIndexReportV1": {
+        "additionalProperties": false,
+        "properties": {
+          "reportRevisionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "original",
+              "revised"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reportRevisionId",
+          "revision",
+          "status"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthIndexResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningMonthIndexItemV1"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "nextCursor": {
+            "nullable": true,
+            "pattern": "^v1\\.[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "queryLocalDate": {
+            "format": "date",
+            "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "planning.month-index.v1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "queryLocalDate",
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
       "ProblemConflictResponseDto": {
         "properties": {
           "currentRevision": {
@@ -13878,6 +14104,158 @@
           }
         ],
         "summary": "Atomically publish the confirmed monthly plan snapshot.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
+    "/planning/months": {
+      "get": {
+        "operationId": "PlanningMonthController_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 300,
+              "pattern": "^v1\\.[A-Za-z0-9_-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningMonthIndexResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Planning authorization denied"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "List monthly planning states for the workspace.",
         "tags": [
           "planning"
         ]
