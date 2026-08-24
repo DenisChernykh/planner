@@ -457,6 +457,7 @@ describe('S03 HTTP contracts', () => {
       '/planning/catalog/goal-definitions/{goalDefinitionId}/restore',
       '/planning/catalog/goal-definitions/{goalDefinitionId}/versions',
       '/planning/drafts',
+      '/planning/drafts/empty',
       '/planning/drafts/from-seed',
       '/planning/drafts/publication-preview',
       '/planning/drafts/{planMonthId}/goals',
@@ -632,6 +633,9 @@ describe('S03 HTTP contracts', () => {
     })
     expect(Object.keys(document.components?.schemas ?? {}).sort()).toEqual(
       expect.arrayContaining([
+        'ExistingPlanMonthConflictResponseDto',
+        'PlanMonthAlreadyExistsConflictResponseDto',
+        'PlanMonthAlreadyExistsProblemResponseDto',
         'ProblemFieldErrorResponseDto',
         'ProblemResponseDto',
         'ValidationProblemResponseDto',
@@ -656,7 +660,6 @@ describe('S03 HTTP contracts', () => {
       'PLANNING_AUTHORIZATION_DENIED',
       'PLAN_DRAFT_NOT_EDITABLE',
       'PLAN_DRAFT_NOT_FOUND',
-      'PLAN_MONTH_ALREADY_EXISTS',
       'PLAN_MONTH_NOT_FOUND',
       'PLAN_MONTH_RECLOSE_CONFLICT',
       'PLAN_MONTH_REOPEN_CONFLICT',
@@ -696,6 +699,54 @@ describe('S03 HTTP contracts', () => {
         'conflict'
       ],
     ).toBeUndefined()
+    const existingMonthProblem =
+      document.components?.schemas?.['PlanMonthAlreadyExistsProblemResponseDto']
+    expect(existingMonthProblem).toMatchObject({
+      properties: {
+        code: {
+          enum: ['PLAN_MONTH_ALREADY_EXISTS'],
+          example: 'PLAN_MONTH_ALREADY_EXISTS',
+        },
+        conflict: {
+          $ref: '#/components/schemas/PlanMonthAlreadyExistsConflictResponseDto',
+        },
+      },
+    })
+    expect(existingMonthProblem?.required).toEqual(
+      expect.arrayContaining([
+        'type',
+        'title',
+        'status',
+        'detail',
+        'instance',
+        'code',
+        'requestId',
+        'conflict',
+      ]),
+    )
+    expect(
+      document.components?.schemas?.[
+        'PlanMonthAlreadyExistsConflictResponseDto'
+      ],
+    ).toMatchObject({
+      properties: {
+        existingRef: {
+          $ref: '#/components/schemas/ExistingPlanMonthConflictResponseDto',
+        },
+        nextAction: { enum: ['open-existing-month'] },
+      },
+      required: ['existingRef', 'nextAction'],
+    })
+    expect(
+      document.components?.schemas?.['ExistingPlanMonthConflictResponseDto'],
+    ).toMatchObject({
+      properties: {
+        kind: { enum: ['planning.plan-draft.v1'] },
+        aggregateId: { format: 'uuid', type: 'string' },
+        aggregateRevision: { pattern: '^[1-9][0-9]*$', type: 'string' },
+      },
+      required: ['kind', 'aggregateId', 'aggregateRevision'],
+    })
     expect(document.components?.securitySchemes?.['sessionCookie']).toEqual({
       type: 'apiKey',
       in: 'cookie',
@@ -984,6 +1035,7 @@ describe('S03 HTTP contracts', () => {
     }
 
     const drafts = document.paths['/planning/drafts']
+    const emptyDraft = document.paths['/planning/drafts/empty']
     const publicationPreview =
       document.paths['/planning/drafts/publication-preview']
     const draftAdd = document.paths['/planning/drafts/{planMonthId}/goals']
@@ -994,6 +1046,7 @@ describe('S03 HTTP contracts', () => {
     const draftReorder =
       document.paths['/planning/drafts/{planMonthId}/goals/reorder']
     expect(Object.keys(drafts ?? {})).toEqual(['get'])
+    expect(Object.keys(emptyDraft ?? {})).toEqual(['post'])
     expect(Object.keys(publicationPreview ?? {})).toEqual(['get'])
     for (const operation of [
       draftAdd,
@@ -1004,7 +1057,57 @@ describe('S03 HTTP contracts', () => {
       expect(Object.keys(operation ?? {})).toEqual(['post'])
     }
     expect(drafts?.get?.security).toEqual([{ sessionCookie: [] }])
+    expect(emptyDraft?.post?.security).toEqual([
+      { sessionCookie: [], csrfToken: [] },
+    ])
     expect(publicationPreview?.get?.security).toEqual([{ sessionCookie: [] }])
+    expect(emptyDraft?.post?.requestBody).toEqual({
+      content: {
+        'application/json': {
+          schema: {
+            additionalProperties: false,
+            properties: {
+              commandId: uuidSchema,
+              targetMonth: {
+                pattern:
+                  '^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$',
+                type: 'string',
+              },
+              focus: {
+                maxLength: 500,
+                minLength: 1,
+                pattern: '^(?![\\s\\S]*\\u0000)[\\s\\S]*\\S[\\s\\S]*$',
+                type: 'string',
+              },
+            },
+            required: ['commandId', 'targetMonth', 'focus'],
+            type: 'object',
+          },
+        },
+      },
+      required: true,
+    })
+    expect(emptyDraft?.post?.responses?.['201']).toMatchObject({
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/DraftMutationResponseV1' },
+        },
+      },
+    })
+    expect(emptyDraft?.post?.responses?.['409']).toMatchObject({
+      content: {
+        'application/problem+json': {
+          schema: {
+            oneOf: [
+              baseProblemRef,
+              {
+                $ref: '#/components/schemas/PlanMonthAlreadyExistsProblemResponseDto',
+              },
+            ],
+          },
+        },
+      },
+    })
     for (const operation of [
       draftAdd?.post,
       draftUpdate?.post,

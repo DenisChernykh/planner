@@ -2447,13 +2447,13 @@ CSRF-protected и idempotent HTTP command.
 - Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
 - Test: `test/e2e/planning/create-empty-draft.e2e.spec.ts`
 
-- [ ] Зафиксировать exact DTO `{ commandId, targetMonth, focus }` и finite
+- [x] Зафиксировать exact DTO `{ commandId, targetMonth, focus }` и finite
   Problem/recovery mapping.
-- [ ] Реализовать `POST /planning/drafts/empty` только как adapter существующей
+- [x] Реализовать `POST /planning/drafts/empty` только как adapter существующей
   application command.
-- [ ] Доказать replay/fingerprint/competing month, CSRF и actor-from-session.
-- [ ] Regenerate OpenAPI and run focused contract/E2E.
-- [ ] Commit: `feat: expose empty planner drafts`.
+- [x] Доказать replay/fingerprint/competing month, CSRF и actor-from-session.
+- [x] Regenerate OpenAPI and run focused contract/E2E.
+- [x] Commit: `feat: expose empty planner drafts`.
 
 ### F04 — Copy publication to draft HTTP adapter
 

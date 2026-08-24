@@ -40,7 +40,10 @@ import {
   type PlanningApplication,
 } from '../application/planning-application'
 import type { PlanMonthIndex } from '../application/list-plan-months.query'
-import { CANONICAL_CALENDAR_MONTH_PATTERN } from '../domain/planning-values'
+import {
+  CANONICAL_CALENDAR_MONTH_PATTERN,
+  MONTH_FOCUS_PATTERN,
+} from '../domain/planning-values'
 import {
   GoalDefinitionNotFoundError,
   PlanDraftNotFoundError,
@@ -92,6 +95,7 @@ import {
 } from './goal-catalog.response'
 import {
   AddDraftGoalRequestDto,
+  CreateEmptyDraftRequestDto,
   CreateDraftFromSeedRequestDto,
   DraftGoalPathDto,
   DraftMonthQueryDto,
@@ -225,6 +229,24 @@ const createFromSeedBodySchema = {
   },
   required: ['commandId', 'targetMonth', 'actorPersona'],
 }
+const createEmptyDraftBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    targetMonth: {
+      type: 'string' as const,
+      pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
+    },
+    focus: {
+      type: 'string' as const,
+      pattern: MONTH_FOCUS_PATTERN,
+      minLength: 1,
+      maxLength: 500,
+    },
+  },
+  required: ['commandId', 'targetMonth', 'focus'],
+}
 const draftEditorResponseSchema = {
   $ref: '#/components/schemas/DraftEditorResponseV1',
 }
@@ -332,6 +354,10 @@ const seedDraftProblems = [
   ...mutationProblems,
   PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
   PLAN_SEED_ALREADY_CONSUMED_PROBLEM,
+]
+const emptyDraftProblems = [
+  ...mutationProblems,
+  PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
 ]
 const draftMutationBaseProblems = [
   ...mutationProblems,
@@ -658,6 +684,30 @@ export class PlanningDraftController {
           targetMonth: body.targetMonth,
           actorPersona: body.actorPersona,
         },
+      }),
+    )
+  }
+
+  @Post('empty')
+  @ApiOperation({
+    summary: 'Create an empty editable monthly draft.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiCreatedResponse({
+    description: 'Draft aggregate reference at revision one.',
+    schema: draftMutationResponseSchema,
+  })
+  @ApiBody({ required: true, schema: createEmptyDraftBodySchema })
+  @ApiProblemResponses(...emptyDraftProblems)
+  public async createEmpty(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Body() body: CreateEmptyDraftRequestDto,
+  ): Promise<DraftMutationResponse> {
+    return toDraftMutationResponse(
+      await this.planning.createEmptyDraft.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        payload: { targetMonth: body.targetMonth, focus: body.focus },
       }),
     )
   }

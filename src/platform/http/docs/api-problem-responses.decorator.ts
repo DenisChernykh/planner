@@ -24,6 +24,7 @@ import {
   PublicationPreviewConflictProblemResponseDto,
   PublicationPreviewConflictResponseDto,
   PlanMonthAlreadyPublishedProblemResponseDto,
+  PlanMonthAlreadyExistsProblemResponseDto,
   AlreadyPublishedConflictResponseDto,
   PlanPublicationBlockedProblemResponseDto,
   PublicationBlockerResponseDto,
@@ -89,6 +90,9 @@ export function ApiProblemResponses(
           }
           if (code === 'PLAN_MONTH_ALREADY_PUBLISHED') {
             return PlanMonthAlreadyPublishedProblemResponseDto
+          }
+          if (code === 'PLAN_MONTH_ALREADY_EXISTS') {
+            return PlanMonthAlreadyExistsProblemResponseDto
           }
           if (code === 'PLAN_PUBLICATION_BLOCKED') {
             return PlanPublicationBlockedProblemResponseDto
@@ -169,6 +173,7 @@ export function ApiProblemResponses(
       PublicationPreviewConflictProblemResponseDto,
       AlreadyPublishedConflictResponseDto,
       PlanMonthAlreadyPublishedProblemResponseDto,
+      PlanMonthAlreadyExistsProblemResponseDto,
       PublicationBlockerResponseDto,
       PlanPublicationBlockedProblemResponseDto,
       TrackingFactTargetUnavailableConflictResponseDto,
@@ -282,6 +287,18 @@ function problemExample(definition: RegisteredProblemDefinition): object {
             publicationId: '11111111-1111-4111-8111-111111111111',
             publicationRevision: '1',
             nextAction: 'open-published-plan',
+          },
+        }
+      : {}),
+    ...(definition.code === 'PLAN_MONTH_ALREADY_EXISTS'
+      ? {
+          conflict: {
+            existingRef: {
+              kind: 'planning.plan-draft.v1',
+              aggregateId: '11111111-1111-4111-8111-111111111111',
+              aggregateRevision: '1',
+            },
+            nextAction: 'open-existing-month',
           },
         }
       : {}),

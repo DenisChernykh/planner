@@ -34,6 +34,7 @@ export type ProblemConflict =
   | PlanMonthRevisionProblemConflict
   | PlanMonthReopenProblemConflict
   | PlanMonthRecloseProblemConflict
+  | PlanMonthAlreadyExistsProblemConflict
 
 export interface TrackingFactTargetUnavailableProblemConflict {
   readonly reason:
@@ -107,6 +108,15 @@ export interface PlanMonthRecloseProblemConflict {
   readonly currentStatus: 'draft' | 'published' | 'grace' | 'closed'
   readonly currentLifecycleMode: 'ordinary' | 'reopened'
   readonly nextAction: 'reload-month'
+}
+
+export interface PlanMonthAlreadyExistsProblemConflict {
+  readonly existingRef: {
+    readonly kind: 'planning.plan-draft.v1'
+    readonly aggregateId: string
+    readonly aggregateRevision: string
+  }
+  readonly nextAction: 'open-existing-month'
 }
 
 export interface PublicationPreviewProblemConflict {

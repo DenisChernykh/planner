@@ -138,7 +138,18 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
         return { code: 'PLAN_DRAFT_NOT_FOUND' }
       }
       if (error instanceof PlanMonthAlreadyExistsError) {
-        return { code: 'PLAN_MONTH_ALREADY_EXISTS' }
+        return {
+          code: 'PLAN_MONTH_ALREADY_EXISTS',
+          conflict: {
+            existingRef: {
+              kind: error.existingRef.kind,
+              aggregateId: error.existingRef.aggregateId,
+              aggregateRevision:
+                error.existingRef.aggregateRevision.toString(10),
+            },
+            nextAction: 'open-existing-month',
+          },
+        }
       }
       if (error instanceof PlanSeedAlreadyConsumedError) {
         return { code: 'PLAN_SEED_ALREADY_CONSUMED' }

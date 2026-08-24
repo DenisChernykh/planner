@@ -1757,6 +1757,28 @@ P01 public errors finite: `CommandValidationError`,
 предшествуют permission/CAS. Fresh stale command не пишет receipt, поэтому тот
 же command ID может быть повторён с новой revision и новым fingerprint.
 
+F03 exposes this existing command through the authenticated browser adapter
+`POST /planning/drafts/empty`. The request body is exactly
+`{ commandId, targetMonth, focus }`: `commandId` is UUID, `targetMonth` is the
+canonical `YYYY-MM` value, and `focus` is preserved byte-for-byte (no trim or
+Unicode normalization), while requiring one non-whitespace character, rejecting
+U+0000, and allowing at most 500 characters. `actor`, `space`, and
+`expectedRevision` are never read
+from the request; the controller resolves the actor from the checked session
+principal through the workspace member resolver and delegates policy to the
+existing P01 command. Successful create and exact replay return `201` with
+`planning.plan-draft.v1` and decimal-string `aggregateRevision`.
+
+The HTTP adapter has finite Problems for authentication/CSRF, malformed or
+unsupported/oversized bodies, validation, fingerprint conflict, planning
+authorization, existing month, and dependency unavailability. The
+`PLAN_MONTH_ALREADY_EXISTS` conflict is shared by empty/seed/future-copy
+adapters and exposes only `{ existingRef: { kind, aggregateId,
+aggregateRevision }, nextAction: "open-existing-month" }`; no user or space
+identifier is returned. Exact replay remains safe after an ambiguous network
+result, and competing month creation leaves one draft, one receipt, and one
+history action.
+
 P02 commands имеют exact contracts:
 
 ```text

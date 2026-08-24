@@ -451,6 +451,36 @@ export class PlanMonthAlreadyPublishedProblemResponseDto extends ProblemResponse
   public readonly conflict!: AlreadyPublishedConflictResponseDto
 }
 
+export class ExistingPlanMonthConflictResponseDto {
+  @ApiProperty({ enum: ['planning.plan-draft.v1'] })
+  public readonly kind!: 'planning.plan-draft.v1'
+
+  @ApiProperty({ type: String, format: 'uuid' })
+  public readonly aggregateId!: string
+
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$' })
+  public readonly aggregateRevision!: string
+}
+
+export class PlanMonthAlreadyExistsConflictResponseDto {
+  @ApiProperty({ type: () => ExistingPlanMonthConflictResponseDto })
+  public readonly existingRef!: ExistingPlanMonthConflictResponseDto
+
+  @ApiProperty({ enum: ['open-existing-month'] })
+  public readonly nextAction!: 'open-existing-month'
+}
+
+export class PlanMonthAlreadyExistsProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['PLAN_MONTH_ALREADY_EXISTS'],
+    example: 'PLAN_MONTH_ALREADY_EXISTS',
+  })
+  declare public readonly code: 'PLAN_MONTH_ALREADY_EXISTS'
+
+  @ApiProperty({ type: () => PlanMonthAlreadyExistsConflictResponseDto })
+  public readonly conflict!: PlanMonthAlreadyExistsConflictResponseDto
+}
+
 export class PublicationBlockerResponseDto {
   @ApiProperty({ type: String, format: 'uuid', nullable: true })
   public readonly planGoalId!: string | null

@@ -2,8 +2,8 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01` и `F02` реализованы в
-backend contract, `F03…F10` не начаты
+**Статус:** обязательные backend-требования; `F01`, `F02` и `F03` реализованы
+в backend contract, `F04…F10` не начаты
 **Backend contract baseline:** `44f00d00715d6a485ad5aff3f36680a414af96ae`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
@@ -167,10 +167,10 @@ bounded page size отклоняется без truncation неизвестно�
 
 ### GAP-03 — Create empty draft HTTP command
 
-**Current state:** `CreateEmptyDraft` реализован в P01 только как application
-command.
+**Implemented state (F03):** authenticated + CSRF `POST /planning/drafts/empty`
+реализован и закоммичен поверх существующего `planning.create-empty-draft.v1`.
 
-**Required surface:** authenticated + CSRF `POST /planning/drafts/empty` поверх
+**Committed surface:** authenticated + CSRF `POST /planning/drafts/empty` поверх
 существующего `planning.create-empty-draft.v1`.
 
 Body содержит ровно `commandId`, `targetMonth`, `focus`; actor/space отсутствуют.
@@ -180,6 +180,24 @@ result допускает exact replay.
 
 **Acceptance:** любой из двух members создаёт один empty draft; competing или
 replayed commands не создают второй month/history/receipt.
+
+**F03 implementation contract:** `POST /planning/drafts/empty` requires the
+session cookie, allowed browser origin and session-bound CSRF header. The JSON
+body has `additionalProperties: false` and exactly `commandId` (UUID),
+`targetMonth` (canonical `YYYY-MM`) and `focus` (one non-whitespace character,
+no U+0000, maximum 500 characters, preserved without trim or normalization).
+The actor is derived from the authenticated principal and workspace member resolver; actor,
+space and `expectedRevision` payload fields are rejected. Create and exact
+replay return `201` and `DraftMutationResponseV1` with string revisions.
+
+The finite mutation Problems are authentication/CSRF, planning authorization,
+malformed/unsupported/oversized body, validation, command fingerprint conflict,
+`PLAN_MONTH_ALREADY_EXISTS`, and dependency unavailable. Existing-month
+conflicts return only the safe draft reference and
+`nextAction: "open-existing-month"`; user and space IDs are concealed. The
+same conflict shape is used by empty, seed and future publication-copy
+adapters so the browser can open the authoritative existing month without
+guessing or retrying a second create.
 
 ### GAP-04 — Create draft from publication HTTP command
 

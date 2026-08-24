@@ -770,6 +770,30 @@
           }
         ]
       },
+      "ExistingPlanMonthConflictResponseDto": {
+        "properties": {
+          "aggregateId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "aggregateRevision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "planning.plan-draft.v1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "aggregateId",
+          "aggregateRevision"
+        ],
+        "type": "object"
+      },
       "FixedEligibleCalendarV1": {
         "additionalProperties": false,
         "properties": {
@@ -1214,6 +1238,77 @@
         ],
         "type": "object"
       },
+      "PlanMonthAlreadyExistsConflictResponseDto": {
+        "properties": {
+          "existingRef": {
+            "$ref": "#/components/schemas/ExistingPlanMonthConflictResponseDto"
+          },
+          "nextAction": {
+            "enum": [
+              "open-existing-month"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "existingRef",
+          "nextAction"
+        ],
+        "type": "object"
+      },
+      "PlanMonthAlreadyExistsProblemResponseDto": {
+        "properties": {
+          "code": {
+            "enum": [
+              "PLAN_MONTH_ALREADY_EXISTS"
+            ],
+            "example": "PLAN_MONTH_ALREADY_EXISTS",
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/PlanMonthAlreadyExistsConflictResponseDto"
+          },
+          "detail": {
+            "example": "The server could not complete the request.",
+            "type": "string"
+          },
+          "instance": {
+            "example": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "type": "string"
+          },
+          "status": {
+            "example": 500,
+            "maximum": 599,
+            "minimum": 400,
+            "type": "number"
+          },
+          "title": {
+            "example": "Internal server error",
+            "type": "string"
+          },
+          "type": {
+            "example": "https://planner.invalid/problems/internal-error",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "code",
+          "requestId",
+          "conflict"
+        ],
+        "type": "object"
+      },
       "PlanMonthAlreadyPublishedProblemResponseDto": {
         "properties": {
           "code": {
@@ -1314,7 +1409,6 @@
               "PLANNING_AUTHORIZATION_DENIED",
               "PLAN_DRAFT_NOT_EDITABLE",
               "PLAN_DRAFT_NOT_FOUND",
-              "PLAN_MONTH_ALREADY_EXISTS",
               "PLAN_MONTH_NOT_FOUND",
               "PLAN_MONTH_RECLOSE_CONFLICT",
               "PLAN_MONTH_REOPEN_CONFLICT",
@@ -1444,7 +1538,6 @@
               "PLANNING_AUTHORIZATION_DENIED",
               "PLAN_DRAFT_NOT_EDITABLE",
               "PLAN_DRAFT_NOT_FOUND",
-              "PLAN_MONTH_ALREADY_EXISTS",
               "PLAN_MONTH_NOT_FOUND",
               "PLAN_MONTH_RECLOSE_CONFLICT",
               "PLAN_MONTH_REOPEN_CONFLICT",
@@ -1574,7 +1667,6 @@
               "PLANNING_AUTHORIZATION_DENIED",
               "PLAN_DRAFT_NOT_EDITABLE",
               "PLAN_DRAFT_NOT_FOUND",
-              "PLAN_MONTH_ALREADY_EXISTS",
               "PLAN_MONTH_NOT_FOUND",
               "PLAN_MONTH_RECLOSE_CONFLICT",
               "PLAN_MONTH_REOPEN_CONFLICT",
@@ -2053,7 +2145,6 @@
               "PLANNING_AUTHORIZATION_DENIED",
               "PLAN_DRAFT_NOT_EDITABLE",
               "PLAN_DRAFT_NOT_FOUND",
-              "PLAN_MONTH_ALREADY_EXISTS",
               "PLAN_MONTH_NOT_FOUND",
               "PLAN_MONTH_RECLOSE_CONFLICT",
               "PLAN_MONTH_REOPEN_CONFLICT",
@@ -11774,6 +11865,304 @@
         ]
       }
     },
+    "/planning/drafts/empty": {
+      "post": {
+        "operationId": "PlanningDraftController_createEmpty",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "commandId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "focus": {
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "pattern": "^(?![\\s\\S]*\\u0000)[\\s\\S]*\\S[\\s\\S]*$",
+                    "type": "string"
+                  },
+                  "targetMonth": {
+                    "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commandId",
+                  "targetMonth",
+                  "focus"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftMutationResponseV1"
+                }
+              }
+            },
+            "description": "Draft aggregate reference at revision one."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "MALFORMED_REQUEST": {
+                    "summary": "Malformed request",
+                    "value": {
+                      "code": "MALFORMED_REQUEST",
+                      "detail": "The request could not be parsed.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 400,
+                      "title": "Malformed request",
+                      "type": "https://planner.invalid/problems/malformed-request"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Malformed request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHORIZATION_DENIED": {
+                    "summary": "Authorization denied",
+                    "value": {
+                      "code": "AUTHORIZATION_DENIED",
+                      "detail": "The request did not satisfy browser authorization controls.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Authorization denied",
+                      "type": "https://planner.invalid/problems/authorization-denied"
+                    }
+                  },
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authorization denied; Planning authorization denied"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "COMMAND_FINGERPRINT_CONFLICT": {
+                    "summary": "Command fingerprint conflict",
+                    "value": {
+                      "code": "COMMAND_FINGERPRINT_CONFLICT",
+                      "detail": "The command key already completed with a different request.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Command fingerprint conflict",
+                      "type": "https://planner.invalid/problems/command-fingerprint-conflict"
+                    }
+                  },
+                  "PLAN_MONTH_ALREADY_EXISTS": {
+                    "summary": "Plan month already exists",
+                    "value": {
+                      "code": "PLAN_MONTH_ALREADY_EXISTS",
+                      "conflict": {
+                        "existingRef": {
+                          "aggregateId": "11111111-1111-4111-8111-111111111111",
+                          "aggregateRevision": "1",
+                          "kind": "planning.plan-draft.v1"
+                        },
+                        "nextAction": "open-existing-month"
+                      },
+                      "detail": "A plan already exists for the requested calendar month.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Plan month already exists",
+                      "type": "https://planner.invalid/problems/plan-month-already-exists"
+                    }
+                  }
+                },
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlanMonthAlreadyExistsProblemResponseDto"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Command fingerprint conflict; Plan month already exists"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PAYLOAD_TOO_LARGE": {
+                    "summary": "Payload too large",
+                    "value": {
+                      "code": "PAYLOAD_TOO_LARGE",
+                      "detail": "The request payload exceeds the configured limit.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 413,
+                      "title": "Payload too large",
+                      "type": "https://planner.invalid/problems/payload-too-large"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "Unsupported media type",
+                    "value": {
+                      "code": "UNSUPPORTED_MEDIA_TYPE",
+                      "detail": "The request content type is not supported.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 415,
+                      "title": "Unsupported media type",
+                      "type": "https://planner.invalid/problems/unsupported-media-type"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Create an empty editable monthly draft.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
     "/planning/drafts/from-seed": {
       "post": {
         "operationId": "PlanningDraftController_createFromSeed",
@@ -11926,6 +12315,14 @@
                     "summary": "Plan month already exists",
                     "value": {
                       "code": "PLAN_MONTH_ALREADY_EXISTS",
+                      "conflict": {
+                        "existingRef": {
+                          "aggregateId": "11111111-1111-4111-8111-111111111111",
+                          "aggregateRevision": "1",
+                          "kind": "planning.plan-draft.v1"
+                        },
+                        "nextAction": "open-existing-month"
+                      },
                       "detail": "A plan already exists for the requested calendar month.",
                       "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
                       "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -11948,7 +12345,14 @@
                   }
                 },
                 "schema": {
-                  "$ref": "#/components/schemas/ProblemResponseDto"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProblemResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PlanMonthAlreadyExistsProblemResponseDto"
+                    }
+                  ]
                 }
               }
             },

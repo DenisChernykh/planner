@@ -12,6 +12,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator'
+import { MONTH_FOCUS_PATTERN } from '../domain/planning-values'
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
@@ -35,6 +36,21 @@ export class CreateDraftFromSeedRequestDto {
 
   @IsIn(['memberA', 'memberB'])
   public readonly actorPersona!: 'memberA' | 'memberB'
+}
+
+export class CreateEmptyDraftRequestDto {
+  @IsString()
+  @Matches(UUID)
+  public readonly commandId!: string
+
+  @IsString()
+  @Matches(MONTH)
+  public readonly targetMonth!: string
+
+  @IsString()
+  @Matches(new RegExp(MONTH_FOCUS_PATTERN, 'u'))
+  @MaxLength(500)
+  public readonly focus!: string
 }
 
 export class PlanMonthPathDto {

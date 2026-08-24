@@ -2,6 +2,7 @@ const CANONICAL_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 export const CANONICAL_CALENDAR_MONTH_PATTERN =
   '^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$'
+export const MONTH_FOCUS_PATTERN = '^(?![\\s\\S]*\\u0000)[\\s\\S]*\\S[\\s\\S]*$'
 const CANONICAL_MONTH = new RegExp(CANONICAL_CALENDAR_MONTH_PATTERN)
 
 export function isCanonicalCalendarMonth(value: unknown): value is string {
@@ -17,6 +18,7 @@ export function isCanonicalPlanningUuid(value: unknown): value is string {
 export function isValidMonthFocus(value: unknown): value is string {
   return (
     typeof value === 'string' &&
+    !value.includes('\u0000') &&
     value.replace(/^ +| +$/g, '').length > 0 &&
     Array.from(value).length <= 500
   )
