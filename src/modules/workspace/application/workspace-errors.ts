@@ -32,3 +32,24 @@ export class WorkspaceDependencyUnavailableError extends Error {
     this.name = 'WorkspaceDependencyUnavailableError'
   }
 }
+
+export class CurrentWorkspaceAuthorizationDeniedError extends Error {
+  public constructor(options?: ErrorOptions) {
+    super('Current workspace access is denied', options)
+    this.name = 'CurrentWorkspaceAuthorizationDeniedError'
+  }
+}
+
+export class CurrentWorkspaceStateConflictError extends Error {
+  public constructor(options?: ErrorOptions) {
+    super('Current workspace state is inconsistent', options)
+    this.name = 'CurrentWorkspaceStateConflictError'
+  }
+}
+
+export class CurrentWorkspaceDependencyUnavailableError extends Error {
+  public constructor(options?: ErrorOptions) {
+    super('Current workspace dependency is unavailable', options)
+    this.name = 'CurrentWorkspaceDependencyUnavailableError'
+  }
+}

@@ -1333,7 +1333,9 @@
               "TRACKING_FACT_VALUE_INVALID",
               "TRACKING_QUERY_INVALID",
               "TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND",
-              "UNSUPPORTED_MEDIA_TYPE"
+              "UNSUPPORTED_MEDIA_TYPE",
+              "WORKSPACE_AUTHORIZATION_DENIED",
+              "WORKSPACE_STATE_CONFLICT"
             ],
             "example": "INTERNAL_ERROR",
             "type": "string"
@@ -1461,7 +1463,9 @@
               "TRACKING_FACT_VALUE_INVALID",
               "TRACKING_QUERY_INVALID",
               "TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND",
-              "UNSUPPORTED_MEDIA_TYPE"
+              "UNSUPPORTED_MEDIA_TYPE",
+              "WORKSPACE_AUTHORIZATION_DENIED",
+              "WORKSPACE_STATE_CONFLICT"
             ],
             "example": "INTERNAL_ERROR",
             "type": "string"
@@ -1589,7 +1593,9 @@
               "TRACKING_FACT_VALUE_INVALID",
               "TRACKING_QUERY_INVALID",
               "TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND",
-              "UNSUPPORTED_MEDIA_TYPE"
+              "UNSUPPORTED_MEDIA_TYPE",
+              "WORKSPACE_AUTHORIZATION_DENIED",
+              "WORKSPACE_STATE_CONFLICT"
             ],
             "example": "INTERNAL_ERROR",
             "type": "string"
@@ -1840,7 +1846,9 @@
               "TRACKING_FACT_VALUE_INVALID",
               "TRACKING_QUERY_INVALID",
               "TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND",
-              "UNSUPPORTED_MEDIA_TYPE"
+              "UNSUPPORTED_MEDIA_TYPE",
+              "WORKSPACE_AUTHORIZATION_DENIED",
+              "WORKSPACE_STATE_CONFLICT"
             ],
             "example": "INTERNAL_ERROR",
             "type": "string"
@@ -8350,6 +8358,95 @@
         "required": [
           "kind",
           "n"
+        ],
+        "type": "object"
+      },
+      "WorkspaceCurrentResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "currentMemberId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceMemberPresentationV1"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "personaMappingState": {
+            "enum": [
+              "unbound",
+              "bound"
+            ],
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "workspace.current.v1"
+            ],
+            "type": "string"
+          },
+          "spaceId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "timeZone": {
+            "enum": [
+              "Asia/Yekaterinburg"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "spaceId",
+          "timeZone",
+          "currentMemberId",
+          "personaMappingState",
+          "members"
+        ],
+        "type": "object"
+      },
+      "WorkspaceMemberPresentationV1": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "enum": [
+              "Вы",
+              "Партнёр",
+              "Участник А",
+              "Участник Б"
+            ],
+            "type": "string"
+          },
+          "memberId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "persona": {
+            "enum": [
+              "memberA",
+              "memberB"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "relation": {
+            "enum": [
+              "current",
+              "partner"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "memberId",
+          "relation",
+          "displayName",
+          "persona"
         ],
         "type": "object"
       }
@@ -20702,6 +20799,129 @@
           "tracking"
         ]
       }
+    },
+    "/workspace/current": {
+      "get": {
+        "operationId": "WorkspaceController_current",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceCurrentResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "WORKSPACE_AUTHORIZATION_DENIED": {
+                    "summary": "Workspace authorization denied",
+                    "value": {
+                      "code": "WORKSPACE_AUTHORIZATION_DENIED",
+                      "detail": "The current principal is not a member of the workspace.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Workspace authorization denied",
+                      "type": "https://planner.invalid/problems/workspace-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Workspace authorization denied"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "WORKSPACE_STATE_CONFLICT": {
+                    "summary": "Workspace state conflict",
+                    "value": {
+                      "code": "WORKSPACE_STATE_CONFLICT",
+                      "detail": "The workspace pair state is inconsistent.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 409,
+                      "title": "Workspace state conflict",
+                      "type": "https://planner.invalid/problems/workspace-state-conflict"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Workspace state conflict"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read current workspace and member presentation context.",
+        "tags": [
+          "workspace"
+        ]
+      }
     }
   },
   "servers": [
@@ -20734,6 +20954,10 @@
     {
       "description": "Current, preliminary, closed and revised pilot report read models.",
       "name": "reporting"
+    },
+    {
+      "description": "Current pair workspace and safe member presentation context.",
+      "name": "workspace"
     }
   ]
 }

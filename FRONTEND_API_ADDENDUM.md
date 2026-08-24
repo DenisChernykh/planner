@@ -84,6 +84,17 @@ workspace resolver не является browser read model.
 
 **Required surface:** authenticated `GET /workspace/current`.
 
+The committed response schema is `workspace.current.v1` and contains exactly
+`spaceId`, `timeZone = "Asia/Yekaterinburg"`, `currentMemberId`,
+`personaMappingState` (`unbound|bound`) and two members ordered current first.
+Each member contains `memberId`, explicit `relation` (`current|partner`),
+finite backend-owned `displayName` and nullable `persona` (`memberA|memberB`).
+Before the immutable April seed binding the labels are `Вы` and `Партнёр` and
+both personas are `null`; after binding the labels are `Участник А` and `Участник Б` and
+the mapping is stable for both viewers. The mapping is read-only from the
+immutable `planning_seed_consumptions` row; F01 adds no presentation profile
+table or migration.
+
 Response должен в одном bounded read возвращать:
 
 - `spaceId` и exact `timeZone = "Asia/Yekaterinburg"`;
@@ -98,8 +109,10 @@ Display name/persona не берутся из Telegram username и не раск
 Telegram ID. Если presentation profile потребует новую persistence, она
 остаётся workspace-owned и не меняет равные права участников.
 
-**Recovery:** `401` → новый login; missing membership → concealed finite `403`;
-inconsistent pair state → safe `409/503`, без частичного member list.
+**Recovery:** `401` → новый login; missing membership → concealed finite
+`403 WORKSPACE_AUTHORIZATION_DENIED`; inconsistent pair or partial mapping →
+`409 WORKSPACE_STATE_CONFLICT`; database failure → `503 DEPENDENCY_UNAVAILABLE`.
+No partial member list is returned.
 
 **Acceptance:** `W-02/W-10/W-13/W-14` показывают «я / партнёр / shared», owner
 selection и report labels без hardcoded UUID/persona.

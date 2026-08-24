@@ -3078,6 +3078,17 @@ backend-owned requirements, но не считаются доступными д
 определены addendum. Любое изменение этих требований синхронно обновляет
 addendum, OpenAPI/contract tests и consumer matrix до реализации.
 
+F01 реализует `GET /workspace/current` как bounded single-statement read.
+Ответ `workspace.current.v1` возвращает только same-space `spaceId`,
+`Asia/Yekaterinburg`, trusted current `memberId`, explicit current/partner
+relations и два safe display labels. До immutable April seed binding labels
+равны `Вы`/`Партнёр`, persona nullable и `personaMappingState=unbound`; после
+binding mapping `memberA|memberB` и labels `Участник А`/`Участник Б` стабильны для обоих
+viewers. Persona читается из module-owned immutable
+`planning_seed_consumptions`; отдельная profile persistence не добавляется.
+Missing membership скрывается как `403`, inconsistent pair/mapping — как
+`409`, database failure — как `503`; partial member lists запрещены.
+
 ## 16. Failure model
 
 | Failure | Обязательное поведение |

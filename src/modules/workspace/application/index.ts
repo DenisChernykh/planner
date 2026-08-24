@@ -1,3 +1,5 @@
+export * from './current-workspace.read.port'
+export * from './get-current-workspace.query'
 export * from './pair-workspace.port'
 export * from './provision-pair.use-case'
 export * from './workspace-errors'

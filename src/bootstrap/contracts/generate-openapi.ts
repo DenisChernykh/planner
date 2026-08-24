@@ -8,6 +8,7 @@ import { PLANNING_OPENAPI_CONTRIBUTION } from '@/modules/planning/composition'
 import { REMINDERS_OPENAPI_CONTRIBUTION } from '@/modules/reminders/composition'
 import { REPORTING_OPENAPI_CONTRIBUTION } from '@/modules/reporting/composition'
 import { TRACKING_OPENAPI_CONTRIBUTION } from '@/modules/tracking/composition'
+import { WORKSPACE_OPENAPI_CONTRIBUTION } from '@/modules/workspace/composition'
 import { createOpenApiDocument } from '@/platform/http/docs/openapi-document'
 import { canonicalizeJson } from '@/platform/http/docs/openapi-normalizer'
 import { HttpProblemRegistry } from '@/platform/http/errors/http-problem.registry'
@@ -31,6 +32,7 @@ export async function generateOpenApiArtifact(): Promise<string> {
           TRACKING_OPENAPI_CONTRIBUTION,
           REMINDERS_OPENAPI_CONTRIBUTION,
           REPORTING_OPENAPI_CONTRIBUTION,
+          WORKSPACE_OPENAPI_CONTRIBUTION,
         ],
       ),
     )

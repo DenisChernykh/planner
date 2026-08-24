@@ -10,6 +10,7 @@ import { REPORTING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/reporting/composi
 import { TrackingModule } from '@/modules/tracking/composition/tracking.module'
 import { TRACKING_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/tracking/composition/tracking-http-problem.contribution'
 import { TelegramBotModule } from '@/modules/telegram-bot'
+import { WORKSPACE_HTTP_PROBLEM_CONTRIBUTION } from '@/modules/workspace/composition/workspace-http-problem.contribution'
 import type { ApplicationRuntimeConfig } from '@/platform/config/runtime-config.types'
 import { RuntimeConfigModule } from '@/platform/config/runtime-config.module'
 import { DatabaseModule } from '@/platform/database/database.module'
@@ -38,6 +39,7 @@ export class ApiModule {
           AUTH_HTTP_PROBLEM_CONTRIBUTION,
           PLANNING_HTTP_PROBLEM_CONTRIBUTION,
           TRACKING_HTTP_PROBLEM_CONTRIBUTION,
+          WORKSPACE_HTTP_PROBLEM_CONTRIBUTION,
           REMINDERS_HTTP_PROBLEM_CONTRIBUTION,
           REPORTING_HTTP_PROBLEM_CONTRIBUTION,
         ]),

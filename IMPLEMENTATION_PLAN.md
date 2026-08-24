@@ -2405,12 +2405,12 @@ labels, timezone и backend-owned persona mapping без UUID/slot inference.
 - Modify: `src/bootstrap/contracts/generate-openapi.ts`
 - Test: `test/e2e/workspace/current-workspace.e2e.spec.ts`
 
-- [ ] Зафиксировать profile/persona persistence and pre-binding null semantics.
-- [ ] Реализовать bounded same-space query и `GET /workspace/current`.
-- [ ] Доказать no hardcoded UUID/slot, foreign/inconsistent state и PII-negative
+- [x] Зафиксировать profile/persona persistence and pre-binding null semantics.
+- [x] Реализовать bounded same-space query и `GET /workspace/current`.
+- [x] Доказать no hardcoded UUID/slot, foreign/inconsistent state и PII-negative
   serialization.
-- [ ] Regenerate OpenAPI, запустить focused tests и `pnpm check:quick`.
-- [ ] Commit: `feat: expose current planner workspace context`.
+- [x] Regenerate OpenAPI, запустить focused tests и `pnpm check:quick`.
+- [x] Commit: `feat: expose current planner workspace context`.
 
 ### F02 — Plan/month discovery read model
 
