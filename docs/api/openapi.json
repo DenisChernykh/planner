@@ -10199,7 +10199,7 @@
         ],
         "responses": {
           "303": {
-            "description": "Local session created; redirect to the fixed Planner root.",
+            "description": "Recognized terminal callback; redirect to the fixed Planner result route.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -10210,10 +10210,15 @@
                 }
               },
               "Location": {
-                "description": "Fixed relative Planner destination.",
+                "description": "Fixed relative Planner result route with one backend-owned result code.",
                 "schema": {
                   "enum": [
-                    "/"
+                    "/auth/telegram/result?result=success",
+                    "/auth/telegram/result?result=cancelled",
+                    "/auth/telegram/result?result=login_rejected",
+                    "/auth/telegram/result?result=access_denied",
+                    "/auth/telegram/result?result=dependency_unavailable",
+                    "/auth/telegram/result?result=invalid_callback"
                   ],
                   "type": "string"
                 }

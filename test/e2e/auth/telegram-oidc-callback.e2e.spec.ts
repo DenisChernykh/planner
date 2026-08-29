@@ -19,6 +19,10 @@ import {
   TELEGRAM_OIDC_TOKEN_ENDPOINT,
 } from '@/modules/auth/application/telegram-oidc.ports'
 import {
+  TELEGRAM_OIDC_RESULT_CODES,
+  telegramOidcResultLocation,
+} from '@/modules/auth/presentation/telegram-oidc.controller'
+import {
   resumeRedis,
   suspendRedis,
 } from '@test/integration/support/redis-outage'
@@ -338,7 +342,7 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
 
     expect(response.text).toBe('')
     expect(response.headers).toMatchObject({
-      location: '/',
+      location: telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.success),
       'cache-control': 'no-store',
       pragma: 'no-cache',
       'referrer-policy': 'no-referrer',
@@ -438,15 +442,17 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
     expectStateClear(valid.headers['set-cookie'] as unknown as string[])
   })
 
-  it('consumes matched invalid and OAuth-error candidates before fixed safe Problems', async () => {
-    for (const [query, status, code] of [
-      [{ unknown: 'x' }, 422, 'VALIDATION_FAILED'],
+  it('consumes matched invalid and OAuth-error candidates before fixed safe redirects', async () => {
+    for (const [query, resultCode] of [
+      [{ unknown: 'x' }, TELEGRAM_OIDC_RESULT_CODES.invalidCallback],
       [
         { error: 'access_denied', error_description: 'private value' },
-        401,
-        'OIDC_LOGIN_REJECTED',
+        TELEGRAM_OIDC_RESULT_CODES.cancelled,
       ],
-      [{ code: 'x', error: 'access_denied' }, 422, 'VALIDATION_FAILED'],
+      [
+        { code: 'x', error: 'access_denied' },
+        TELEGRAM_OIDC_RESULT_CODES.invalidCallback,
+      ],
     ] as const) {
       const ceremony = await startCeremony()
       providerRequests = []
@@ -455,22 +461,13 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
         .query({ state: ceremony.state, ...query })
         .set('Cookie', ceremony.cookie)
         .redirects(0)
-        .expect(status)
-      const responseBody: unknown = response.body
-      expect(responseBody).toMatchObject({ code, status })
-      if (code === 'VALIDATION_FAILED') {
-        expect(responseBody).toMatchObject({
-          errors: [
-            {
-              pointer: '/query',
-              code: 'invalid_value',
-              detail: 'OIDC callback query is invalid.',
-            },
-          ],
-        })
-      }
+        .expect(303)
+      expect(response.text).toBe('')
+      expect(response.headers['location']).toBe(
+        telegramOidcResultLocation(resultCode),
+      )
       expectStateClear(response.headers['set-cookie'] as unknown as string[])
-      expect(JSON.stringify(responseBody)).not.toMatch(
+      expect(JSON.stringify(response.headers)).not.toMatch(
         /private value|access_denied/u,
       )
       expect(providerRequests).toHaveLength(0)
@@ -480,7 +477,11 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
         .query({ state: ceremony.state, code: 'replay' })
         .set('Cookie', ceremony.cookie)
         .redirects(0)
-        .expect(401)
+        .expect(303)
+        .expect(
+          'Location',
+          telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.loginRejected),
+        )
     }
   })
 
@@ -551,8 +552,10 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
         .get(path(ceremony.state))
         .set('Cookie', ceremony.cookie)
         .redirects(0)
-        .expect(422)
-      expect(response.body).toMatchObject({ code: 'VALIDATION_FAILED' })
+        .expect(303)
+      expect(response.headers['location']).toBe(
+        telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.invalidCallback),
+      )
       expectStateClear(response.headers['set-cookie'] as unknown as string[])
       expect(providerRequests).toHaveLength(0)
     }
@@ -569,8 +572,10 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
       })
       .set('Cookie', oauth.cookie)
       .redirects(0)
-      .expect(401)
-    expect(cancelled.body).toMatchObject({ code: 'OIDC_LOGIN_REJECTED' })
+      .expect(303)
+    expect(cancelled.headers['location']).toBe(
+      telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.cancelled),
+    )
     expectStateClear(cancelled.headers['set-cookie'] as unknown as string[])
     expect(providerRequests).toHaveLength(0)
   })
@@ -583,8 +588,10 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
       .query({ state: invalidGrant.state, code: 'invalid-code' })
       .set('Cookie', invalidGrant.cookie)
       .redirects(0)
-      .expect(401)
-    expect(rejected.body).toMatchObject({ code: 'OIDC_LOGIN_REJECTED' })
+      .expect(303)
+    expect(rejected.headers['location']).toBe(
+      telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.loginRejected),
+    )
     expectStateClear(rejected.headers['set-cookie'] as unknown as string[])
     expect(
       (rejected.headers['set-cookie'] as unknown as string[]).join(';'),
@@ -599,8 +606,10 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
       .query({ state: unknown.state, code: 'verified-unknown' })
       .set('Cookie', unknown.cookie)
       .redirects(0)
-      .expect(403)
-    expect(denied.body).toMatchObject({ code: 'OIDC_ACCESS_DENIED' })
+      .expect(303)
+    expect(denied.headers['location']).toBe(
+      telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.accessDenied),
+    )
     expectStateClear(denied.headers['set-cookie'] as unknown as string[])
     expect(
       (denied.headers['set-cookie'] as unknown as string[]).join(';'),
@@ -615,8 +624,12 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
       .query({ state: first.state, code: 'session-fails' })
       .set('Cookie', first.cookie)
       .redirects(0)
-      .expect(503)
-    expect(unavailable.body).toMatchObject({ code: 'DEPENDENCY_UNAVAILABLE' })
+      .expect(303)
+    expect(unavailable.headers['location']).toBe(
+      telegramOidcResultLocation(
+        TELEGRAM_OIDC_RESULT_CODES.dependencyUnavailable,
+      ),
+    )
     expectStateClear(unavailable.headers['set-cookie'] as unknown as string[])
     expect(
       (unavailable.headers['set-cookie'] as unknown as string[]).join(';'),

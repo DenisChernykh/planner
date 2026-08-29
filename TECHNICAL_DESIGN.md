@@ -338,10 +338,14 @@ Locked callback/identity contract для A03:
   Verified identity вне allowlist и любой binding collision возвращают новый
   `OIDC_ACCESS_DENIED` `403`; dependency failures — существующий safe
   `DEPENDENCY_UNAVAILABLE` `503`. Titles/details не содержат provider data;
-- success отвечает bodyless `303` с exact relative `Location: /`, request ID,
-  перечисленными cache/referrer headers, новой local-session cookie и очисткой
-  state cookie. Callback response, state, code, OAuth error values, cookies,
-  tokens и raw Telegram ID не логируются;
+- после совпавшего browser-binding любой распознанный terminal callback отвечает
+  bodyless `303` на exact relative `/auth/telegram/result` с единственным query
+  `result` из allowlist `success|cancelled|login_rejected|access_denied|dependency_unavailable|invalid_callback`.
+  Success дополнительно выставляет новую local-session cookie; все terminal
+  outcomes очищают state cookie и сохраняют request ID и перечисленные
+  cache/referrer headers. До browser-binding malformed body/state mismatch
+  остаются direct safe Problem Details. Callback response, provider values,
+  state, code, cookies, tokens и raw Telegram ID не логируются;
 - после `GETDEL` provider выполняет ровно по одному redirect-free request в
   порядке discovery → token → JWKS, без retry, cache или UserInfo. Каждый
   request имеет timeout `2_000 ms`, принимает только JSON и streaming body до

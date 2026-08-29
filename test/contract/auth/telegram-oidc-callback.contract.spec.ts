@@ -27,6 +27,10 @@ import {
 import { AuthDependencyUnavailableError } from '@/modules/auth/application/auth-errors'
 import type { IssuedBrowserSession } from '@/modules/auth/application/session-store.port'
 import { TelegramOidcProvider } from '@/modules/auth/infrastructure/telegram-oidc.provider'
+import {
+  TELEGRAM_OIDC_RESULT_CODES,
+  telegramOidcResultLocation,
+} from '@/modules/auth/presentation/telegram-oidc.controller'
 
 const clientId = '123456789'
 const clientSecret = 'telegram-client-secret-for-tests'
@@ -62,6 +66,29 @@ const issuedSession: IssuedBrowserSession = Object.freeze({
   sessionId: Buffer.alloc(16, 45).toString('base64url'),
   csrfToken: Buffer.alloc(32, 46).toString('base64url'),
   absoluteExpiresAt: new Date(nowMs + 60_000),
+})
+
+describe('F08 Telegram OIDC frontend result contract', () => {
+  it('pins a finite safe result allowlist to one fixed relative route', () => {
+    expect(TELEGRAM_OIDC_RESULT_CODES).toEqual({
+      success: 'success',
+      cancelled: 'cancelled',
+      loginRejected: 'login_rejected',
+      accessDenied: 'access_denied',
+      dependencyUnavailable: 'dependency_unavailable',
+      invalidCallback: 'invalid_callback',
+    })
+    expect(
+      Object.values(TELEGRAM_OIDC_RESULT_CODES).map(telegramOidcResultLocation),
+    ).toEqual([
+      '/auth/telegram/result?result=success',
+      '/auth/telegram/result?result=cancelled',
+      '/auth/telegram/result?result=login_rejected',
+      '/auth/telegram/result?result=access_denied',
+      '/auth/telegram/result?result=dependency_unavailable',
+      '/auth/telegram/result?result=invalid_callback',
+    ])
+  })
 })
 
 function successCandidate(value = code): TelegramOidcCallbackCandidate {

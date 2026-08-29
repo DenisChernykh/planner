@@ -2,9 +2,9 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01…F07` реализованы в backend
-contract, `F08…F10` не начаты
-**Backend contract baseline:** `9dc431a02254ff1f49dc4c587f44da1669c2bef8`
+**Статус:** обязательные backend-требования; `F01…F08` реализованы в backend
+contract, `F09…F10` не начаты
+**Backend contract baseline:** `4271b158fbf2a3455d383631c08a0266686bbb84`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
 ## 1. Назначение и граница
@@ -333,15 +333,16 @@ telemetry.
 
 ### GAP-08 — Frontend-safe OIDC result redirect
 
-**Current state:** success callback делает `303 /`, а terminal failures
-возвращают Problem Details непосредственно в top-level browser navigation.
+**Implemented state:** после совпавшего browser-binding распознанные terminal
+outcomes возвращают bodyless `303` на `/auth/telegram/result`.
 
 **Required behavior:** сохранить все A03 security/consume/cookie precedence, но
 после распознанного terminal callback завершать browser ceremony `303` на
 фиксированный relative frontend route `/auth/telegram/result`.
 
 Redirect query содержит только один finite safe result code из backend-owned
-allowlist. Provider description/URI, `state`, `code`, tokens, claims, Telegram
+allowlist `success|cancelled|login_rejected|access_denied|dependency_unavailable|invalid_callback`.
+Provider description/URI, `state`, `code`, tokens, claims, Telegram
 ID и internal exception не попадают в URL. Caller-controlled `returnTo` и open
 redirect запрещены. Pre-binding malformed/mismatched requests, для которых
 redirect ослабит security semantics, могут сохранить direct safe Problem

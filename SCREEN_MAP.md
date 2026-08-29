@@ -141,12 +141,15 @@ flowchart LR
 - вход ещё не начат;
 - redirect в Telegram выполняется;
 - callback обрабатывается;
+- callback завершён на fixed `/auth/telegram/result` с finite состоянием
+  `success`, `cancelled`, `login_rejected`, `access_denied`,
+  `dependency_unavailable` или `invalid_callback`;
 - пользователь отменил вход или Telegram временно недоступен;
 - callback отклонён из-за несовпадения состояния — вход нужно начать заново;
 - стабильный Telegram ID отсутствует в закрытом allowlist — доступ не предоставлен;
 - локальная веб-сессия создана.
 
-**Переходы:** после успеха — `W-02`, если есть активный план; `W-07`, если план нужно создать или опубликовать; `W-13`, если открыт завершённый месяц.
+**Переходы:** после успеха — `W-02`, если есть активный план; `W-07`, если план нужно создать или опубликовать; `W-13`, если открыт завершённый месяц. После любого terminal failure повтор требует нового `GET /auth/telegram/start`; result route не принимает caller-controlled destination.
 
 **Flows:** UF-01.
 

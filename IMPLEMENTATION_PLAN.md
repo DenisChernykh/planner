@@ -2550,14 +2550,14 @@ frontend result route, не ослабляя ceremony consume/cookie/identity po
 - Test: `test/contract/auth/telegram-oidc-callback.contract.spec.ts`
 - Test: `test/e2e/auth/telegram-oidc-callback.e2e.spec.ts`
 
-- [ ] Зафиксировать finite frontend result-code allowlist и exact redirect
+- [x] Зафиксировать finite frontend result-code allowlist и exact redirect
   boundary для malformed/mismatch outcomes.
-- [ ] Реализовать only relative `/auth/telegram/result`; запретить returnTo/open
+- [x] Реализовать only relative `/auth/telegram/result`; запретить returnTo/open
   redirect и provider data in URL.
-- [ ] Доказать cancel/rejected/denied/dependency/invalid, replay and PII-negative
+- [x] Доказать cancel/rejected/denied/dependency/invalid, replay and PII-negative
   headers/logs.
-- [ ] Regenerate OpenAPI and run focused auth E2E.
-- [ ] Commit: `feat: redirect telegram oidc results safely`.
+- [x] Regenerate OpenAPI and run focused auth E2E.
+- [x] Commit: `feat: redirect telegram oidc results safely`.
 
 ### F09 — Bot navigation metadata
 

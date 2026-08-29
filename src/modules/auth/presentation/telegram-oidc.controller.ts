@@ -12,7 +12,12 @@ import {
   CompleteTelegramOidcLoginUseCase,
   type TelegramOidcCallbackCandidate,
 } from '../application/complete-telegram-oidc-login.use-case'
-import { OidcLoginRejectedError } from '../application/auth-errors'
+import {
+  AuthDependencyUnavailableError,
+  OidcAccessDeniedError,
+  OidcCallbackValidationError,
+  OidcLoginRejectedError,
+} from '../application/auth-errors'
 import { StartTelegramOidcLoginUseCase } from '../application/start-telegram-oidc-login.use-case'
 import { ApiProblemResponses } from '@/platform/http/docs/api-problem-responses.decorator'
 import { ValidationProblemResponseDto } from '@/platform/http/docs/problem-response.dto'
@@ -34,6 +39,25 @@ const forbiddenInputIssue = Object.freeze({
 const canonicalStatePattern = /^[A-Za-z0-9_-]{43}$/u
 const visibleCodePattern = /^[\x21-\x7e]{1,4096}$/u
 const nqsCharPattern = /^[\x20-\x21\x23-\x5b\x5d-\x7e]*$/u
+const oidcResultPath = '/auth/telegram/result'
+
+export const TELEGRAM_OIDC_RESULT_CODES = Object.freeze({
+  success: 'success',
+  cancelled: 'cancelled',
+  loginRejected: 'login_rejected',
+  accessDenied: 'access_denied',
+  dependencyUnavailable: 'dependency_unavailable',
+  invalidCallback: 'invalid_callback',
+} as const)
+
+export type TelegramOidcResultCode =
+  (typeof TELEGRAM_OIDC_RESULT_CODES)[keyof typeof TELEGRAM_OIDC_RESULT_CODES]
+
+export function telegramOidcResultLocation(
+  result: TelegramOidcResultCode,
+): string {
+  return `${oidcResultPath}?result=${result}`
+}
 
 function callbackQuery(request: Request): URLSearchParams {
   return new URL(request.originalUrl, 'http://planner.invalid').searchParams
@@ -238,11 +262,18 @@ export class TelegramOidcController {
   })
   @ApiResponse({
     status: 303,
-    description: 'Local session created; redirect to the fixed Planner root.',
+    description:
+      'Recognized terminal callback; redirect to the fixed Planner result route.',
     headers: {
       Location: {
-        description: 'Fixed relative Planner destination.',
-        schema: { type: 'string', enum: ['/'] },
+        description:
+          'Fixed relative Planner result route with one backend-owned result code.',
+        schema: {
+          type: 'string',
+          enum: Object.values(TELEGRAM_OIDC_RESULT_CODES).map(
+            telegramOidcResultLocation,
+          ),
+        },
       },
       'Cache-Control': { schema: { type: 'string', enum: ['no-store'] } },
       Pragma: { schema: { type: 'string', enum: ['no-cache'] } },
@@ -327,19 +358,52 @@ export class TelegramOidcController {
     response.setHeader('Cache-Control', 'no-store')
     response.setHeader('Pragma', 'no-cache')
     response.setHeader('Referrer-Policy', 'no-referrer')
-    let result
+    let candidate: TelegramOidcCallbackCandidate | undefined
     try {
-      result = await this.completeLogin.execute(
-        state,
-        () => classifyCallback(query),
-        Date.now(),
-      )
+      try {
+        const result = await this.completeLogin.execute(
+          state,
+          () => {
+            candidate = classifyCallback(query)
+            return candidate
+          },
+          Date.now(),
+        )
+        this.sessionCookie.set(response, result.session)
+        response.status(303)
+        response.setHeader(
+          'Location',
+          telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.success),
+        )
+      } catch (error: unknown) {
+        const resultCode = this.resultCodeFor(error, candidate)
+        response.status(303)
+        response.setHeader('Location', telegramOidcResultLocation(resultCode))
+      }
     } finally {
       this.stateCookie.clear(response)
     }
-    this.sessionCookie.set(response, result.session)
-    response.status(303)
-    response.setHeader('Location', result.returnTo)
     response.end()
+  }
+
+  private resultCodeFor(
+    error: unknown,
+    candidate: TelegramOidcCallbackCandidate | undefined,
+  ): TelegramOidcResultCode {
+    if (error instanceof OidcCallbackValidationError) {
+      return TELEGRAM_OIDC_RESULT_CODES.invalidCallback
+    }
+    if (error instanceof OidcAccessDeniedError) {
+      return TELEGRAM_OIDC_RESULT_CODES.accessDenied
+    }
+    if (error instanceof AuthDependencyUnavailableError) {
+      return TELEGRAM_OIDC_RESULT_CODES.dependencyUnavailable
+    }
+    if (error instanceof OidcLoginRejectedError) {
+      return candidate?.kind === 'oauth-error'
+        ? TELEGRAM_OIDC_RESULT_CODES.cancelled
+        : TELEGRAM_OIDC_RESULT_CODES.loginRejected
+    }
+    throw error
   }
 }
