@@ -33,3 +33,17 @@ export class PublicationPathDto {
   @Matches(UUID)
   public readonly publicationId!: string
 }
+
+export class CancelPublicationRequestDto {
+  @IsString()
+  @Matches(UUID)
+  public readonly commandId!: string
+
+  @IsString()
+  @Matches(UUID)
+  public readonly planMonthId!: string
+
+  @IsString()
+  @Matches(POSITIVE)
+  public readonly expectedRevision!: string
+}

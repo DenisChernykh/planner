@@ -1636,6 +1636,14 @@ export const PLANNING_OPENAPI_CONTRIBUTION: OpenApiDocumentContribution = {
       componentName: 'PlanMonthAlreadyExistsProblemResponseDto',
       codes: ['PLAN_MONTH_ALREADY_EXISTS'],
     },
+    {
+      componentName: 'PlanPublicationCancellationConflictProblemResponseDto',
+      codes: ['PLAN_PUBLICATION_CANCELLATION_CONFLICT'],
+    },
+    {
+      componentName: 'PlanPublicationModeConflictProblemResponseDto',
+      codes: ['PLAN_PUBLICATION_MODE_CONFLICT'],
+    },
   ],
   install: installPlanningGoalSchemas,
 }

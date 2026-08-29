@@ -484,6 +484,48 @@ export class PlanMonthAlreadyExistsProblemResponseDto extends ProblemResponseDto
   public readonly conflict!: PlanMonthAlreadyExistsConflictResponseDto
 }
 
+export class PlanPublicationCancellationConflictResponseDto {
+  @ApiProperty({ enum: ['not_active', 'month_started', 'facts_exist'] })
+  public readonly reason!: 'not_active' | 'month_started' | 'facts_exist'
+
+  @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$' })
+  public readonly currentRevision!: string
+}
+
+export class PlanPublicationCancellationConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['PLAN_PUBLICATION_CANCELLATION_CONFLICT'],
+    example: 'PLAN_PUBLICATION_CANCELLATION_CONFLICT',
+  })
+  declare public readonly code: 'PLAN_PUBLICATION_CANCELLATION_CONFLICT'
+
+  @ApiProperty({ type: () => PlanPublicationCancellationConflictResponseDto })
+  public readonly conflict!: PlanPublicationCancellationConflictResponseDto
+}
+
+export class PlanPublicationModeConflictResponseDto {
+  @ApiProperty({ enum: ['publish', 'republish'] })
+  public readonly requiredMode!: 'publish' | 'republish'
+
+  @ApiProperty({
+    type: String,
+    pattern: '^[1-9][0-9]*$',
+    nullable: true,
+  })
+  public readonly latestPublicationRevision!: string | null
+}
+
+export class PlanPublicationModeConflictProblemResponseDto extends ProblemResponseDto {
+  @ApiProperty({
+    enum: ['PLAN_PUBLICATION_MODE_CONFLICT'],
+    example: 'PLAN_PUBLICATION_MODE_CONFLICT',
+  })
+  declare public readonly code: 'PLAN_PUBLICATION_MODE_CONFLICT'
+
+  @ApiProperty({ type: () => PlanPublicationModeConflictResponseDto })
+  public readonly conflict!: PlanPublicationModeConflictResponseDto
+}
+
 export class PublicationBlockerResponseDto {
   @ApiProperty({ type: String, format: 'uuid', nullable: true })
   public readonly planGoalId!: string | null

@@ -1817,6 +1817,26 @@ can be retried against the new revision. Missing and foreign drafts are both
 appears in the next preview and immutable publication snapshot, and cannot
 mutate that snapshot after publication.
 
+F06 exposes P08 through authenticated, CSRF-protected commands. `POST
+/planning/publications/{publicationId}/cancel` accepts the exact body
+`{ commandId, planMonthId, expectedRevision }`, where both IDs are UUIDs and
+`expectedRevision` is a positive lifecycle revision. Success and exact replay
+return `200 planning.plan-month.v1`. `POST
+/planning/drafts/{planMonthId}/republish` accepts the exact P07 confirmation
+body and returns `201 planning.plan-publication.v1`; the path plan month remains
+the command payload identity. Actor and space are resolved from the checked
+session and never accepted from JSON.
+
+The adapters delegate lifecycle, facts, preview, receipt and immutable snapshot
+policy to P08/P07. Stale cancellation returns the existing typed plan-month
+revision conflict. Cancellation guards return
+`PLAN_PUBLICATION_CANCELLATION_CONFLICT` with finite reason
+`not_active|month_started|facts_exist` and current lifecycle revision. Calling
+publish versus republish in the wrong lifecycle returns
+`PLAN_PUBLICATION_MODE_CONFLICT` with `requiredMode: publish|republish` and the
+nullable latest publication revision. A successful republish appends the next
+publication revision while every old publication remains readable by exact ID.
+
 P02 commands имеют exact contracts:
 
 ```text

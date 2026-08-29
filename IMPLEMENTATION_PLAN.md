@@ -2506,13 +2506,13 @@ CSRF-protected и idempotent HTTP command.
 - Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
 - Test: `test/e2e/planning/cancel-republish.e2e.spec.ts`
 
-- [ ] Зафиксировать cancel lifecycle revision и exact republish P07 confirmation
+- [x] Зафиксировать cancel lifecycle revision и exact republish P07 confirmation
   DTOs.
-- [ ] Реализовать cancel/republish routes без controller-owned policy.
-- [ ] Доказать started/facts/stale/replay, immutable old snapshots and next
+- [x] Реализовать cancel/republish routes без controller-owned policy.
+- [x] Доказать started/facts/stale/replay, immutable old snapshots and next
   publication revision.
-- [ ] Regenerate OpenAPI and run focused integration/E2E.
-- [ ] Commit: `feat: expose publication cancel and republish`.
+- [x] Regenerate OpenAPI and run focused integration/E2E.
+- [x] Commit: `feat: expose publication cancel and republish`.
 
 ### F07 — Fact and lifecycle audit read models
 

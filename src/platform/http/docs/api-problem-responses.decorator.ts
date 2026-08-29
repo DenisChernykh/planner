@@ -25,6 +25,10 @@ import {
   PublicationPreviewConflictResponseDto,
   PlanMonthAlreadyPublishedProblemResponseDto,
   PlanMonthAlreadyExistsProblemResponseDto,
+  PlanPublicationCancellationConflictProblemResponseDto,
+  PlanPublicationCancellationConflictResponseDto,
+  PlanPublicationModeConflictProblemResponseDto,
+  PlanPublicationModeConflictResponseDto,
   AlreadyPublishedConflictResponseDto,
   PlanPublicationBlockedProblemResponseDto,
   PublicationBlockerResponseDto,
@@ -93,6 +97,12 @@ export function ApiProblemResponses(
           }
           if (code === 'PLAN_MONTH_ALREADY_EXISTS') {
             return PlanMonthAlreadyExistsProblemResponseDto
+          }
+          if (code === 'PLAN_PUBLICATION_CANCELLATION_CONFLICT') {
+            return PlanPublicationCancellationConflictProblemResponseDto
+          }
+          if (code === 'PLAN_PUBLICATION_MODE_CONFLICT') {
+            return PlanPublicationModeConflictProblemResponseDto
           }
           if (code === 'PLAN_PUBLICATION_BLOCKED') {
             return PlanPublicationBlockedProblemResponseDto
@@ -174,6 +184,10 @@ export function ApiProblemResponses(
       AlreadyPublishedConflictResponseDto,
       PlanMonthAlreadyPublishedProblemResponseDto,
       PlanMonthAlreadyExistsProblemResponseDto,
+      PlanPublicationCancellationConflictResponseDto,
+      PlanPublicationCancellationConflictProblemResponseDto,
+      PlanPublicationModeConflictResponseDto,
+      PlanPublicationModeConflictProblemResponseDto,
       PublicationBlockerResponseDto,
       PlanPublicationBlockedProblemResponseDto,
       TrackingFactTargetUnavailableConflictResponseDto,
@@ -303,6 +317,19 @@ function problemExample(definition: RegisteredProblemDefinition): object {
               aggregateRevision: '1',
             },
             nextAction: 'open-existing-month',
+          },
+        }
+      : {}),
+    ...(definition.code === 'PLAN_PUBLICATION_CANCELLATION_CONFLICT'
+      ? {
+          conflict: { reason: 'month_started', currentRevision: '2' },
+        }
+      : {}),
+    ...(definition.code === 'PLAN_PUBLICATION_MODE_CONFLICT'
+      ? {
+          conflict: {
+            requiredMode: 'republish',
+            latestPublicationRevision: '1',
           },
         }
       : {}),

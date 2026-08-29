@@ -2,9 +2,9 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01…F05` реализованы в backend
-contract, `F06…F10` не начаты
-**Backend contract baseline:** `2c5e691eeb16e3a54142eede7927b5449aa9e5e3`
+**Статус:** обязательные backend-требования; `F01…F06` реализованы в backend
+contract, `F07…F10` не начаты
+**Backend contract baseline:** `8a28a3ab6f2e466e21ebe409a0ad7f5240c5fedc`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
 ## 1. Назначение и граница
@@ -266,8 +266,8 @@ change.
 
 ### GAP-06 — Cancel and republish HTTP commands
 
-**Current state:** P08 application commands и persistence реализованы, HTTP и
-OpenAPI отсутствуют.
+**Implemented contract:** P08 application commands и persistence доступны через
+authenticated HTTP и committed OpenAPI.
 
 **Required surfaces:** authenticated + CSRF:
 
@@ -280,6 +280,14 @@ Cancel разрешён только до начала месяца и при `f
 active pointer, но не изменяет snapshot/history. Republish требует latest
 cancellation marker и создаёт следующую append-only publication revision через
 тот же P07 builder. Started/factual/stale states имеют разные finite conflicts.
+
+Cancel success и exact replay возвращают `200 planning.plan-month.v1`; stale
+lifecycle revision использует `PLAN_MONTH_REVISION_CONFLICT`, а lifecycle guard
+использует `PLAN_PUBLICATION_CANCELLATION_CONFLICT` с reason
+`not_active|month_started|facts_exist`. Republish success/replay возвращают
+`201 planning.plan-publication.v1`; неверный выбор initial publish/republish
+возвращает `PLAN_PUBLICATION_MODE_CONFLICT` с required mode и nullable latest
+publication revision. Actor и space остаются server-derived.
 
 **Acceptance:** `W-07/W-11` показывают только server-confirmed draft/new
 publication; старые publications доступны по exact ID и не переписываются.

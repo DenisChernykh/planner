@@ -19,6 +19,8 @@ import {
   PlanMonthAlreadyPublishedError,
   PlanPublicationBlockedError,
   PlanPublicationNotFoundError,
+  PlanPublicationCancellationConflictError,
+  PlanPublicationModeConflictError,
   PublicationPreviewConflictError,
   PlanningAuthorizationDeniedError,
   PlanningDependencyUnavailableError,
@@ -43,6 +45,8 @@ import {
   PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
   PLAN_PUBLICATION_BLOCKED_PROBLEM,
   PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
+  PLAN_PUBLICATION_CANCELLATION_CONFLICT_PROBLEM,
+  PLAN_PUBLICATION_MODE_CONFLICT_PROBLEM,
   PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
   PLAN_MONTH_NOT_FOUND_PROBLEM,
   PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
@@ -74,6 +78,8 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       PLAN_PUBLICATION_BLOCKED_PROBLEM,
       PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
       PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
+      PLAN_PUBLICATION_CANCELLATION_CONFLICT_PROBLEM,
+      PLAN_PUBLICATION_MODE_CONFLICT_PROBLEM,
       ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM,
       PLAN_MONTH_NOT_FOUND_PROBLEM,
       PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
@@ -96,6 +102,8 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       'PLAN_PUBLICATION_BLOCKED',
       'PLAN_MONTH_ALREADY_PUBLISHED',
       'PLAN_PUBLICATION_NOT_FOUND',
+      'PLAN_PUBLICATION_CANCELLATION_CONFLICT',
+      'PLAN_PUBLICATION_MODE_CONFLICT',
       'ACTIVE_PLAN_MONTH_NOT_FOUND',
       'PLAN_MONTH_NOT_FOUND',
       'PLAN_MONTH_REVISION_CONFLICT',
@@ -200,6 +208,25 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
       }
       if (error instanceof PlanPublicationNotFoundError) {
         return { code: 'PLAN_PUBLICATION_NOT_FOUND' }
+      }
+      if (error instanceof PlanPublicationCancellationConflictError) {
+        return {
+          code: 'PLAN_PUBLICATION_CANCELLATION_CONFLICT',
+          conflict: {
+            reason: error.reason,
+            currentRevision: error.currentRevision.toString(10),
+          },
+        }
+      }
+      if (error instanceof PlanPublicationModeConflictError) {
+        return {
+          code: 'PLAN_PUBLICATION_MODE_CONFLICT',
+          conflict: {
+            requiredMode: error.requiredMode,
+            latestPublicationRevision:
+              error.latestPublicationRevision?.toString(10) ?? null,
+          },
+        }
       }
       if (error instanceof ActivePlanMonthNotFoundError) {
         return { code: 'ACTIVE_PLAN_MONTH_NOT_FOUND' }

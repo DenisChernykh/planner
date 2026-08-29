@@ -894,6 +894,7 @@ describe('P03 authenticated typed draft-goal HTTP', () => {
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/remove',
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/update',
       '/planning/drafts/{planMonthId}/publish',
+      '/planning/drafts/{planMonthId}/republish',
     ])
     expect(document.components.schemas['AddDraftGoalMeasurementV1']).toEqual(
       expect.objectContaining({

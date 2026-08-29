@@ -467,11 +467,13 @@ describe('S03 HTTP contracts', () => {
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/remove',
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/update',
       '/planning/drafts/{planMonthId}/publish',
+      '/planning/drafts/{planMonthId}/republish',
       '/planning/months',
       '/planning/months/active',
       '/planning/months/{planMonthId}/reclose',
       '/planning/months/{planMonthId}/reopen',
       '/planning/publications/{publicationId}',
+      '/planning/publications/{publicationId}/cancel',
       '/reminders/delivery-status',
       '/reminders/settings',
       '/reporting/months/{targetMonth}',
@@ -2259,6 +2261,7 @@ describe('S03 HTTP contracts', () => {
       'PLAN_DRAFT_NOT_EDITABLE',
       'PLAN_MONTH_ALREADY_PUBLISHED',
       'PLAN_PUBLICATION_BLOCKED',
+      'PLAN_PUBLICATION_MODE_CONFLICT',
       'PUBLICATION_PREVIEW_CONFLICT',
     ])
     expect(

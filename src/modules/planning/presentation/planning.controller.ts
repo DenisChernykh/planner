@@ -65,6 +65,8 @@ import {
   PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
   PLAN_PUBLICATION_BLOCKED_PROBLEM,
   PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
+  PLAN_PUBLICATION_CANCELLATION_CONFLICT_PROBLEM,
+  PLAN_PUBLICATION_MODE_CONFLICT_PROBLEM,
   PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
   PLANNING_AUTHORIZATION_DENIED_PROBLEM,
   PLAN_MONTH_ALREADY_EXISTS_PROBLEM,
@@ -117,7 +119,11 @@ import {
   toPublicationPreviewResponse,
   type PublicationPreviewResponse,
 } from './publication-preview.response'
-import { PublicationPathDto, PublishMonthRequestDto } from './publication.dto'
+import {
+  CancelPublicationRequestDto,
+  PublicationPathDto,
+  PublishMonthRequestDto,
+} from './publication.dto'
 import {
   toPlanPublicationResultResponse,
   toPublishedSnapshotResponse,
@@ -307,6 +313,16 @@ const publishBodySchema = {
     'previewHash',
   ],
 }
+const cancelPublicationBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    planMonthId: uuidSchema,
+    expectedRevision: revisionSchema,
+  },
+  required: ['commandId', 'planMonthId', 'expectedRevision'],
+}
 const metadataProperties = {
   title: {
     type: 'string' as const,
@@ -425,6 +441,14 @@ const publicationProblems = [
   PUBLICATION_PREVIEW_CONFLICT_PROBLEM,
   PLAN_PUBLICATION_BLOCKED_PROBLEM,
   PLAN_MONTH_ALREADY_PUBLISHED_PROBLEM,
+  PLAN_PUBLICATION_MODE_CONFLICT_PROBLEM,
+]
+const republishProblems = [...publicationProblems]
+const cancellationProblems = [
+  ...mutationProblems,
+  PLAN_PUBLICATION_NOT_FOUND_PROBLEM,
+  PLAN_MONTH_REVISION_CONFLICT_PROBLEM,
+  PLAN_PUBLICATION_CANCELLATION_CONFLICT_PROBLEM,
 ]
 
 @ApiTags('planning')
@@ -803,6 +827,38 @@ export class PlanningDraftController {
     )
   }
 
+  @Post(':planMonthId/republish')
+  @ApiOperation({
+    summary: 'Republish a cancelled future monthly plan.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiCreatedResponse({
+    description: 'New immutable publication aggregate reference.',
+    schema: { $ref: '#/components/schemas/PlanPublicationResultResponseV1' },
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiBody({ required: true, schema: publishBodySchema })
+  @ApiProblemResponses(...republishProblems)
+  public async republish(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PlanMonthPathDto,
+    @Body() body: PublishMonthRequestDto,
+  ): Promise<PlanPublicationResultResponse> {
+    return toPlanPublicationResultResponse(
+      await this.planning.republishMonth.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: {
+          planMonthId: path.planMonthId,
+          previewSchemaVersion: body.previewSchemaVersion,
+          previewHashVersion: body.previewHashVersion,
+          previewHash: body.previewHash,
+        },
+      }),
+    )
+  }
+
   @Post(':planMonthId/publish')
   @ApiOperation({
     summary: 'Atomically publish the confirmed monthly plan snapshot.',
@@ -985,6 +1041,8 @@ export class PlanningPublicationController {
   public constructor(
     @Inject(PLANNING_APPLICATION)
     private readonly planning: PlanningApplication,
+    @Inject(WORKSPACE_MEMBER_RESOLVER)
+    private readonly workspaceMembers: WorkspaceMemberResolver,
   ) {}
 
   @Get(':publicationId')
@@ -1004,6 +1062,49 @@ export class PlanningPublicationController {
     })
     if (value === null) throw new PlanPublicationNotFoundError()
     return toPublishedSnapshotResponse(value)
+  }
+
+  @Post(':publicationId/cancel')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Cancel an unstarted fact-free publication.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiOkResponse({
+    schema: { $ref: '#/components/schemas/PlanMonthMutationResponseV1' },
+  })
+  @ApiParam({ name: 'publicationId', required: true, schema: uuidSchema })
+  @ApiBody({ required: true, schema: cancelPublicationBodySchema })
+  @ApiProblemResponses(...cancellationProblems)
+  public async cancel(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PublicationPathDto,
+    @Body() body: CancelPublicationRequestDto,
+  ): Promise<PlanMonthMutationResponse> {
+    return toPlanMonthMutationResponse(
+      await this.planning.cancelPublication.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: {
+          planMonthId: body.planMonthId,
+          publicationId: path.publicationId,
+        },
+      }),
+    )
+  }
+
+  private async actor(
+    principal: AuthenticatedPrincipal,
+  ): Promise<{ readonly kind: 'member'; readonly id: string }> {
+    try {
+      const member = await this.workspaceMembers.resolveUser(principal.userId)
+      return { kind: 'member', id: member.memberId }
+    } catch (error: unknown) {
+      if (error instanceof WorkspaceMemberNotFoundError)
+        throw new PlanningAuthorizationDeniedError()
+      throw new PlanningDependencyUnavailableError({ cause: error })
+    }
   }
 }
 

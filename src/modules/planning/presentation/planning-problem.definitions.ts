@@ -122,6 +122,23 @@ export const PLAN_PUBLICATION_NOT_FOUND_PROBLEM = defineProblemDefinition({
   detail: 'The requested plan publication was not found.',
 })
 
+export const PLAN_PUBLICATION_CANCELLATION_CONFLICT_PROBLEM =
+  defineProblemDefinition({
+    slug: 'plan-publication-cancellation-conflict',
+    code: 'PLAN_PUBLICATION_CANCELLATION_CONFLICT',
+    status: 409,
+    title: 'Plan publication cannot be cancelled',
+    detail: 'The publication is not eligible for cancellation.',
+  })
+
+export const PLAN_PUBLICATION_MODE_CONFLICT_PROBLEM = defineProblemDefinition({
+  slug: 'plan-publication-mode-conflict',
+  code: 'PLAN_PUBLICATION_MODE_CONFLICT',
+  status: 409,
+  title: 'Plan publication mode conflict',
+  detail: 'The plan month requires a different publication command.',
+})
+
 export const ACTIVE_PLAN_MONTH_NOT_FOUND_PROBLEM = defineProblemDefinition({
   slug: 'active-plan-month-not-found',
   code: 'ACTIVE_PLAN_MONTH_NOT_FOUND',
