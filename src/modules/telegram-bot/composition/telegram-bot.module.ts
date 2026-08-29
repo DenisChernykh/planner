@@ -27,6 +27,7 @@ import {
 } from '../application/telegram-bot.types'
 import { TelegramUpdateHandler } from '../application/telegram-update.handler'
 import { TelegramActionIntentService } from '../application/action-intent.service'
+import { GetBotNavigationQuery } from '../application/get-bot-navigation.query'
 import {
   GetUpdatesRunner,
   DisabledTelegramIngress,
@@ -34,6 +35,7 @@ import {
 import { TelegramBotApiClient } from '../infrastructure/telegram-bot-api.client'
 import { PrismaTelegramIngressStateRepository } from '../infrastructure/prisma-telegram-ingress-state.repository'
 import { PrismaActionIntentRepository } from '../infrastructure/prisma-action-intent.repository'
+import { TelegramNavigationController } from '../presentation/telegram-navigation.controller'
 
 const TELEGRAM_TRACKING_APPLICATION: unique symbol = Symbol(
   'TELEGRAM_TRACKING_APPLICATION',
@@ -47,7 +49,14 @@ export class TelegramBotModule {
     return {
       module: TelegramBotModule,
       imports: [DatabaseModule, WorkspaceModule],
+      controllers: [TelegramNavigationController],
       providers: [
+        {
+          provide: GetBotNavigationQuery,
+          inject: [RuntimeConfigService],
+          useFactory: (config: RuntimeConfigService) =>
+            new GetBotNavigationQuery(config.telegramBot.navigationUrl),
+        },
         PrismaTelegramIngressStateRepository,
         PrismaActionIntentRepository,
         {

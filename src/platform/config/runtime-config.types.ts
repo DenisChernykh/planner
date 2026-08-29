@@ -67,6 +67,7 @@ export interface TelegramOidcRuntimeConfig {
 export interface TelegramBotRuntimeConfig {
   readonly ingressMode: 'disabled' | 'get_updates'
   readonly token?: string
+  readonly navigationUrl?: string
   readonly getUpdatesTimeoutSeconds: number
   readonly requestTimeoutMs: number
   readonly responseBodyLimitBytes: number

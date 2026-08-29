@@ -32,3 +32,8 @@ Bot ingress является opt-in частью API process. По умолча�
 
 Локальный `planner-worker` также использует `TELEGRAM_BOT_TOKEN` для отправки
 напоминаний; Compose не запускает worker без этого секрета.
+
+Authenticated web navigation к боту настраивается отдельно через optional
+`TELEGRAM_BOT_URL=https://t.me/<username>`. Без него capability имеет status
+`disabled`; unsafe/non-canonical значение возвращается как `misconfigured` и
+не отражается в HTTP response.

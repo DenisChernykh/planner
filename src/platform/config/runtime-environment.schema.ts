@@ -21,6 +21,7 @@ interface ValidatedRuntimeEnvironment {
   readonly TELEGRAM_OIDC_CALLBACK_URL: string
   readonly TELEGRAM_INGRESS_MODE: 'disabled' | 'get_updates'
   readonly TELEGRAM_BOT_TOKEN?: string
+  readonly TELEGRAM_BOT_URL?: string
   readonly OTEL_SDK_DISABLED: boolean
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string
 }
@@ -197,6 +198,7 @@ export const runtimeEnvironmentSchema = Joi.object<ValidatedRuntimeEnvironment>(
         validTelegramBotToken(value) ? value : helpers.error('any.invalid'),
       )
       .optional(),
+    TELEGRAM_BOT_URL: Joi.string().allow('').max(2_048).optional(),
     OTEL_SDK_DISABLED: Joi.boolean().default(true),
     OTEL_EXPORTER_OTLP_ENDPOINT: Joi.string()
       .trim()

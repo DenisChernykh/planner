@@ -1,4 +1,5 @@
 export * from './action-intent.service'
+export * from './get-bot-navigation.query'
 export * from './action-intent.types'
 export * from './basic-fact-command.mapper'
 export * from './composite-fact-command.mapper'

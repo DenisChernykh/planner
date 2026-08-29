@@ -91,6 +91,9 @@ export function buildApiRuntimeConfig(
       ...(environment.TELEGRAM_BOT_TOKEN === undefined
         ? {}
         : { token: environment.TELEGRAM_BOT_TOKEN }),
+      ...(environment.TELEGRAM_BOT_URL === undefined
+        ? {}
+        : { navigationUrl: environment.TELEGRAM_BOT_URL }),
       ...runtimeDefaults.telegramBot,
     }),
     observability: Object.freeze({

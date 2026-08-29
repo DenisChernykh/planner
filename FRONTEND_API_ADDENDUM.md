@@ -2,9 +2,9 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01…F08` реализованы в backend
-contract, `F09…F10` не начаты
-**Backend contract baseline:** `4271b158fbf2a3455d383631c08a0266686bbb84`
+**Статус:** обязательные backend-требования; `F01…F09` реализованы в backend
+contract, `F10` не начат
+**Backend contract baseline:** `cbf26d5b843eb2ca121c8abdbc294319c18e911c`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
 ## 1. Назначение и граница
@@ -354,8 +354,9 @@ invalid callback различимы в `W-01`; повтор login создаёт
 
 ### GAP-09 — Bot navigation metadata
 
-**Current state:** reminder delivery status не содержит server-owned bot link;
-frontend не должен хардкодить username/URL.
+**Implemented state:** authenticated `GET /telegram/navigation` возвращает
+server-owned bot capability отдельно от reminder delivery status; frontend не
+хардкодит username/URL.
 
 **Required surface:** authenticated `GET /telegram/navigation`.
 
@@ -371,6 +372,11 @@ Bot unavailable/misconfigured возвращается как явный unavail
 
 **Acceptance:** `W-01/W-14` открывают правильного configured bot без frontend
 constant и не смешивают navigation с delivery health.
+
+Exact v1 response содержит `schemaVersion=telegram.navigation.v1`, capability
+`open_bot`, status `available|disabled|misconfigured` и `url`. URL non-null
+только для `available` и имеет canonical форму `https://t.me/<username>` без
+query/start payload; disabled/misconfigured возвращают `url: null`.
 
 ## 4. OpenAPI и межрепозиторный handoff
 

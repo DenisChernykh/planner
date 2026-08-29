@@ -2904,6 +2904,16 @@ BullMQ можно добавить после intent creation при доказ�
 
 ## 14. Telegram interface
 
+Authenticated web navigation к боту является отдельным read-only contract
+`GET /telegram/navigation`. Он возвращает closed
+`telegram.navigation.v1` с capability `open_bot`, status
+`available|disabled|misconfigured` и URL только для `available`. Единственный
+допустимый URL — canonical `https://t.me/<username>` без query, fragment,
+credentials или start payload; source — optional `TELEGRAM_BOT_URL`. Отсутствие
+config даёт `disabled`, unsafe value — `misconfigured` без отражения исходного
+значения. Navigation не читает Bot API token, ingress lifecycle, reminder
+attempts или delivery status и не является identity key.
+
 ### 14.1. Ingress
 
 Один application handler обрабатывает нормализованный Telegram update.

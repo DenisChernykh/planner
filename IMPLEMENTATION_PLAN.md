@@ -2573,13 +2573,13 @@ capability отдельно от reminder delivery status.
 - Modify: `src/modules/telegram-bot/composition/telegram-bot.module.ts`
 - Test: `test/e2e/telegram-bot/navigation.e2e.spec.ts`
 
-- [ ] Зафиксировать safe HTTPS URL/capability response и disabled/misconfigured
+- [x] Зафиксировать safe HTTPS URL/capability response и disabled/misconfigured
   behavior.
-- [ ] Реализовать `GET /telegram/navigation` без raw Telegram/chat/member IDs.
-- [ ] Доказать no hardcoded consumer URL, no bot token/start payload leakage and
+- [x] Реализовать `GET /telegram/navigation` без raw Telegram/chat/member IDs.
+- [x] Доказать no hardcoded consumer URL, no bot token/start payload leakage and
   no coupling to delivery health.
-- [ ] Regenerate OpenAPI and run focused contract/E2E.
-- [ ] Commit: `feat: expose planner bot navigation`.
+- [x] Regenerate OpenAPI and run focused contract/E2E.
+- [x] Commit: `feat: expose planner bot navigation`.
 
 ### F10 — Published OpenAPI consumer handoff
 
