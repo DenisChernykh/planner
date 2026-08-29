@@ -478,6 +478,7 @@ describe('S03 HTTP contracts', () => {
       '/reminders/delivery-status',
       '/reminders/settings',
       '/reporting/months/{targetMonth}',
+      '/telegram/navigation',
       '/tracking/facts',
       '/tracking/facts/checklist-item',
       '/tracking/facts/checkpoint',
@@ -511,7 +512,7 @@ describe('S03 HTTP contracts', () => {
       Object.keys(
         document.paths['/auth/telegram/callback']?.get?.responses ?? {},
       ).sort(),
-    ).toEqual(['303', '400', '401', '403', '413', '422', '503'])
+    ).toEqual(['303', '400', '401', '413', '422'])
     expect(document.paths['/auth/telegram/callback']?.get?.security).toEqual([])
     const callbackParameters =
       document.paths['/auth/telegram/callback']?.get?.parameters ?? []
@@ -592,19 +593,31 @@ describe('S03 HTTP contracts', () => {
     ).toEqual({
       'Cache-Control': { schema: { enum: ['no-store'], type: 'string' } },
       Location: {
-        description: 'Fixed relative Planner destination.',
-        schema: { enum: ['/'], type: 'string' },
+        description:
+          'Fixed relative Planner result route with one backend-owned result code.',
+        schema: {
+          enum: [
+            '/auth/telegram/result?result=success',
+            '/auth/telegram/result?result=cancelled',
+            '/auth/telegram/result?result=login_rejected',
+            '/auth/telegram/result?result=access_denied',
+            '/auth/telegram/result?result=dependency_unavailable',
+            '/auth/telegram/result?result=invalid_callback',
+          ],
+          type: 'string',
+        },
       },
       Pragma: { schema: { enum: ['no-cache'], type: 'string' } },
       'Referrer-Policy': {
         schema: { enum: ['no-referrer'], type: 'string' },
       },
       'Set-Cookie': {
-        description: 'Local session cookie and cleared OIDC state cookie.',
+        description:
+          'Cleared OIDC state cookie; success also sets the local session cookie.',
         schema: {
           items: { type: 'string' },
           maxItems: 2,
-          minItems: 2,
+          minItems: 1,
           type: 'array',
         },
       },

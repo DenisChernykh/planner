@@ -349,6 +349,7 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
       'x-request-id': '01ARZ3NDEKTSV4RRFFQ69G5FAV',
     })
     const cookies = response.headers['set-cookie'] as unknown as string[]
+    expect(cookies).toHaveLength(2)
     expectStateClear(cookies)
     expect(cookies).toEqual(
       expect.arrayContaining([
@@ -580,7 +581,7 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
     expect(providerRequests).toHaveLength(0)
   })
 
-  it('maps invalid grant to 401 and verified unknown allowlist to 403 without session cookies', async () => {
+  it('maps rejected and denied outcomes to redirects with only the cleared state cookie', async () => {
     const invalidGrant = await startCeremony()
     mode = 'invalid-grant'
     const rejected = await request(baseUrl)
@@ -592,10 +593,12 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
     expect(rejected.headers['location']).toBe(
       telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.loginRejected),
     )
-    expectStateClear(rejected.headers['set-cookie'] as unknown as string[])
-    expect(
-      (rejected.headers['set-cookie'] as unknown as string[]).join(';'),
-    ).not.toContain('planner-session=')
+    const rejectedCookies = rejected.headers[
+      'set-cookie'
+    ] as unknown as string[]
+    expect(rejectedCookies).toHaveLength(1)
+    expectStateClear(rejectedCookies)
+    expect(rejectedCookies.join(';')).not.toContain('planner-session=')
 
     mode = 'success'
     providerUserId = 42
@@ -610,10 +613,10 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
     expect(denied.headers['location']).toBe(
       telegramOidcResultLocation(TELEGRAM_OIDC_RESULT_CODES.accessDenied),
     )
-    expectStateClear(denied.headers['set-cookie'] as unknown as string[])
-    expect(
-      (denied.headers['set-cookie'] as unknown as string[]).join(';'),
-    ).not.toContain('planner-session=')
+    const deniedCookies = denied.headers['set-cookie'] as unknown as string[]
+    expect(deniedCookies).toHaveLength(1)
+    expectStateClear(deniedCookies)
+    expect(deniedCookies.join(';')).not.toContain('planner-session=')
   })
 
   it('keeps a committed binding across Redis session failure and recovers idempotently', async () => {
@@ -630,10 +633,12 @@ describe('A03 public Telegram OIDC callback with real PostgreSQL and Redis', () 
         TELEGRAM_OIDC_RESULT_CODES.dependencyUnavailable,
       ),
     )
-    expectStateClear(unavailable.headers['set-cookie'] as unknown as string[])
-    expect(
-      (unavailable.headers['set-cookie'] as unknown as string[]).join(';'),
-    ).not.toContain('planner-session=')
+    const unavailableCookies = unavailable.headers[
+      'set-cookie'
+    ] as unknown as string[]
+    expect(unavailableCookies).toHaveLength(1)
+    expectStateClear(unavailableCookies)
+    expect(unavailableCookies.join(';')).not.toContain('planner-session=')
     expect(
       (
         await admin.query(

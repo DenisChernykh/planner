@@ -10240,13 +10240,13 @@
                 }
               },
               "Set-Cookie": {
-                "description": "Local session cookie and cleared OIDC state cookie.",
+                "description": "Cleared OIDC state cookie; success also sets the local session cookie.",
                 "schema": {
                   "items": {
                     "type": "string"
                   },
                   "maxItems": 2,
-                  "minItems": 2,
+                  "minItems": 1,
                   "type": "array"
                 }
               },
@@ -10306,30 +10306,6 @@
             },
             "description": "Telegram login rejected"
           },
-          "403": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "OIDC_ACCESS_DENIED": {
-                    "summary": "Telegram access denied",
-                    "value": {
-                      "code": "OIDC_ACCESS_DENIED",
-                      "detail": "The verified Telegram identity is not allowed to access Planner.",
-                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
-                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-                      "status": 403,
-                      "title": "Telegram access denied",
-                      "type": "https://planner.invalid/problems/oidc-access-denied"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemResponseDto"
-                }
-              }
-            },
-            "description": "Telegram access denied"
-          },
           "413": {
             "content": {
               "application/problem+json": {
@@ -10384,30 +10360,6 @@
               }
             },
             "description": "Validation failed\n\nValidation failed"
-          },
-          "503": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "DEPENDENCY_UNAVAILABLE": {
-                    "summary": "Dependency unavailable",
-                    "value": {
-                      "code": "DEPENDENCY_UNAVAILABLE",
-                      "detail": "A required service is temporarily unavailable.",
-                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
-                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-                      "status": 503,
-                      "title": "Dependency unavailable",
-                      "type": "https://planner.invalid/problems/dependency-unavailable"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemResponseDto"
-                }
-              }
-            },
-            "description": "Dependency unavailable"
           }
         },
         "security": [],

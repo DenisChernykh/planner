@@ -25,10 +25,7 @@ import { RequestValidationError } from '@/platform/http/errors/request-validatio
 import { PublicEndpoint } from '@/platform/http/policy/public-endpoint.decorator'
 
 import { AuthCookieAdapter } from './auth-cookie.adapter'
-import {
-  OIDC_ACCESS_DENIED_PROBLEM,
-  OIDC_LOGIN_REJECTED_PROBLEM,
-} from './auth-problem.definitions'
+import { OIDC_LOGIN_REJECTED_PROBLEM } from './auth-problem.definitions'
 import { OidcStateCookieAdapter } from './oidc-state-cookie.adapter'
 
 const forbiddenInputIssue = Object.freeze({
@@ -285,10 +282,11 @@ export class TelegramOidcController {
         schema: { type: 'string' },
       },
       'Set-Cookie': {
-        description: 'Local session cookie and cleared OIDC state cookie.',
+        description:
+          'Cleared OIDC state cookie; success also sets the local session cookie.',
         schema: {
           type: 'array',
-          minItems: 2,
+          minItems: 1,
           maxItems: 2,
           items: { type: 'string' },
         },
@@ -328,10 +326,8 @@ export class TelegramOidcController {
   @ApiProblemResponses(
     'MALFORMED_REQUEST',
     OIDC_LOGIN_REJECTED_PROBLEM,
-    OIDC_ACCESS_DENIED_PROBLEM,
     'PAYLOAD_TOO_LARGE',
     'VALIDATION_FAILED',
-    'DEPENDENCY_UNAVAILABLE',
   )
   public async callback(
     @Req() request: Request,
