@@ -1998,6 +1998,303 @@
         ],
         "type": "object"
       },
+      "PlanningHistoryActorV1": {
+        "discriminator": {
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PlanningHistoryMemberActorV1"
+          },
+          {
+            "$ref": "#/components/schemas/PlanningHistorySystemActorV1"
+          }
+        ]
+      },
+      "PlanningHistoryMemberActorV1": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "member"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object"
+      },
+      "PlanningHistorySystemActorV1": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "system"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthClosedHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/PlanningHistoryActorV1"
+          },
+          "after": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "closed"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "publication": {
+            "enum": [
+              null
+            ]
+          },
+          "reason": {
+            "enum": [
+              null
+            ]
+          },
+          "report": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryReportRefV1"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "before",
+          "after",
+          "publication",
+          "report"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthGraceStartedHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/PlanningHistoryActorV1"
+          },
+          "after": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "grace_started"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "publication": {
+            "enum": [
+              null
+            ]
+          },
+          "reason": {
+            "enum": [
+              null
+            ]
+          },
+          "report": {
+            "enum": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "before",
+          "after",
+          "publication",
+          "report"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthHistoryEventV1": {
+        "discriminator": {
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PlanningMonthPublishedHistoryEventV1"
+          },
+          {
+            "$ref": "#/components/schemas/PlanningMonthPublicationCancelledHistoryEventV1"
+          },
+          {
+            "$ref": "#/components/schemas/PlanningMonthGraceStartedHistoryEventV1"
+          },
+          {
+            "$ref": "#/components/schemas/PlanningMonthClosedHistoryEventV1"
+          },
+          {
+            "$ref": "#/components/schemas/PlanningMonthReopenedHistoryEventV1"
+          },
+          {
+            "$ref": "#/components/schemas/PlanningMonthReclosedHistoryEventV1"
+          }
+        ]
+      },
+      "PlanningMonthHistoryLifecycleV1": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "ordinary",
+              "reopened"
+            ],
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "grace",
+              "closed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "mode",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthHistoryPublicationRefV1": {
+        "additionalProperties": false,
+        "properties": {
+          "publicationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "publicationId",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthHistoryReportRefV1": {
+        "additionalProperties": false,
+        "properties": {
+          "reportRevisionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reportRevisionId",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthHistoryResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningMonthHistoryEventV1"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "nextCursor": {
+            "nullable": true,
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "planMonthId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "enum": [
+              "planning.month-history.v1"
+            ],
+            "type": "string"
+          },
+          "targetMonth": {
+            "pattern": "^(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(?:0[1-9]|1[0-2])$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "planMonthId",
+          "targetMonth",
+          "current",
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
       "PlanningMonthIndexActionsV1": {
         "additionalProperties": false,
         "properties": {
@@ -2221,6 +2518,220 @@
           "queryLocalDate",
           "items",
           "nextCursor"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthPublicationCancelledHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/PlanningHistoryActorV1"
+          },
+          "after": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "publication_cancelled"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "publication": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryPublicationRefV1"
+          },
+          "reason": {
+            "enum": [
+              null
+            ]
+          },
+          "report": {
+            "enum": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "before",
+          "after",
+          "publication",
+          "report"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthPublishedHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/PlanningHistoryActorV1"
+          },
+          "after": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "published"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "publication": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryPublicationRefV1"
+          },
+          "reason": {
+            "enum": [
+              null
+            ]
+          },
+          "report": {
+            "enum": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "before",
+          "after",
+          "publication",
+          "report"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthReclosedHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/PlanningHistoryActorV1"
+          },
+          "after": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "reclosed"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "publication": {
+            "enum": [
+              null
+            ]
+          },
+          "reason": {
+            "enum": [
+              null
+            ]
+          },
+          "report": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryReportRefV1"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "before",
+          "after",
+          "publication",
+          "report"
+        ],
+        "type": "object"
+      },
+      "PlanningMonthReopenedHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/PlanningHistoryActorV1"
+          },
+          "after": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PlanningMonthHistoryLifecycleV1"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "reopened"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "publication": {
+            "enum": [
+              null
+            ]
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "report": {
+            "enum": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "before",
+          "after",
+          "publication",
+          "report"
         ],
         "type": "object"
       },
@@ -6858,6 +7369,191 @@
         ],
         "type": "object"
       },
+      "TrackingFactCorrectedHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/TrackingHistoryActorV1"
+          },
+          "afterRevision": {
+            "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+          },
+          "beforeRevision": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "compensation": {
+            "enum": [
+              null
+            ]
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "corrected"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "beforeRevision",
+          "afterRevision",
+          "compensation"
+        ],
+        "type": "object"
+      },
+      "TrackingFactHistoryCompensationV1": {
+        "additionalProperties": false,
+        "properties": {
+          "restoredFromRevision": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "undoneEventId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "undoneEventId",
+          "restoredFromRevision"
+        ],
+        "type": "object"
+      },
+      "TrackingFactHistoryEventV1": {
+        "discriminator": {
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrackingFactRecordedHistoryEventV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingFactCorrectedHistoryEventV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingFactTombstonedHistoryEventV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingFactUndoneHistoryEventV1"
+          }
+        ]
+      },
+      "TrackingFactHistoryResponseV1": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currentRevision": {
+            "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+          },
+          "factRecordId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrackingFactHistoryEventV1"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "nextCursor": {
+            "nullable": true,
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "originalActor": {
+            "$ref": "#/components/schemas/TrackingHistoryActorV1"
+          },
+          "schemaVersion": {
+            "enum": [
+              "tracking.fact-history.v1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "factRecordId",
+          "originalActor",
+          "createdAt",
+          "currentRevision",
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "TrackingFactHistoryRevisionV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/TrackingHistoryActorV1"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "recorded",
+              "tombstoned"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "kind",
+          "actor",
+          "occurredAt"
+        ],
+        "type": "object"
+      },
       "TrackingFactMutationResponseV1Dto": {
         "additionalProperties": false,
         "properties": {
@@ -6975,6 +7671,64 @@
           "value",
           "recordedByMemberId",
           "recordedBySystemActorId"
+        ],
+        "type": "object"
+      },
+      "TrackingFactRecordedHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/TrackingHistoryActorV1"
+          },
+          "afterRevision": {
+            "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+          },
+          "beforeRevision": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "compensation": {
+            "enum": [
+              null
+            ]
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "recorded"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "beforeRevision",
+          "afterRevision",
+          "compensation"
         ],
         "type": "object"
       },
@@ -7127,6 +7881,64 @@
         ],
         "type": "object"
       },
+      "TrackingFactTombstonedHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/TrackingHistoryActorV1"
+          },
+          "afterRevision": {
+            "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+          },
+          "beforeRevision": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "compensation": {
+            "enum": [
+              null
+            ]
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "tombstoned"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "beforeRevision",
+          "afterRevision",
+          "compensation"
+        ],
+        "type": "object"
+      },
       "TrackingFactUndoConflictResponseDto": {
         "additionalProperties": false,
         "properties": {
@@ -7202,6 +8014,62 @@
           "code",
           "requestId",
           "conflict"
+        ],
+        "type": "object"
+      },
+      "TrackingFactUndoneHistoryEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/TrackingHistoryActorV1"
+          },
+          "afterRevision": {
+            "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+          },
+          "beforeRevision": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrackingFactHistoryRevisionV1"
+              },
+              {
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "compensation": {
+            "$ref": "#/components/schemas/TrackingFactHistoryCompensationV1"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "undone"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "occurredAt",
+          "reason",
+          "beforeRevision",
+          "afterRevision",
+          "compensation"
         ],
         "type": "object"
       },
@@ -7554,6 +8422,60 @@
           "calendar",
           "viewerAccess",
           "progress"
+        ],
+        "type": "object"
+      },
+      "TrackingHistoryActorV1": {
+        "discriminator": {
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrackingHistoryMemberActorV1"
+          },
+          {
+            "$ref": "#/components/schemas/TrackingHistorySystemActorV1"
+          }
+        ]
+      },
+      "TrackingHistoryMemberActorV1": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "member"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object"
+      },
+      "TrackingHistorySystemActorV1": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "system"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
         ],
         "type": "object"
       },
@@ -16071,6 +16993,190 @@
         ]
       }
     },
+    "/planning/months/{planMonthId}/history": {
+      "get": {
+        "operationId": "PlanningMonthController_history",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "pattern": "^[1-9][0-9]*$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "planMonthId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningMonthHistoryResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PLANNING_AUTHORIZATION_DENIED": {
+                    "summary": "Planning authorization denied",
+                    "value": {
+                      "code": "PLANNING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this planning operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Planning authorization denied",
+                      "type": "https://planner.invalid/problems/planning-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Planning authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "PLAN_MONTH_NOT_FOUND": {
+                    "summary": "Plan month not found",
+                    "value": {
+                      "code": "PLAN_MONTH_NOT_FOUND",
+                      "detail": "The requested plan month was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Plan month not found",
+                      "type": "https://planner.invalid/problems/plan-month-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Plan month not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read the bounded immutable month lifecycle history.",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
     "/planning/months/{planMonthId}/reclose": {
       "post": {
         "operationId": "PlanningMonthController_reclose",
@@ -21604,6 +22710,190 @@
           }
         ],
         "summary": "Append a personal fact tombstone.",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/tracking/facts/{factRecordId}/history": {
+      "get": {
+        "operationId": "FactMaintenanceController_getHistory",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "pattern": "^[1-9][0-9]*$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "factRecordId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingFactHistoryResponseV1"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "Authentication required",
+                    "value": {
+                      "code": "AUTHENTICATION_REQUIRED",
+                      "detail": "A valid browser session is required.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 401,
+                      "title": "Authentication required",
+                      "type": "https://planner.invalid/problems/authentication-required"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_AUTHORIZATION_DENIED": {
+                    "summary": "Tracking authorization denied",
+                    "value": {
+                      "code": "TRACKING_AUTHORIZATION_DENIED",
+                      "detail": "The current principal cannot access this tracking operation.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 403,
+                      "title": "Tracking authorization denied",
+                      "type": "https://planner.invalid/problems/tracking-authorization-denied"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking authorization denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "TRACKING_FACT_TARGET_NOT_FOUND": {
+                    "summary": "Tracking fact target not found",
+                    "value": {
+                      "code": "TRACKING_FACT_TARGET_NOT_FOUND",
+                      "detail": "The requested tracking fact target was not found.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 404,
+                      "title": "Tracking fact target not found",
+                      "type": "https://planner.invalid/problems/tracking-fact-target-not-found"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Tracking fact target not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "detail": "One or more request fields are invalid.",
+                      "errors": [
+                        {
+                          "code": "invalid_type",
+                          "detail": "Field has an invalid type.",
+                          "pointer": "/profile/name~1with~0reserved"
+                        }
+                      ],
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 422,
+                      "title": "Validation failed",
+                      "type": "https://planner.invalid/problems/validation-failed"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemResponseDto"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "examples": {
+                  "DEPENDENCY_UNAVAILABLE": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "code": "DEPENDENCY_UNAVAILABLE",
+                      "detail": "A required service is temporarily unavailable.",
+                      "instance": "urn:request:01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "requestId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "https://planner.invalid/problems/dependency-unavailable"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponseDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read the bounded immutable fact revision history.",
         "tags": [
           "tracking"
         ]

@@ -15,6 +15,7 @@ import type { GetMonthQuery, GetTodayQuery } from './tracking-read.query'
 import type { CloseDayCommand } from './close-day.command'
 import type { PreviewCloseDayQuery } from './preview-close-day.query'
 import type { RecordWeeklyTaskResultCommand } from './record-weekly-task-result.command'
+import type { GetFactHistoryQuery } from './get-fact-history.query'
 
 export const TRACKING_APPLICATION: unique symbol = Symbol(
   'TRACKING_APPLICATION',
@@ -36,6 +37,7 @@ export type TrackingApplication = {
   readonly recordWeeklyTaskResult: RecordWeeklyTaskResultCommand
   readonly undoLastOwnAction: UndoLastOwnActionCommand
   readonly getFactState: GetFactStateQuery
+  readonly getFactHistory: GetFactHistoryQuery
   readonly getGoalProgress: GetGoalProgressQuery
   readonly getToday: GetTodayQuery
   readonly getMonth: GetMonthQuery

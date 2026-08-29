@@ -1599,6 +1599,169 @@ function installPlanningGoalSchemas(document: OpenAPIObject): void {
     },
     ['schemaVersion', 'queryLocalDate', 'items', 'nextCursor'],
   )
+  const historyRef = (name: string): Record<string, unknown> => ({
+    $ref: `#/components/schemas/${name}`,
+  })
+  schemas['PlanningHistoryMemberActorV1'] = object(
+    { kind: { type: 'string', enum: ['member'] }, id: uuid },
+    ['kind', 'id'],
+  )
+  schemas['PlanningHistorySystemActorV1'] = object(
+    {
+      kind: { type: 'string', enum: ['system'] },
+      id: { type: 'string', minLength: 1, maxLength: 32 },
+    },
+    ['kind', 'id'],
+  )
+  schemas['PlanningHistoryActorV1'] = {
+    oneOf: [
+      historyRef('PlanningHistoryMemberActorV1'),
+      historyRef('PlanningHistorySystemActorV1'),
+    ],
+    discriminator: { propertyName: 'kind' },
+  }
+  schemas['PlanningMonthHistoryLifecycleV1'] = object(
+    {
+      status: {
+        type: 'string',
+        enum: ['draft', 'published', 'grace', 'closed'],
+      },
+      mode: { type: 'string', enum: ['ordinary', 'reopened'] },
+      revision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+    },
+    ['status', 'mode', 'revision'],
+  )
+  schemas['PlanningMonthHistoryPublicationRefV1'] = object(
+    {
+      publicationId: uuid,
+      revision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+    },
+    ['publicationId', 'revision'],
+  )
+  schemas['PlanningMonthHistoryReportRefV1'] = object(
+    {
+      reportRevisionId: uuid,
+      revision: { type: 'string', pattern: '^[1-9][0-9]*$' },
+    },
+    ['reportRevisionId', 'revision'],
+  )
+  const monthHistoryEvent = (
+    name: string,
+    kind: string,
+    reason: Record<string, unknown>,
+    publication: Record<string, unknown>,
+    report: Record<string, unknown>,
+  ): void => {
+    schemas[name] = object(
+      {
+        id: uuid,
+        kind: { type: 'string', enum: [kind] },
+        actor: historyRef('PlanningHistoryActorV1'),
+        occurredAt: { type: 'string', format: 'date-time' },
+        reason,
+        before: historyRef('PlanningMonthHistoryLifecycleV1'),
+        after: historyRef('PlanningMonthHistoryLifecycleV1'),
+        publication,
+        report,
+      },
+      [
+        'id',
+        'kind',
+        'actor',
+        'occurredAt',
+        'reason',
+        'before',
+        'after',
+        'publication',
+        'report',
+      ],
+    )
+  }
+  const nullValue = { enum: [null] }
+  const publicationRef = historyRef('PlanningMonthHistoryPublicationRefV1')
+  const reportRef = historyRef('PlanningMonthHistoryReportRefV1')
+  monthHistoryEvent(
+    'PlanningMonthPublishedHistoryEventV1',
+    'published',
+    nullValue,
+    publicationRef,
+    nullValue,
+  )
+  monthHistoryEvent(
+    'PlanningMonthPublicationCancelledHistoryEventV1',
+    'publication_cancelled',
+    nullValue,
+    publicationRef,
+    nullValue,
+  )
+  monthHistoryEvent(
+    'PlanningMonthGraceStartedHistoryEventV1',
+    'grace_started',
+    nullValue,
+    nullValue,
+    nullValue,
+  )
+  monthHistoryEvent(
+    'PlanningMonthClosedHistoryEventV1',
+    'closed',
+    nullValue,
+    nullValue,
+    reportRef,
+  )
+  monthHistoryEvent(
+    'PlanningMonthReopenedHistoryEventV1',
+    'reopened',
+    { type: 'string', minLength: 1, maxLength: 2_000 },
+    nullValue,
+    nullValue,
+  )
+  monthHistoryEvent(
+    'PlanningMonthReclosedHistoryEventV1',
+    'reclosed',
+    nullValue,
+    nullValue,
+    reportRef,
+  )
+  schemas['PlanningMonthHistoryEventV1'] = {
+    oneOf: [
+      historyRef('PlanningMonthPublishedHistoryEventV1'),
+      historyRef('PlanningMonthPublicationCancelledHistoryEventV1'),
+      historyRef('PlanningMonthGraceStartedHistoryEventV1'),
+      historyRef('PlanningMonthClosedHistoryEventV1'),
+      historyRef('PlanningMonthReopenedHistoryEventV1'),
+      historyRef('PlanningMonthReclosedHistoryEventV1'),
+    ],
+    discriminator: { propertyName: 'kind' },
+  }
+  schemas['PlanningMonthHistoryResponseV1'] = object(
+    {
+      schemaVersion: { type: 'string', enum: ['planning.month-history.v1'] },
+      planMonthId: uuid,
+      targetMonth: {
+        type: 'string',
+        pattern: CANONICAL_CALENDAR_MONTH_PATTERN,
+      },
+      current: historyRef('PlanningMonthHistoryLifecycleV1'),
+      items: {
+        type: 'array',
+        maxItems: 50,
+        items: historyRef('PlanningMonthHistoryEventV1'),
+      },
+      nextCursor: {
+        type: 'string',
+        pattern: '^[1-9][0-9]*$',
+        nullable: true,
+      },
+    },
+    [
+      'schemaVersion',
+      'planMonthId',
+      'targetMonth',
+      'current',
+      'items',
+      'nextCursor',
+    ],
+  )
 }
 
 export const PLANNING_OPENAPI_CONTRIBUTION: OpenApiDocumentContribution = {

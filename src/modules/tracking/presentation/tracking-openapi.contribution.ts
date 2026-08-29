@@ -640,6 +640,130 @@ function installTrackingSchemas(document: OpenAPIObject): void {
     'state',
   )
 
+  schemas['TrackingHistoryMemberActorV1'] = object(
+    { kind: { type: 'string', enum: ['member'] }, id: uuid },
+    ['kind', 'id'],
+  )
+  schemas['TrackingHistorySystemActorV1'] = object(
+    {
+      kind: { type: 'string', enum: ['system'] },
+      id: { type: 'string', minLength: 1, maxLength: 32 },
+    },
+    ['kind', 'id'],
+  )
+  schemas['TrackingHistoryActorV1'] = oneOf(
+    ['TrackingHistoryMemberActorV1', 'TrackingHistorySystemActorV1'],
+    'kind',
+  )
+  schemas['TrackingFactHistoryRevisionV1'] = object(
+    {
+      id: uuid,
+      revision: positive,
+      kind: { type: 'string', enum: ['recorded', 'tombstoned'] },
+      actor: ref('TrackingHistoryActorV1'),
+      occurredAt: { type: 'string', format: 'date-time' },
+    },
+    ['id', 'revision', 'kind', 'actor', 'occurredAt'],
+  )
+  schemas['TrackingFactHistoryCompensationV1'] = object(
+    {
+      undoneEventId: uuid,
+      restoredFromRevision: {
+        oneOf: [ref('TrackingFactHistoryRevisionV1'), { enum: [null] }],
+      },
+    },
+    ['undoneEventId', 'restoredFromRevision'],
+  )
+  const factHistoryEvent = (
+    name: string,
+    kind: string,
+    reason: Record<string, unknown>,
+    compensation: Record<string, unknown>,
+  ): void => {
+    schemas[name] = object(
+      {
+        id: uuid,
+        kind: { type: 'string', enum: [kind] },
+        actor: ref('TrackingHistoryActorV1'),
+        occurredAt: { type: 'string', format: 'date-time' },
+        reason,
+        beforeRevision: {
+          oneOf: [ref('TrackingFactHistoryRevisionV1'), { enum: [null] }],
+        },
+        afterRevision: ref('TrackingFactHistoryRevisionV1'),
+        compensation,
+      },
+      [
+        'id',
+        'kind',
+        'actor',
+        'occurredAt',
+        'reason',
+        'beforeRevision',
+        'afterRevision',
+        'compensation',
+      ],
+    )
+  }
+  const nullValue = { enum: [null] }
+  factHistoryEvent(
+    'TrackingFactRecordedHistoryEventV1',
+    'recorded',
+    nullValue,
+    nullValue,
+  )
+  factHistoryEvent(
+    'TrackingFactCorrectedHistoryEventV1',
+    'corrected',
+    { type: 'string', minLength: 1, maxLength: 2_000 },
+    nullValue,
+  )
+  factHistoryEvent(
+    'TrackingFactTombstonedHistoryEventV1',
+    'tombstoned',
+    { type: 'string', minLength: 1, maxLength: 2_000 },
+    nullValue,
+  )
+  factHistoryEvent(
+    'TrackingFactUndoneHistoryEventV1',
+    'undone',
+    nullValue,
+    ref('TrackingFactHistoryCompensationV1'),
+  )
+  schemas['TrackingFactHistoryEventV1'] = oneOf(
+    [
+      'TrackingFactRecordedHistoryEventV1',
+      'TrackingFactCorrectedHistoryEventV1',
+      'TrackingFactTombstonedHistoryEventV1',
+      'TrackingFactUndoneHistoryEventV1',
+    ],
+    'kind',
+  )
+  schemas['TrackingFactHistoryResponseV1'] = object(
+    {
+      schemaVersion: { type: 'string', enum: ['tracking.fact-history.v1'] },
+      factRecordId: uuid,
+      originalActor: ref('TrackingHistoryActorV1'),
+      createdAt: { type: 'string', format: 'date-time' },
+      currentRevision: ref('TrackingFactHistoryRevisionV1'),
+      items: {
+        type: 'array',
+        maxItems: 50,
+        items: ref('TrackingFactHistoryEventV1'),
+      },
+      nextCursor: { ...positive, nullable: true },
+    },
+    [
+      'schemaVersion',
+      'factRecordId',
+      'originalActor',
+      'createdAt',
+      'currentRevision',
+      'items',
+      'nextCursor',
+    ],
+  )
+
   for (const name of [
     'ProblemFieldErrorResponseDto',
     'ProblemResponseDto',

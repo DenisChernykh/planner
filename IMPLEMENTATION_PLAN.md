@@ -2530,12 +2530,12 @@ lifecycle timeline без global audit store.
 - Test: `test/integration/tracking/fact-history.integration.spec.ts`
 - Test: `test/integration/planning/month-history.integration.spec.ts`
 
-- [ ] Зафиксировать bounded pagination/order и exact typed history variants.
-- [ ] Реализовать separate tracking/planning queries в consistent snapshots.
-- [ ] Доказать authors/reasons/revisions/tombstones, concealed foreign state и
+- [x] Зафиксировать bounded pagination/order и exact typed history variants.
+- [x] Реализовать separate tracking/planning queries в consistent snapshots.
+- [x] Доказать authors/reasons/revisions/tombstones, concealed foreign state и
   no reason text in logs/telemetry.
-- [ ] Regenerate OpenAPI, run focused tests and `pnpm check:quick`.
-- [ ] Commit: `feat: expose planner audit histories`.
+- [x] Regenerate OpenAPI, run focused tests and `pnpm check:quick`.
+- [x] Commit: `feat: expose planner audit histories`.
 
 ### F08 — Frontend-safe OIDC result redirect
 

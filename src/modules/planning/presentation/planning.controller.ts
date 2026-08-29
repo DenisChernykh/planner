@@ -135,6 +135,8 @@ import {
   ReopenMonthRequestDto,
 } from './month-lifecycle.dto'
 import { ListPlanMonthsQueryDto } from './month-index.dto'
+import { MonthHistoryQueryDto } from './month-history.dto'
+import type { MonthHistoryPage } from '../application/get-month-history.query'
 import {
   toReportRevisionMutationResponse,
   toPlanMonthMutationResponse,
@@ -1118,6 +1120,34 @@ export class PlanningMonthController {
     @Inject(WORKSPACE_MEMBER_RESOLVER)
     private readonly workspaceMembers: WorkspaceMemberResolver,
   ) {}
+
+  @Get(':planMonthId/history')
+  @ApiOperation({
+    summary: 'Read the bounded immutable month lifecycle history.',
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+  })
+  @ApiQuery({ name: 'cursor', required: false, schema: revisionSchema })
+  @ApiOkResponse({
+    schema: { $ref: '#/components/schemas/PlanningMonthHistoryResponseV1' },
+  })
+  @ApiProblemResponses(...readProblems, PLAN_MONTH_NOT_FOUND_PROBLEM)
+  public history(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PlanMonthPathDto,
+    @Query() query: MonthHistoryQueryDto,
+  ): Promise<MonthHistoryPage> {
+    return this.planning.getMonthHistory.execute({
+      trustedUserId: principal.userId,
+      planMonthId: path.planMonthId,
+      ...(query.limit === undefined ? {} : { limit: query.limit }),
+      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+    })
+  }
 
   @Get()
   @ApiOperation({ summary: 'List monthly planning states for the workspace.' })

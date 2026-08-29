@@ -1837,6 +1837,26 @@ publish versus republish in the wrong lifecycle returns
 nullable latest publication revision. A successful republish appends the next
 publication revision while every old publication remains readable by exact ID.
 
+F07 exposes two module-owned authenticated reads: `GET
+/tracking/facts/{factRecordId}/history` and `GET
+/planning/months/{planMonthId}/history`. Both use newest-first keyset pagination
+with optional `limit` `1..50` (default `20`) and a positive decimal after-revision
+cursor. Member resolution, resource header and `limit + 1` items execute in one
+`REPEATABLE READ READ ONLY` transaction; missing and foreign resources are
+concealed by the existing module 404.
+
+`tracking.fact-history.v1` returns the immutable original actor/time, current
+revision and exact `recorded|corrected|tombstoned|undone` events. Every event
+contains actor/time, nullable bounded reason, typed before/after revision refs
+and nullable compensation with the undone action and restored revision.
+`planning.month-history.v1` returns current lifecycle plus exact
+`published|publication_cancelled|grace_started|closed|reopened|reclosed`
+events with before/after status, mode and lifecycle revision, actor/time,
+nullable reopen reason and nullable publication/report revision refs. The read
+adapters do not duplicate or mutate command policy. Authorized reason text is
+response data only and is excluded from logs and telemetry by the existing
+allowlist-only HTTP/observability boundary.
+
 P02 commands имеют exact contracts:
 
 ```text

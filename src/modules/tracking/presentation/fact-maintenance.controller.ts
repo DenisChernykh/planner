@@ -6,6 +6,7 @@ import {
   Inject,
   Param,
   Post,
+  Query,
 } from '@nestjs/common'
 import {
   ApiBody,
@@ -13,6 +14,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger'
@@ -76,6 +78,8 @@ import {
   TRACKING_WEEKLY_TASK_TARGET_NOT_FOUND_PROBLEM,
   TRACKING_WEEKLY_TASK_TARGET_UNAVAILABLE_PROBLEM,
 } from './tracking-problem.definitions'
+import { FactHistoryQueryDto } from './fact-history.dto'
+import type { FactHistoryPage } from '../application/get-fact-history.query'
 
 const uuid = {
   type: 'string' as const,
@@ -206,6 +210,36 @@ export class FactMaintenanceController {
     @Inject(WORKSPACE_MEMBER_RESOLVER)
     private readonly workspaceMembers: WorkspaceMemberResolver,
   ) {}
+
+  @Get('facts/:factRecordId/history')
+  @ApiOperation({
+    summary: 'Read the bounded immutable fact revision history.',
+  })
+  @ApiParam({ name: 'factRecordId', schema: uuid })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    schema: positive,
+  })
+  @ApiOkResponse({ schema: ref('TrackingFactHistoryResponseV1') })
+  @ApiProblemResponses(...readProblems, TRACKING_FACT_TARGET_NOT_FOUND_PROBLEM)
+  public getHistory(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: FactRecordPathDto,
+    @Query() query: FactHistoryQueryDto,
+  ): Promise<FactHistoryPage> {
+    return this.tracking.getFactHistory.execute({
+      trustedUserId: principal.userId,
+      factRecordId: path.factRecordId,
+      ...(query.limit === undefined ? {} : { limit: query.limit }),
+      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+    })
+  }
 
   @Post('facts/:factRecordId/correct')
   @HttpCode(200)

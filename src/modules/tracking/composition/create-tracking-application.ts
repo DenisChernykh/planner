@@ -30,6 +30,8 @@ import { PrismaFactPersistence } from '../infrastructure/prisma-fact.persistence
 import { PrismaCloseDayPersistence } from '../infrastructure/prisma-close-day.persistence'
 import { PrismaTrackingReadPersistence } from '../infrastructure/prisma-tracking-read.persistence'
 import { PrismaWeeklyTaskResultPersistence } from '../infrastructure/prisma-weekly-task-result.persistence'
+import { GetFactHistoryQuery } from '../application/get-fact-history.query'
+import { PrismaFactHistoryRead } from '../infrastructure/prisma-fact-history.read'
 
 export function createTrackingApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -43,6 +45,7 @@ export function createTrackingApplication(dependencies: {
   const weeklyTasks = new PrismaWeeklyTaskResultPersistence(
     dependencies.database,
   )
+  const factHistory = new PrismaFactHistoryRead(dependencies.database)
   const executor = new DurableCommandExecutor(
     dependencies.transaction,
     new PrismaCommandReceiptAdapter(dependencies.database),
@@ -121,6 +124,11 @@ export function createTrackingApplication(dependencies: {
       facts,
     ),
     getFactState: new GetFactStateQuery(dependencies.workspaceMembers, facts),
+    getFactHistory: new GetFactHistoryQuery(
+      dependencies.workspaceMembers,
+      factHistory,
+      dependencies.transaction,
+    ),
     getGoalProgress: new GetGoalProgressQuery(
       dependencies.workspaceMembers,
       facts,

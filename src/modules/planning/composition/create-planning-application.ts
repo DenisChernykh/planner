@@ -47,6 +47,8 @@ import { PrismaSeedOwnerBinding } from '../infrastructure/prisma-seed-owner-bind
 import { PrismaReopenMonthPersistence } from '../infrastructure/prisma-reopen-month.persistence'
 import { PrismaRecloseMonthPersistence } from '../infrastructure/prisma-reclose-month.persistence'
 import { PrismaListPlanMonthsRead } from '../infrastructure/prisma-list-plan-months.read'
+import { GetMonthHistoryQuery } from '../application/get-month-history.query'
+import { PrismaMonthHistoryRead } from '../infrastructure/prisma-month-history.read'
 
 export function createPlanningApplication(dependencies: {
   readonly database: PrismaClientProvider
@@ -65,6 +67,7 @@ export function createPlanningApplication(dependencies: {
     dependencies.database,
   )
   const listPlanMonthsRead = new PrismaListPlanMonthsRead(dependencies.database)
+  const monthHistory = new PrismaMonthHistoryRead(dependencies.database)
   const closeMonthReport: CloseMonthReportPort =
     dependencies.closeMonthReport ?? {
       build: () =>
@@ -149,6 +152,11 @@ export function createPlanningApplication(dependencies: {
       listPlanMonthsRead,
       dependencies.transaction,
       dependencies.clock,
+    ),
+    getMonthHistory: new GetMonthHistoryQuery(
+      dependencies.workspaceMembers,
+      monthHistory,
+      dependencies.transaction,
     ),
     addDraftGoal: new AddDraftGoalCommand(
       executor,

@@ -2,9 +2,9 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01…F06` реализованы в backend
-contract, `F07…F10` не начаты
-**Backend contract baseline:** `8a28a3ab6f2e466e21ebe409a0ad7f5240c5fedc`
+**Статус:** обязательные backend-требования; `F01…F07` реализованы в backend
+contract, `F08…F10` не начаты
+**Backend contract baseline:** `9dc431a02254ff1f49dc4c587f44da1669c2bef8`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
 ## 1. Назначение и граница
@@ -294,8 +294,8 @@ publication; старые publications доступны по exact ID и не п
 
 ### GAP-07 — Fact and lifecycle audit read models
 
-**Current state:** module-owned append-only history существует, но T07/report
-read models отдают только current values/revisions.
+**Implemented contract:** module-owned append-only history доступна через два
+authenticated bounded read model без global audit store.
 
 **Required surfaces:** authenticated bounded GET:
 
@@ -311,6 +311,22 @@ old/new lifecycle status/mode и publication/report revision refs.
 store. Free text reason разрешено вернуть авторизованным members, но запрещено
 логировать или включать в telemetry. Pagination/order deterministic; response
 принадлежит одному consistent snapshot.
+
+Оба endpoint принимают optional integer `limit` `1..50` (default `20`) и
+optional positive decimal-string `cursor`. Items отсортированы newest-first по
+after revision; `nextCursor` равен after revision последнего item либо `null`.
+Каждая страница, включая member resolution, header и items, читается в одной
+`REPEATABLE READ READ ONLY` transaction.
+
+Fact response `tracking.fact-history.v1` содержит original actor/createdAt,
+current revision и exact variants `recorded|corrected|tombstoned|undone` с
+actor/time, nullable reason, before/after revision refs и compensation detail.
+Month response `planning.month-history.v1` содержит current lifecycle и exact
+variants `published|publication_cancelled|grace_started|closed|reopened|reclosed`
+с before/after status/mode/revision, actor/time, reopen reason и nullable exact
+publication/report refs. Missing и foreign IDs concealed as module-owned 404;
+reason возвращается только в authorized response и не входит в access logs или
+telemetry.
 
 **Acceptance:** `W-06` показывает полную доступную fact chain, а
 `W-07/W-13/W-15` — bounded lifecycle timeline; foreign resources concealed.

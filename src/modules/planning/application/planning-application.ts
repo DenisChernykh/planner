@@ -30,6 +30,7 @@ import type { RepublishMonthCommand } from './republish-month.command'
 import type { ReopenMonthCommand } from './reopen-month.command'
 import type { RecloseMonthCommand } from './reclose-month.command'
 import type { ListPlanMonthsQuery } from './list-plan-months.query'
+import type { GetMonthHistoryQuery } from './get-month-history.query'
 
 export const PLANNING_APPLICATION: unique symbol = Symbol(
   'PLANNING_APPLICATION',
@@ -51,6 +52,7 @@ export type PlanningApplication = {
   readonly getPublishedSnapshot: GetPublishedSnapshotQuery
   readonly getActiveMonth: GetActiveMonthQuery
   readonly listPlanMonths: ListPlanMonthsQuery
+  readonly getMonthHistory: GetMonthHistoryQuery
   readonly addDraftGoal: AddDraftGoalCommand
   readonly updateDraftGoal: UpdateDraftGoalCommand
   readonly removeDraftGoal: RemoveDraftGoalCommand
