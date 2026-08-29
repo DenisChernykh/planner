@@ -89,6 +89,13 @@ class MutationDto {
   public readonly expectedRevision!: string
 }
 
+export class UpdateMonthFocusRequestDto extends MutationDto {
+  @IsString()
+  @Matches(new RegExp(MONTH_FOCUS_PATTERN, 'u'))
+  @MaxLength(500)
+  public readonly focus!: string
+}
+
 export class SourceProvenanceDto {
   @IsIn([1])
   public readonly schemaVersion!: 1

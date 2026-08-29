@@ -105,6 +105,7 @@ import {
   ReorderDraftGoalsRequestDto,
   type SourceProvenanceDto,
   UpdateDraftGoalRequestDto,
+  UpdateMonthFocusRequestDto,
 } from './draft-goal.dto'
 import {
   toDraftEditorResponse,
@@ -261,6 +262,21 @@ const createFromPublicationBodySchema = {
   },
   required: ['commandId', 'sourcePublicationId', 'targetMonth'],
 }
+const updateMonthFocusBodySchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    commandId: uuidSchema,
+    expectedRevision: revisionSchema,
+    focus: {
+      type: 'string' as const,
+      pattern: MONTH_FOCUS_PATTERN,
+      minLength: 1,
+      maxLength: 500,
+    },
+  },
+  required: ['commandId', 'expectedRevision', 'focus'],
+}
 const draftEditorResponseSchema = {
   $ref: '#/components/schemas/DraftEditorResponseV1',
 }
@@ -384,6 +400,7 @@ const draftMutationBaseProblems = [
   PLAN_DRAFT_NOT_EDITABLE_PROBLEM,
   DRAFT_REVISION_CONFLICT_PROBLEM,
 ]
+const focusMutationProblems = [...draftMutationBaseProblems]
 const draftAddProblems = [
   ...draftMutationBaseProblems,
   GOAL_DEFINITION_VERSION_NOT_FOUND_PROBLEM,
@@ -754,6 +771,34 @@ export class PlanningDraftController {
           sourcePublicationId: body.sourcePublicationId,
           targetMonth: body.targetMonth,
         },
+      }),
+    )
+  }
+
+  @Post(':planMonthId/focus')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Replace the editable monthly draft focus.',
+    security: [{ sessionCookie: [], csrfToken: [] }],
+  })
+  @ApiOkResponse({
+    description: 'Draft aggregate reference at the confirmed revision.',
+    schema: draftMutationResponseSchema,
+  })
+  @ApiParam({ name: 'planMonthId', required: true, schema: uuidSchema })
+  @ApiBody({ required: true, schema: updateMonthFocusBodySchema })
+  @ApiProblemResponses(...focusMutationProblems)
+  public async updateMonthFocus(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() path: PlanMonthPathDto,
+    @Body() body: UpdateMonthFocusRequestDto,
+  ): Promise<DraftMutationResponse> {
+    return toDraftMutationResponse(
+      await this.planning.updateMonthFocus.execute({
+        commandId: body.commandId,
+        trustedActor: await this.actor(principal),
+        expectedRevision: BigInt(body.expectedRevision),
+        payload: { planMonthId: path.planMonthId, focus: body.focus },
       }),
     )
   }

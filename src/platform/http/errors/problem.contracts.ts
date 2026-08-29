@@ -149,6 +149,7 @@ export interface GoalDefinitionProblemConflict {
 export interface DraftProblemConflict {
   readonly expectedRevision: string
   readonly currentRevision: string
+  readonly nextAction: 'reload-draft-and-retry'
 }
 
 export interface ProblemDefinition {

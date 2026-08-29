@@ -865,7 +865,11 @@ describe('P03 authenticated typed draft-goal HTTP', () => {
       detail: 'The plan draft changed before this request completed.',
       instance: staleInstanceMatcher,
       requestId: staleRequestIdMatcher,
-      conflict: { expectedRevision: '1', currentRevision: '5' },
+      conflict: {
+        expectedRevision: '1',
+        currentRevision: '5',
+        nextAction: 'reload-draft-and-retry',
+      },
     })
   })
 
@@ -881,8 +885,10 @@ describe('P03 authenticated typed draft-goal HTTP', () => {
     ).toEqual([
       '/planning/drafts',
       '/planning/drafts/empty',
+      '/planning/drafts/from-publication',
       '/planning/drafts/from-seed',
       '/planning/drafts/publication-preview',
+      '/planning/drafts/{planMonthId}/focus',
       '/planning/drafts/{planMonthId}/goals',
       '/planning/drafts/{planMonthId}/goals/reorder',
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/remove',

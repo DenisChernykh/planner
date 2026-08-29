@@ -169,6 +169,7 @@ export const PLANNING_HTTP_PROBLEM_CONTRIBUTION: HttpProblemContribution =
           conflict: {
             expectedRevision: error.expectedRevision.toString(10),
             currentRevision: error.currentRevision.toString(10),
+            nextAction: 'reload-draft-and-retry',
           },
         }
       }

@@ -1798,6 +1798,25 @@ source focus/configuration/order/provenance and new draft identities; source
 publication/month rows stay immutable and destination has no facts, results,
 reports, reminders, progress, publication metadata, expectations or periods.
 
+F05 exposes the existing P01 `UpdateMonthFocus` command through authenticated
+and CSRF-protected `POST /planning/drafts/{planMonthId}/focus`. The path contains
+only the draft plan-month UUID. Its strict body is exactly `{ commandId,
+expectedRevision, focus }`, where `expectedRevision` is a positive decimal
+string and focus keeps its original bytes while requiring a non-whitespace
+character, rejecting U+0000 and allowing at most 500 characters. Actor and
+space remain server-derived; the controller delegates authorization, receipt,
+CAS, history and editability policy to P01. Success and exact replay return
+`200` with `planning.plan-draft.v1` and decimal-string aggregate revision.
+
+F05 uses the shared finite draft-mutation Problems. A stale fresh command
+returns `DRAFT_REVISION_CONFLICT` with `{ expectedRevision, currentRevision,
+nextAction: "reload-draft-and-retry" }` and no receipt, so the same command ID
+can be retried against the new revision. Missing and foreign drafts are both
+`PLAN_DRAFT_NOT_FOUND`; a published/non-editable month is
+`PLAN_DRAFT_NOT_EDITABLE`. A confirmed update increments only draft revision,
+appears in the next preview and immutable publication snapshot, and cannot
+mutate that snapshot after publication.
+
 P02 commands имеют exact contracts:
 
 ```text

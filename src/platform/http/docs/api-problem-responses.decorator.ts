@@ -229,7 +229,11 @@ function problemExample(definition: RegisteredProblemDefinition): object {
       : {}),
     ...(definition.code === 'DRAFT_REVISION_CONFLICT'
       ? {
-          conflict: { expectedRevision: '1', currentRevision: '2' },
+          conflict: {
+            expectedRevision: '1',
+            currentRevision: '2',
+            nextAction: 'reload-draft-and-retry',
+          },
         }
       : {}),
     ...(definition.code === 'PLAN_MONTH_REVISION_CONFLICT'
@@ -319,7 +323,10 @@ function problemExample(definition: RegisteredProblemDefinition): object {
       : {}),
     ...(definition.code === 'TRACKING_FACT_REVISION_CONFLICT'
       ? {
-          conflict: { expectedRevision: '1', currentRevision: '2' },
+          conflict: {
+            expectedRevision: '1',
+            currentRevision: '2',
+          },
         }
       : {}),
     ...(definition.code === 'TRACKING_FACT_UNDO_UNAVAILABLE'

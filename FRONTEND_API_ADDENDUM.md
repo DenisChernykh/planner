@@ -2,9 +2,9 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01`, `F02`, `F03` и `F04`
-реализованы в backend contract, `F05…F10` не начаты
-**Backend contract baseline:** `99f42d09bbb79de8e4c0f12ac099e1d96921c7f3`
+**Статус:** обязательные backend-требования; `F01…F05` реализованы в backend
+contract, `F06…F10` не начаты
+**Backend contract baseline:** `2c5e691eeb16e3a54142eede7927b5449aa9e5e3`
 **Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
 
 ## 1. Назначение и граница
@@ -229,8 +229,8 @@ space or source metadata is returned.
 
 ### GAP-05 — Update month focus HTTP command
 
-**Current state:** `UpdateMonthFocus` реализован в P01 только как application
-command.
+**Implemented state (F05):** `UpdateMonthFocus` из P01 опубликован через strict
+authenticated + CSRF HTTP adapter.
 
 **Required surface:** authenticated + CSRF
 `POST /planning/drafts/{planMonthId}/focus`.
@@ -244,6 +244,25 @@ published/non-editable → read-only conflict; exact replay стабилен.
 
 **Acceptance:** параллельное изменение не затирается, server-confirmed focus
 попадает в publication preview/snapshot, published month неизменяем.
+
+**F05 implementation contract:** authenticated + CSRF
+`POST /planning/drafts/{planMonthId}/focus` requires the session cookie, allowed
+browser origin and session-bound CSRF header. Path `planMonthId` is UUID. The
+JSON body has `additionalProperties: false` and exactly `commandId` (UUID),
+positive decimal-string `expectedRevision` and `focus` (one non-whitespace
+character, no U+0000, maximum 500 characters, preserved without trim or
+normalization). Actor and space are derived from the authenticated principal
+and workspace member resolver.
+
+Success and exact replay return `200 DraftMutationResponseV1`. A fresh command
+increments only draft revision and keeps P01 history/receipt semantics; same
+focus under a fresh command remains a confirmed revision. Stale returns
+`DRAFT_REVISION_CONFLICT` with `expectedRevision`, `currentRevision` and
+`nextAction: "reload-draft-and-retry"`; it writes no receipt and the same
+command ID can be retried with the current revision. Missing/foreign drafts are
+concealed as `PLAN_DRAFT_NOT_FOUND`; published/non-editable months return
+`PLAN_DRAFT_NOT_EDITABLE` and their immutable publication snapshots do not
+change.
 
 ### GAP-06 — Cancel and republish HTTP commands
 

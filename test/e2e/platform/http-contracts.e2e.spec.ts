@@ -461,6 +461,7 @@ describe('S03 HTTP contracts', () => {
       '/planning/drafts/from-publication',
       '/planning/drafts/from-seed',
       '/planning/drafts/publication-preview',
+      '/planning/drafts/{planMonthId}/focus',
       '/planning/drafts/{planMonthId}/goals',
       '/planning/drafts/{planMonthId}/goals/reorder',
       '/planning/drafts/{planMonthId}/goals/{planGoalId}/remove',
@@ -2142,6 +2143,12 @@ describe('S03 HTTP contracts', () => {
         conflict: {
           $ref: '#/components/schemas/DraftProblemConflictResponseDto',
         },
+      },
+    })
+    expect(schemas['DraftProblemConflictResponseDto']).toMatchObject({
+      required: ['expectedRevision', 'currentRevision', 'nextAction'],
+      properties: {
+        nextAction: { enum: ['reload-draft-and-retry'] },
       },
     })
 

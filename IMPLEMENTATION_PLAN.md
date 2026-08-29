@@ -2487,11 +2487,11 @@ CSRF-protected и idempotent HTTP command.
 - Modify: `src/modules/planning/presentation/planning-openapi.contribution.ts`
 - Test: `test/e2e/planning/update-month-focus.e2e.spec.ts`
 
-- [ ] Зафиксировать exact DTO `{ commandId, expectedRevision, focus }`.
-- [ ] Реализовать `POST /planning/drafts/{planMonthId}/focus` поверх P01.
-- [ ] Доказать stale recovery, replay и immutable published state.
-- [ ] Regenerate OpenAPI and run focused contract/E2E.
-- [ ] Commit: `feat: expose planner month focus updates`.
+- [x] Зафиксировать exact DTO `{ commandId, expectedRevision, focus }`.
+- [x] Реализовать `POST /planning/drafts/{planMonthId}/focus` поверх P01.
+- [x] Доказать stale recovery, replay и immutable published state.
+- [x] Regenerate OpenAPI and run focused contract/E2E.
+- [x] Commit: `feat: expose planner month focus updates`.
 
 ### F06 — Cancel and republish HTTP adapters
 

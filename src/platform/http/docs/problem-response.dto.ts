@@ -96,6 +96,9 @@ export class DraftProblemConflictResponseDto {
 
   @ApiProperty({ type: String, pattern: '^[1-9][0-9]*$', example: '2' })
   public readonly currentRevision!: string
+
+  @ApiProperty({ enum: ['reload-draft-and-retry'] })
+  public readonly nextAction!: 'reload-draft-and-retry'
 }
 
 export class DraftConflictProblemResponseDto extends ProblemResponseDto {
