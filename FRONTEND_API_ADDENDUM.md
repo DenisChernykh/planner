@@ -2,10 +2,12 @@
 
 **Версия:** 1.0
 **Дата:** 24 августа 2026 года
-**Статус:** обязательные backend-требования; `F01…F09` реализованы в backend
-contract, `F10` не начат
-**Backend contract baseline:** `cbf26d5b843eb2ca121c8abdbc294319c18e911c`
-**Frontend consumer baseline:** `DenisChernykh/planner-frontend@9eb6e299bb9c36191fbf735004a3a78a1fd78d2f`
+**Статус:** `F01…F09` опубликованы; cross-repository contract handoff `F10`
+проверен и опубликован, remote CI/browser/hosted acceptance остаются отдельными
+evidence
+**Backend contract baseline:** `origin/main@ef76210ad66d442704417addfcf54e7f68cab65d`
+**Frontend consumer baseline:** remote-reachable
+`DenisChernykh/planner-frontend@5e300725b207398da088511eb59f4fd36168d29a`
 
 ## 1. Назначение и граница
 
@@ -395,6 +397,18 @@ checksum committed OpenAPI artifact; local sibling-path и CI retrieval не м�
 frontend regeneration, hosted deployment и browser smoke являются отдельными
 claims.
 
+Проверенный F10 handoff использует backend OpenAPI revision
+`ef76210ad66d442704417addfcf54e7f68cab65d`, SHA-256
+`ed80c89d36296750da11f68f4597a732a8e4e08f82f2e81a6ba8369dd2a9a625` и
+frontend consumer commit
+`5e300725b207398da088511eb59f4fd36168d29a`. Команда
+`pnpm frontend-api:verify` проверяет committed backend bytes, наличие canonical
+OpenAPI revision в local tracking ref `origin/main`, clean frontend HEAD,
+manifest, byte-for-byte snapshot, F01–F09 operation mappings, consumer
+scripts/CI command и generated provenance. Live remote publication отдельно
+зафиксирована через `git ls-remote` в
+`docs/evidence/frontend-api-handoff.md`.
+
 ## 5. Acceptance gate
 
 Backend объявляется frontend-contract-ready только когда одновременно:
@@ -411,3 +425,9 @@ Backend объявляется frontend-contract-ready только когда �
 
 Локальный `pnpm check`, backend Docker smoke или один успешный HTTP request не
 доказывают весь gate.
+
+На 30 августа 2026 года contract-часть `F10` принята независимым review и
+frontend consumer commit опубликован. GitHub source-check для exact F10 commit
+не запускался, потому что после merge PR #1 новая feature-ветка не имеет
+открытого PR. Полный gate этого раздела также не закрыт: mobile/desktop browser
+flows и hosted OIDC/HTTPS/proxy/bot/session smoke не выполнялись.

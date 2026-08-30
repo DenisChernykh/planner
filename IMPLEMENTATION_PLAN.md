@@ -2592,13 +2592,14 @@ capability отдельно от reminder delivery status.
 
 - Modify: `FRONTEND_API_ADDENDUM.md`
 - Create: `docs/evidence/frontend-api-handoff.md`
+- Create: `scripts/openapi/verify-frontend-handoff.mjs`
 - Modify: `package.json`
 
-- [ ] Выбрать один pinned-SHA/checksum handoff для local и CI без copy-paste.
-- [ ] Доказать all 9 capabilities в canonical OpenAPI и consumer regeneration.
-- [ ] Запустить full `pnpm check`; отделить backend/consumer/hosted evidence.
-- [ ] Провести independent cross-repository contract review.
-- [ ] Commit: `docs: verify planner frontend api handoff`.
+- [x] Выбрать один pinned-SHA/checksum handoff для local и CI без copy-paste.
+- [x] Доказать all 9 capabilities в canonical OpenAPI и consumer regeneration.
+- [x] Запустить full `pnpm check`; отделить backend/consumer/hosted evidence.
+- [x] Провести independent cross-repository contract review.
+- [x] Commit: `docs: verify planner frontend api handoff`.
 
 ---
 

@@ -18,6 +18,7 @@
     "check:quick": "pnpm run format:check && pnpm run openapi:drift && pnpm run openapi:lint && pnpm run lint && pnpm run typecheck && pnpm run test:run && pnpm run architecture:check && pnpm run build:compiled",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
+    "frontend-api:verify": "node scripts/openapi/verify-frontend-handoff.mjs",
     "lint": "eslint . --max-warnings=0",
     "openapi:drift": "tsx scripts/openapi/check-openapi-drift.ts",
     "openapi:generate": "tsx scripts/openapi/write-openapi.ts --output docs/api/openapi.json",
