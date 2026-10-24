@@ -13,3 +13,6 @@ coverage/
 .env.production
 .dev.vars
 !*.example
+
+# Local planning source documents
+/Апрель.docx
