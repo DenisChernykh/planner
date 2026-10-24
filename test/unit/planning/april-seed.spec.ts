@@ -181,7 +181,7 @@ describe('P10 versioned April plan seed', () => {
       createHash('sha256')
         .update(JSON.stringify(APRIL_PLAN_SEED), 'utf8')
         .digest('hex'),
-    ).toBe('0edc8269aa68957330dff5fbedc77315783cf12eac95dd601baa65dbe42f6712')
+    ).toBe('b63f910965e2671e2ae174bddd8434a902efc1485ed44404c9520c6ba366ea8d')
   })
 
   it('preserves every approved ambiguous source decision in data', () => {
@@ -206,12 +206,10 @@ describe('P10 versioned April plan seed', () => {
         { label: 'инст' },
       ],
     })
-    expect(goal('goal_08').config.measurement).toMatchObject(
-      {
-        kind: 'checklist',
-        items: [{ label: 'Telegram' }, { label: 'Дзен' }, { label: 'MAX' }],
-      },
-    )
+    expect(goal('goal_08').config.measurement).toMatchObject({
+      kind: 'checklist',
+      items: [{ label: 'Telegram' }, { label: 'Дзен' }, { label: 'MAX' }],
+    })
     expect(goal('goal_09').config.measurement).toEqual({
       kind: 'quantity',
       mode: 'targeted',
@@ -226,8 +224,8 @@ describe('P10 versioned April plan seed', () => {
     })
     expect(
       APRIL_PLAN_SEED.goals
-        .filter(({ seedGoalKey }) =>
-          seedGoalKey.startsWith('memberB_outreach_week_'),
+        .filter(
+          ({ config }) => config.repetition.kind === 'weekly_planned_task',
         )
         .map(({ owner, config }) => ({ owner, repetition: config.repetition })),
     ).toEqual([
@@ -311,22 +309,19 @@ describe('P10 versioned April plan seed', () => {
         sourcePage: 7,
         rawValue: 'ИТОГИ Апреля: УЧАСТНИК Б',
         disposition: 'provenance_summary',
-        resolution:
-          'Показатель 104',
+        resolution: 'Показатель 104',
       },
       {
         sourcePage: 7,
         rawValue: 'Показатель 128',
         disposition: 'derived_report_only',
-        resolution:
-          'Показатель 048',
+        resolution: 'Показатель 048',
       },
       {
         sourcePage: 7,
         rawValue: 'ИТОГИ Апреля: УЧАСТНИК А',
         disposition: 'provenance_summary',
-        resolution:
-          'Показатель 105',
+        resolution: 'Показатель 105',
       },
     ])
   })
@@ -343,13 +338,13 @@ describe('P10 versioned April plan seed', () => {
       }),
     ).toBe(true)
     expect(
-      resolved.goals.find(({ seedGoalKey }) => seedGoalKey === 'memberA_fitness')
-        ?.config.scope,
+      resolved.goals.find(
+        ({ seedGoalKey }) => seedGoalKey === 'memberA_fitness',
+      )?.config.scope,
     ).toEqual({ kind: 'personal', ownerMemberId: denisMemberId })
     expect(
-      resolved.goals.find(
-        ({ seedGoalKey }) => seedGoalKey === 'goal_17',
-      )?.config.scope,
+      resolved.goals.find(({ seedGoalKey }) => seedGoalKey === 'goal_17')
+        ?.config.scope,
     ).toEqual({ kind: 'personal', ownerMemberId: tanyaMemberId })
     expect(
       resolved.goals.find(({ seedGoalKey }) => seedGoalKey === 'shared_order')

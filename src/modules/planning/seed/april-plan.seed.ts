@@ -175,12 +175,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       measurement: { kind: 'actual_time', start: '08:00', end: '09:30' },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      1,
-      'Показатель 102',
-      '/30',
-      'Показатель 063',
-    ),
+    provenance(1, 'Показатель 102', '/30', 'Показатель 063'),
   ),
   goal(
     'memberB_sleep_time',
@@ -194,12 +189,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       measurement: { kind: 'actual_time', start: '21:00', end: '23:00' },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      1,
-      'Показатель 081',
-      '/30',
-      'Показатель 064',
-    ),
+    provenance(1, 'Показатель 081', '/30', 'Показатель 064'),
   ),
   goal(
     'goal_29',
@@ -208,12 +198,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Режим',
     'memberB',
     targetedQuantity({ kind: 'daily' }, 'минуты', 'add', '60'),
-    provenance(
-      1,
-      'Показатель 004',
-      '/30',
-      'Показатель 092',
-    ),
+    provenance(1, 'Показатель 004', '/30', 'Показатель 092'),
   ),
   goal(
     'goal_22',
@@ -249,12 +234,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
         ],
       },
     },
-    provenance(
-      1,
-      'Показатель 094',
-      null,
-      'Показатель 130',
-    ),
+    provenance(1, 'Показатель 094', null, 'Показатель 130'),
   ),
   goal(
     'memberB_water',
@@ -263,12 +243,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Здоровье',
     'memberB',
     targetedQuantity({ kind: 'daily' }, 'мл', 'add', '1200'),
-    provenance(
-      1,
-      'Показатель 046',
-      '/30',
-      'Показатель 065',
-    ),
+    provenance(1, 'Показатель 046', '/30', 'Показатель 065'),
   ),
   goal(
     'goal_36',
@@ -277,12 +252,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Питание',
     'memberB',
     quotaBoolean('monthly', '26'),
-    provenance(
-      1,
-      'Показатель 056',
-      '/26',
-      'Показатель 129',
-    ),
+    provenance(1, 'Показатель 056', '/26', 'Показатель 129'),
   ),
   goal(
     'memberB_meal_schedule',
@@ -318,12 +288,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
         ],
       },
     },
-    provenance(
-      2,
-      'Показатель 118',
-      '/30',
-      'Показатель 045',
-    ),
+    provenance(2, 'Показатель 118', '/30', 'Показатель 045'),
   ),
   goal(
     'memberB_fresh_juice',
@@ -332,12 +297,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Питание',
     'memberB',
     quotaBoolean('monthly', '8'),
-    provenance(
-      2,
-      'Показатель 047',
-      '/8',
-      'Flexible monthly Boolean N=8.',
-    ),
+    provenance(2, 'Показатель 047', '/8', 'Flexible monthly Boolean N=8.'),
   ),
   goal(
     'memberB_vitamin_d',
@@ -364,12 +324,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Уход',
     'memberB',
     quotaBoolean('monthly', '8'),
-    provenance(
-      2,
-      'Показатель 125',
-      '/8',
-      'Flexible monthly Boolean N=8.',
-    ),
+    provenance(2, 'Показатель 125', '/8', 'Flexible monthly Boolean N=8.'),
   ),
   goal(
     'memberB_face_massage',
@@ -401,12 +356,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      2,
-      'Показатель 126',
-      '/8',
-      'Показатель 083',
-    ),
+    provenance(2, 'Показатель 126', '/8', 'Показатель 083'),
   ),
   goal(
     'memberB_meditations',
@@ -415,12 +365,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Самочувствие',
     'memberB',
     quotaBoolean('monthly', '16'),
-    provenance(
-      3,
-      'Показатель 123',
-      '/20',
-      'Показатель 095',
-    ),
+    provenance(3, 'Показатель 123', '/20', 'Показатель 095'),
   ),
   goal(
     'goal_14',
@@ -429,12 +374,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Самочувствие',
     'memberB',
     dailyBoolean(),
-    provenance(
-      3,
-      'Показатель 070',
-      '/30',
-      'Показатель 067',
-    ),
+    provenance(3, 'Показатель 070', '/30', 'Показатель 067'),
   ),
   goal(
     'memberB_fitness',
@@ -466,12 +406,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      3,
-      'Показатель 101',
-      '/8',
-      'Показатель 059',
-    ),
+    provenance(3, 'Показатель 101', '/8', 'Показатель 059'),
   ),
   goal(
     'memberB_mfr',
@@ -480,12 +415,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Активность',
     'memberB',
     quotaBoolean('monthly', '8'),
-    provenance(
-      3,
-      'Показатель 124',
-      '/8',
-      'Показатель 016',
-    ),
+    provenance(3, 'Показатель 124', '/8', 'Показатель 016'),
   ),
   goal(
     'memberB_steps',
@@ -494,12 +424,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Активность',
     'memberB',
     targetedQuantity({ kind: 'weekly', n: '5' }, 'шаги', 'latest', '7000'),
-    provenance(
-      3,
-      'Показатель 109',
-      '/20',
-      'Показатель 028',
-    ),
+    provenance(3, 'Показатель 109', '/20', 'Показатель 028'),
   ),
   goal(
     'goal_31',
@@ -531,12 +456,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      3,
-      'Показатель 110',
-      '/8',
-      'Показатель 027',
-    ),
+    provenance(3, 'Показатель 110', '/8', 'Показатель 027'),
   ),
   goal(
     'shared_activity',
@@ -565,12 +485,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      4,
-      'Показатель 007',
-      '/10',
-      'Показатель 058',
-    ),
+    provenance(4, 'Показатель 007', '/10', 'Показатель 058'),
   ),
   goal(
     'memberB_relax_evening',
@@ -579,12 +494,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Самочувствие',
     'memberB',
     quotaBoolean('monthly', '8'),
-    provenance(
-      4,
-      'Показатель 119',
-      '/8',
-      'Показатель 017',
-    ),
+    provenance(4, 'Показатель 119', '/8', 'Показатель 017'),
   ),
   goal(
     'memberB_new_skill',
@@ -593,12 +503,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Развитие',
     'memberB',
     quotaBoolean('weekly', '1'),
-    provenance(
-      4,
-      'Показатель 002',
-      '/4',
-      'Показатель 025',
-    ),
+    provenance(4, 'Показатель 002', '/4', 'Показатель 025'),
   ),
   goal(
     'goal_32',
@@ -620,12 +525,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      4,
-      'Показатель 079',
-      '/8',
-      'Показатель 015',
-    ),
+    provenance(4, 'Показатель 079', '/8', 'Показатель 015'),
   ),
   goal(
     'goal_08',
@@ -646,12 +546,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      4,
-      'Показатель 080',
-      '/8',
-      'Показатель 014',
-    ),
+    provenance(4, 'Показатель 080', '/8', 'Показатель 014'),
   ),
   goal(
     'goal_09',
@@ -660,12 +555,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Работа',
     'memberB',
     targetedQuantity({ kind: 'monthly', n: '1' }, 'коллаборации', 'add', '7'),
-    provenance(
-      5,
-      'Показатель 077',
-      null,
-      'Показатель 021',
-    ),
+    provenance(5, 'Показатель 077', null, 'Показатель 021'),
   ),
   goal(
     'goal_17',
@@ -674,12 +564,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Работа',
     'memberB',
     quotaBoolean('weekly', '3'),
-    provenance(
-      5,
-      'Показатель 100',
-      '/12',
-      'Показатель 037',
-    ),
+    provenance(5, 'Показатель 100', '/12', 'Показатель 037'),
   ),
   goal(
     'goal_41',
@@ -688,12 +573,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Проект',
     'memberB',
     quotaBoolean('weekly', '5'),
-    provenance(
-      5,
-      'Показатель 098',
-      '/20',
-      'Показатель 026',
-    ),
+    provenance(5, 'Показатель 098', '/20', 'Показатель 026'),
   ),
   goal(
     'memberB_promote_memberA',
@@ -732,12 +612,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      5,
-      'Показатель 107',
-      '/8',
-      'Показатель 038',
-    ),
+    provenance(5, 'Показатель 107', '/8', 'Показатель 038'),
   ),
   goal(
     'memberA_fitness',
@@ -746,12 +621,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Активность',
     'memberA',
     quotaBoolean('weekly', '2'),
-    provenance(
-      5,
-      'Показатель 050',
-      '/8',
-      'Показатель 034',
-    ),
+    provenance(5, 'Показатель 050', '/8', 'Показатель 034'),
   ),
   goal(
     'memberA_steps',
@@ -760,12 +630,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Активность',
     'memberA',
     targetedQuantity({ kind: 'weekly', n: '5' }, 'шаги', 'latest', '7000'),
-    provenance(
-      5,
-      'Показатель 109',
-      '/20',
-      'Показатель 035',
-    ),
+    provenance(5, 'Показатель 109', '/20', 'Показатель 035'),
   ),
   goal(
     'goal_04',
@@ -774,12 +639,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Питание',
     'memberA',
     dailyBoolean(),
-    provenance(
-      5,
-      'Показатель 052',
-      '/30',
-      'Показатель 036',
-    ),
+    provenance(5, 'Показатель 052', '/30', 'Показатель 036'),
   ),
   goal(
     'shared_order',
@@ -788,12 +648,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Дом',
     'shared',
     dailyBoolean(),
-    provenance(
-      6,
-      'Показатель 049',
-      '/30',
-      'Показатель 023',
-    ),
+    provenance(6, 'Показатель 049', '/30', 'Показатель 023'),
   ),
   goal(
     'goal_01',
@@ -802,12 +657,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Питание',
     'memberA',
     dailyBoolean(),
-    provenance(
-      6,
-      'Показатель 051',
-      '/30',
-      'Показатель 036',
-    ),
+    provenance(6, 'Показатель 051', '/30', 'Показатель 036'),
   ),
   goal(
     'goal_06',
@@ -821,40 +671,15 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
       measurement: { kind: 'text' },
       checkpoints: NO_CHECKPOINTS,
     },
-    provenance(
-      6,
-      'Показатель 001',
-      null,
-      'Показатель 022',
-    ),
+    provenance(6, 'Показатель 001', null, 'Показатель 022'),
   ),
   ...(
     [
-      [
-        'goal_24',
-        '1',
-        'Показатель 158',
-        'Показатель 003',
-      ],
-      [
-        'goal_25',
-        '2',
-        'Показатель 157',
-        'Показатель 006',
-      ],
-      [
-        'goal_26',
-        '3',
-        'Показатель 184',
-        'Показатель 008',
-      ],
+      ['goal_24', '1', 'Показатель 158', 'Показатель 003'],
+      ['goal_25', '2', 'Показатель 157', 'Показатель 006'],
+      ['goal_26', '3', 'Показатель 184', 'Показатель 008'],
       ['goal_27', '4', 'глемпенги', 'Показатель 010'],
-      [
-        'goal_28',
-        '5',
-        'Показатель 195',
-        'Показатель 011',
-      ],
+      ['goal_28', '5', 'Показатель 195', 'Показатель 011'],
     ] as const
   ).map(([seedGoalKey, weekOrdinal, taskText, rawValue]) =>
     goal(
@@ -884,12 +709,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Работа',
     'memberB',
     informationalQuantity('руб.', 'add'),
-    provenance(
-      7,
-      'Показатель 076',
-      null,
-      'Показатель 061',
-    ),
+    provenance(7, 'Показатель 076', null, 'Показатель 061'),
   ),
   goal(
     'goal_37',
@@ -898,12 +718,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Контент',
     'memberB',
     targetedQuantity({ kind: 'monthly', n: '1' }, 'подписчики', 'latest', '50'),
-    provenance(
-      7,
-      'Показатель 090',
-      '/50',
-      'Показатель 020',
-    ),
+    provenance(7, 'Показатель 090', '/50', 'Показатель 020'),
   ),
   goal(
     'memberB_max_followers',
@@ -912,12 +727,7 @@ const GOALS: readonly AprilPlanSeedGoalV1[] = [
     'Контент',
     'memberB',
     informationalQuantity('подписчики', 'latest'),
-    provenance(
-      7,
-      'Показатель 089',
-      null,
-      'Показатель 019',
-    ),
+    provenance(7, 'Показатель 089', null, 'Показатель 019'),
   ),
 ]
 

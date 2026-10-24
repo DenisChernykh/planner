@@ -193,10 +193,10 @@ describe('T07 Today and Month read models on PostgreSQL', () => {
     const configByTitle = new Map(
       snapshots.rows.map((row) => [row.title, row.config]),
     )
-    moodCheckpointId = configByTitle.get('Показатель 086')!
-      .checkpoints!.items![0]!.checkpointId
-    fitnessVariantId = configByTitle.get('Показатель 136')!
-      .measurement!.variants![0]!.variantId
+    moodCheckpointId =
+      configByTitle.get('Показатель 086')!.checkpoints!.items![0]!.checkpointId
+    fitnessVariantId =
+      configByTitle.get('Показатель 136')!.measurement!.variants![0]!.variantId
     reelsItemIds = configByTitle
       .get('Показатель 111')!
       .measurement!.items!.map((item) => item.itemId)

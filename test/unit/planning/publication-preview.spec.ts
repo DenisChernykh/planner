@@ -460,7 +460,7 @@ describe('P06 publication preview projector', () => {
       '"blockers":[{"code":"incompatible","detail":"Publication materialization exceeds 10000 rows.","planGoalId":null,"pointer":"/goals"},{"code":"incompatible","detail":"Target month is not current or next.","planGoalId":null,"pointer":"/targetMonth"}]',
     )
     expect(value.previewHash).toBe(
-      '9e6dd67d643d225246d48f080e9861944baff22f2cbc51cabf3df54c38261046',
+      'abf78617a87c35e5f367d38ff29cd22ab8f76d657001867927270a23ec11a9b7',
     )
   })
 

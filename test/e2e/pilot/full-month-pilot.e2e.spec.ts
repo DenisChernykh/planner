@@ -732,12 +732,8 @@ describe('E01 full backend pilot acceptance', () => {
     expect(reminderDeliveries[0]).toMatchObject({
       chatId: BigInt(firstTelegramId),
     })
-    expect(reminderDeliveries[0]!.text).not.toContain(
-      'Показатель 053',
-    )
-    expect(reminderDeliveries[0]!.text).not.toContain(
-      'Показатель 054',
-    )
+    expect(reminderDeliveries[0]!.text).not.toContain('Показатель 053')
+    expect(reminderDeliveries[0]!.text).not.toContain('Показатель 054')
     if (externalFixture !== null) {
       await expect(
         pool.query(
