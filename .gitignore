@@ -8,3 +8,8 @@ coverage/
 .env.*
 !.env.example
 *.log
+.pnpm-store/
+.env.local
+.env.production
+.dev.vars
+!*.example

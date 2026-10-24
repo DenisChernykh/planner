@@ -1,39 +1,39 @@
-# Planner
+# Planner — backend планирования
 
-Закрытый планировщик месяца с web- и Telegram-интерфейсами. Репозиторий пока
-содержит утверждённую продуктовую и backend-спецификацию; приложение будет
-собрано по небольшим задачам из implementation plan.
+Backend системы месячных планов, целей и учёта результатов на NestJS и PostgreSQL.
 
-## Документы
+## Возможности
 
-- [PRD](./PRD.md)
-- [User Flows](./USER_FLOWS.md)
-- [Screen Map](./SCREEN_MAP.md)
-- [Backend Technical Design](./TECHNICAL_DESIGN.md)
-- [Frontend API Addendum](./FRONTEND_API_ADDENDUM.md)
-- [Implementation Plan](./IMPLEMENTATION_PLAN.md)
-- [Инструкции для ИИ-агента](./AGENTS.md)
+- Черновики планов, публикация месяца и работа с целями.
+- Фактические результаты и вычисление прогресса.
+- Web- и Telegram-адаптеры, авторизация и фоновые процессы.
 
-Исходный бумажный план сохранён в [`monthly-plan-template`](./monthly-plan-template). Его
-неоднозначности разрешены в стартовом seed как пользовательские данные, а не
-константы кода.
+## Инженерные акценты
 
-Planner и `nest-js-starter` являются независимыми репозиториями. Перенос
-foundation или reusable capabilities в любую сторону выполняется отдельной,
-проверяемой задачей с provenance.
+- Моделирование предметной области и жизненного цикла планов.
+- Разделение доменных вычислений и инфраструктуры.
+- Контрактные, модульные и интеграционные проверки API.
 
-## Локальный Telegram ingress
+## Стек
 
-Bot ingress является opt-in частью API process. По умолчанию
-`TELEGRAM_INGRESS_MODE=disabled`. Для локального long polling задайте
-`TELEGRAM_INGRESS_MODE=get_updates` и секрет `TELEGRAM_BOT_TOKEN`; production
-режим остаётся заблокирован до отдельной deployment-задачи. Один process
-использует PostgreSQL offset и принимает только private messages и callbacks.
+TypeScript, NestJS, Prisma.
 
-Локальный `planner-worker` также использует `TELEGRAM_BOT_TOKEN` для отправки
-напоминаний; Compose не запускает worker без этого секрета.
+## Навигация по коду
 
-Authenticated web navigation к боту настраивается отдельно через optional
-`TELEGRAM_BOT_URL=https://t.me/<username>`. Без него capability имеет status
-`disabled`; unsafe/non-canonical значение возвращается как `misconfigured` и
-не отражается в HTTP response.
+- [src/modules/](src/modules/) — предметные модули.
+- [src/](src/) — исходный код.
+- [prisma/](prisma/) — схема данных и миграции.
+- [test/](test/) — автоматизированные проверки.
+- [docs/](docs/) — архитектура и документация.
+
+## Разработка
+
+Инструменты: Node.js 24, pnpm@11.15.1.
+
+```sh
+pnpm install
+pnpm check
+pnpm test
+pnpm build
+pnpm lint
+```
